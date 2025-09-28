@@ -141,9 +141,9 @@ new class extends Component {
                                             {{ str_replace('-', ' ', $withdrawal->status) }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                    {{-- <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $withdrawal->transaction_id ?? 'N/A' }}
-                                    </td>
+                                    </td> --}}
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $withdrawal->paid_date ? \Carbon\Carbon::parse($withdrawal->paid_date)->format('M j, Y') : 'N/A' }}
                                     </td>
@@ -216,13 +216,13 @@ new class extends Component {
                         </flux:select>
 
                         <!-- Transaction ID -->
-                        <flux:input
+                        {{-- <flux:input
                             wire:model="transaction_id"
                             :label="__('Transaction ID')"
                             type="text"
                             :placeholder="__('Enter transaction ID')"
                             data-test="transaction-id-input"
-                        />
+                        /> --}}
 
                         <!-- Paid Date -->
                         <flux:input
