@@ -12,15 +12,26 @@ new class extends Component {
     public $transaction_id;
     public $paid_date;
     public $showModal = false;
+    public $totalAmount = 0;
+    public $paidAmount = 0;
+    public $pendingAmount = 0;
 
     public function mount()
     {
         $this->loadWithdrawals();
+        $this->calculateStatistics();
     }
 
     public function loadWithdrawals()
     {
         $this->withdrawals = Withdrawal::where('user_id', auth()->id())->latest()->get();
+    }
+
+    public function calculateStatistics()
+    {
+        $this->totalAmount = $this->withdrawals->sum('amount');
+        $this->paidAmount = $this->withdrawals->where('status', 'paid')->sum('amount');
+        $this->pendingAmount = $this->withdrawals->where('status', 'under-audit')->sum('amount');
     }
 
     public function create()
@@ -38,6 +49,7 @@ new class extends Component {
 
         $this->resetForm();
         $this->loadWithdrawals();
+        $this->calculateStatistics();
         $this->showModal = false;
     }
 
@@ -73,6 +85,7 @@ new class extends Component {
 
         $this->resetForm();
         $this->loadWithdrawals();
+        $this->calculateStatistics();
         $this->showModal = false;
     }
 
@@ -84,6 +97,7 @@ new class extends Component {
 
         $withdrawal->delete();
         $this->loadWithdrawals();
+        $this->calculateStatistics();
     }
 
     public function resetForm()
@@ -108,6 +122,22 @@ new class extends Component {
     <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-xl sm:rounded-lg">
             <div class="p-6 lg:p-8">
+                <!-- Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Withdrawals</h3>
+                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">${{ number_format($totalAmount, 2) }}</p>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Paid Amount</h3>
+                        <p class="text-2xl font-semibold text-green-600 dark:text-green-400">${{ number_format($paidAmount, 2) }}</p>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Under-Audit Amount</h3>
+                        <p class="text-2xl font-semibold text-yellow-600 dark:text-yellow-400">${{ number_format($pendingAmount, 2) }}</p>
+                    </div>
+                </div>
+
                 <!-- Header -->
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Withdrawals</h2>
