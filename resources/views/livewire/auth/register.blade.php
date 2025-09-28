@@ -40,6 +40,9 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
         $validated['password'] = Hash::make($validated['password']);
 
+        $validated['riscoind_id'] = strtoupper($validated['riscoin_id']);
+        $validated['inviters_code'] = strtoupper($validated['inviters_code']);
+
         event(new Registered(($user = User::create($validated))));
 
         //add role to user
