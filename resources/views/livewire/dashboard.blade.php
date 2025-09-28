@@ -1,0 +1,231 @@
+<?php
+
+use Livewire\Volt\Component;
+use App\Models\User;
+use App\Models\Withdrawal;
+use App\Models\Investment;
+use Illuminate\Support\Facades\Auth;
+
+new class extends Component {
+    public $totalTeamWithdrawals = 0;
+    public $totalTeamMembers = 0;
+    public $totalDirectMembers = 0;
+    public $totalTeamFirstInvestments = 0;
+    public $currentNode;
+    public $riscoinId;
+
+    public function mount($riscoinId = null)
+    {
+        if ($riscoinId) {
+            // Viewing a specific user's team data
+            $this->currentNode = User::where('riscoin_id', $riscoinId)
+                ->with(['invites' => function($query) {
+                    $query->withCount('invites');
+                }])
+                ->firstOrFail();
+        } else {
+            // Viewing current user's team data
+            $this->currentNode = Auth::user();
+            $this->currentNode->load(['invites' => function($query) {
+                $query->withCount('invites');
+            }]);
+        }
+
+        $this->riscoinId = $riscoinId;
+        $this->calculateStatistics();
+    }
+
+    private function calculateStatistics()
+    {
+        // Direct members count
+        $this->totalDirectMembers = $this->currentNode->invites->count();
+
+        // Calculate total team members and investments recursively
+        $this->totalTeamMembers = 1; // Start with 1 to include current node
+        $this->totalTeamFirstInvestments = $this->currentNode->invested_amount ?? 0;
+
+        $currentLevel = $this->currentNode->invites;
+
+        while ($currentLevel->isNotEmpty()) {
+            $this->totalTeamMembers += $currentLevel->count();
+            $this->totalTeamFirstInvestments += $currentLevel->sum('invested_amount');
+
+            $nextLevel = collect();
+            foreach ($currentLevel as $user) {
+                $user->load('invites'); // Load invites for the next level
+                $nextLevel = $nextLevel->merge($user->invites);
+            }
+            $currentLevel = $nextLevel;
+        }
+
+        // Get all team member IDs for withdrawal calculation
+        $teamMemberIds = $this->getAllTeamMemberIds($this->currentNode->id);
+
+        // Calculate total team withdrawals
+        $this->totalTeamWithdrawals = Withdrawal::whereIn('user_id', $teamMemberIds)
+            ->sum('amount');
+    }
+
+    private function getAllTeamMemberIds($userId)
+    {
+        $memberIds = [$userId];
+
+        // Get the user with their invites
+        $user = User::with('invites')->find($userId);
+        $currentLevel = $user->invites;
+
+        while ($currentLevel->isNotEmpty()) {
+            $currentLevelIds = $currentLevel->pluck('id')->toArray();
+            $memberIds = array_merge($memberIds, $currentLevelIds);
+
+            $nextLevel = collect();
+            foreach ($currentLevel as $member) {
+                $member->load('invites');
+                $nextLevel = $nextLevel->merge($member->invites);
+            }
+            $currentLevel = $nextLevel;
+        }
+
+        return array_unique($memberIds);
+    }
+}; ?>
+
+<div>
+    <!-- Breadcrumb Navigation -->
+    <nav class="flex mb-6" aria-label="Breadcrumb">
+        <ol class="inline-flex items-center space-x-1 md:space-x-3">
+            <li>
+                <a href="{{ route('dashboard') }}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                    My Dashboard
+                </a>
+            </li>
+            @if($riscoinId)
+            <li>
+                <span class="mx-2 text-gray-400">/</span>
+                <span class="text-gray-500 dark:text-gray-400">Team Stats: {{ $currentNode->riscoin_id }}</span>
+            </li>
+            @endif
+        </ol>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold dark:text-white">
+            @if($riscoinId)
+                Team Statistics: {{ $currentNode->name }} ({{ $currentNode->riscoin_id }})
+            @else
+                My Team Statistics
+            @endif
+        </h1>
+        <p class="text-gray-600 dark:text-gray-400 mt-2">Real-time team performance metrics</p>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <!-- Team Withdrawals Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900 mr-4">
+                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Total Team Withdrawals</h3>
+                    <p class="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-2">${{ number_format($totalTeamWithdrawals, 2) }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Team Members Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 dark:bg-green-900 mr-4">
+                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Total Team Members</h3>
+                    <p class="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">{{ number_format($totalTeamMembers) }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Direct Members Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 dark:bg-purple-900 mr-4">
+                    <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Direct Members</h3>
+                    <p class="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-2">{{ number_format($totalDirectMembers) }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Team Investments Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-orange-100 dark:bg-orange-900 mr-4">
+                    <svg class="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Team Investments</h3>
+                    <p class="text-3xl font-bold text-orange-600 dark:text-orange-400 mt-2">${{ number_format($totalTeamFirstInvestments, 2) }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Information -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Navigation Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Quick Actions</h3>
+            <div class="space-y-3">
+                <a href="{{ route('genealogy', ['riscoinId' => $riscoinId ?? $currentNode->riscoin_id]) }}"
+                   class="flex items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition duration-200">
+                    <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                    </svg>
+                    <span class="text-blue-600 dark:text-blue-400 font-medium">View Genealogy Tree</span>
+                </a>
+
+                @if($riscoinId)
+                <a href="{{ route('dashboard') }}"
+                   class="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition duration-200">
+                    <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                    <span class="text-gray-600 dark:text-gray-400 font-medium">Back to My Dashboard</span>
+                </a>
+                @endif
+            </div>
+        </div>
+
+        <!-- Team Summary Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Team Summary</h3>
+            <div class="space-y-2">
+                <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+                    <span class="text-gray-600 dark:text-gray-400">Direct Team:</span>
+                    <span class="font-semibold dark:text-white">{{ number_format($totalDirectMembers) }} members</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+                    <span class="text-gray-600 dark:text-gray-400">Extended Network:</span>
+                    <span class="font-semibold dark:text-white">{{ number_format($totalTeamMembers - $totalDirectMembers - 1) }} members</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-gray-600 dark:text-gray-400">Total Network:</span>
+                    <span class="font-semibold dark:text-white">{{ number_format($totalTeamMembers) }} members</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
