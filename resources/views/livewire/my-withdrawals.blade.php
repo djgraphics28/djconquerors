@@ -6,6 +6,7 @@ use Livewire\Volt\Component;
 new class extends Component {
     public $withdrawals;
     public $withdrawal;
+    public $isEdit = false;
     public $amount;
     public $status;
     public $transaction_id;
@@ -14,7 +15,6 @@ new class extends Component {
 
     public function mount()
     {
-        // dd($this->withdrawal);
         $this->loadWithdrawals();
     }
 
@@ -52,12 +52,13 @@ new class extends Component {
         $this->status = $withdrawal->status;
         $this->transaction_id = $withdrawal->transaction_id;
         $this->paid_date = $withdrawal->paid_date;
+        $this->isEdit = true;
         $this->showModal = true;
     }
 
     public function update()
     {
-        if($this->withdrawal->user_id !== auth()->id()) {
+        if(!$this->withdrawal || $this->withdrawal->user_id !== auth()->id()) {
             return;
         }
 
@@ -87,7 +88,7 @@ new class extends Component {
 
     public function resetForm()
     {
-        $this->reset(['withdrawal', 'amount', 'status', 'transaction_id', 'paid_date']);
+        $this->reset(['withdrawal', 'amount', 'status', 'transaction_id', 'paid_date', 'isEdit']);
     }
 
     public function openModal()
@@ -125,7 +126,6 @@ new class extends Component {
                             <tr>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                {{-- <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Transaction ID</th> --}}
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Paid Date</th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                             </tr>
@@ -141,9 +141,6 @@ new class extends Component {
                                             {{ str_replace('-', ' ', $withdrawal->status) }}
                                         </span>
                                     </td>
-                                    {{-- <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $withdrawal->transaction_id ?? 'N/A' }}
-                                    </td> --}}
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $withdrawal->paid_date ? \Carbon\Carbon::parse($withdrawal->paid_date)->format('M j, Y') : 'N/A' }}
                                     </td>
@@ -187,10 +184,10 @@ new class extends Component {
                 <!-- Modal -->
                 <flux:modal
                     wire:model="showModal"
-                    :title="$withdrawal ? 'Edit Withdrawal' : 'New Withdrawal'"
+                    :title="$isEdit ? 'Edit Withdrawal' : 'New Withdrawal'"
                     max-width="lg">
 
-                    <form wire:submit.prevent="{{ $withdrawal ? 'update' : 'create' }}" class="space-y-6">
+                    <form wire:submit.prevent="{{ $isEdit ? 'update' : 'create' }}" class="space-y-6">
                         <!-- Amount -->
                         <flux:input
                             wire:model="amount"
@@ -215,15 +212,6 @@ new class extends Component {
                             <option value="paid">Paid</option>
                         </flux:select>
 
-                        <!-- Transaction ID -->
-                        {{-- <flux:input
-                            wire:model="transaction_id"
-                            :label="__('Transaction ID')"
-                            type="text"
-                            :placeholder="__('Enter transaction ID')"
-                            data-test="transaction-id-input"
-                        /> --}}
-
                         <!-- Paid Date -->
                         <flux:input
                             wire:model="paid_date"
@@ -247,8 +235,7 @@ new class extends Component {
                                 variant="primary"
                                 data-test="submit-withdrawal-button"
                             >
-                                {{-- {{ !is_null($withdrawal) ? 'Update' : 'Create' }} --}}
-                                Save
+                               {{ $isEdit ? 'Update Withdrawal' : 'Create Withdrawal' }}
                             </flux:button>
                         </div>
                     </form>
