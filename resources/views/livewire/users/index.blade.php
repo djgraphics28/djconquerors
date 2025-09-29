@@ -5,9 +5,11 @@ use App\Models\User;
 use Spatie\Permission\Models\Role;
 use Spatie\Activitylog\Models\Activity;
 use Livewire\WithPagination;
+use Livewire\WithFileUploads;
+use Illuminate\Support\Facades\Storage;
 
 new class extends Component {
-    use WithPagination;
+    use WithPagination, WithFileUploads;
 
     public $user;
     public $name;
@@ -29,6 +31,10 @@ new class extends Component {
     public $activityLogs = [];
     public $selectedUser = null;
 
+    // Media properties
+    public $avatar;
+    public $avatarToRemove = false;
+
     // Search and filters
     public $search = '';
     public $dateJoined = '';
@@ -42,6 +48,20 @@ new class extends Component {
         'statusFilter' => ['except' => ''],
         'perPage' => ['except' => 10],
         'inviterFilter' => ['except' => ''],
+    ];
+
+    protected $rules = [
+        'name' => 'required|min:3',
+        'email' => 'required|email|unique:users,email',
+        'riscoin_id' => 'nullable|string',
+        'password' => 'required|min:8',
+        'inviters_code' => 'nullable|string',
+        'invested_amount' => 'nullable|numeric|min:0',
+        'birth_date' => 'required',
+        'date_joined' => 'required',
+        'is_active' => 'boolean',
+        'selectedRoles' => 'array',
+        'avatar' => 'nullable|image|max:2048', // 2MB max
     ];
 
     public function mount()
@@ -85,6 +105,7 @@ new class extends Component {
             'date_joined' => 'required',
             'is_active' => 'boolean',
             'selectedRoles' => 'array',
+            'avatar' => 'nullable|image|max:2048', // 2MB max
         ];
     }
 
@@ -106,6 +127,15 @@ new class extends Component {
         ];
 
         $user = User::create($userData);
+
+        // Handle avatar upload
+        if ($this->avatar) {
+            $user
+                ->addMedia($this->avatar->getRealPath())
+                ->usingName('avatar')
+                ->usingFileName($this->avatar->getClientOriginalName())
+                ->toMediaCollection('avatar');
+        }
 
         // Assign roles
         if (!empty($this->selectedRoles)) {
@@ -141,6 +171,7 @@ new class extends Component {
         $this->date_joined = $user->date_joined;
         $this->is_active = $user->is_active;
         $this->selectedRoles = $user->roles->pluck('name')->toArray();
+        $this->avatarToRemove = false;
         $this->showModal = true;
     }
 
@@ -167,6 +198,18 @@ new class extends Component {
 
         $user->update($updateData);
 
+        // Handle avatar upload/removal
+        if ($this->avatarToRemove) {
+            $user->clearMediaCollection('avatar');
+        } elseif ($this->avatar) {
+            $user->clearMediaCollection('avatar');
+            $user
+                ->addMedia($this->avatar->getRealPath())
+                ->usingName('avatar')
+                ->usingFileName($this->avatar->getClientOriginalName())
+                ->toMediaCollection('avatar');
+        }
+
         // Sync roles
         $oldRoles = $user->roles->pluck('name')->toArray();
         $user->syncRoles($this->selectedRoles);
@@ -187,6 +230,12 @@ new class extends Component {
         $this->resetForm();
         $this->showModal = false;
         session()->flash('message', 'User updated successfully.');
+    }
+
+    public function removeAvatar()
+    {
+        $this->avatarToRemove = true;
+        $this->avatar = null;
     }
 
     public function delete(User $user)
@@ -216,7 +265,7 @@ new class extends Component {
 
     public function resetForm()
     {
-        $this->reset(['name', 'email', 'riscoin_id', 'password', 'inviters_code', 'invested_amount', 'is_active', 'userId', 'user', 'selectedRoles']);
+        $this->reset(['name', 'email', 'riscoin_id', 'password', 'inviters_code', 'invested_amount', 'is_active', 'userId', 'user', 'selectedRoles', 'avatar', 'avatarToRemove']);
         $this->is_active = true;
         $this->editMode = false;
     }
@@ -441,6 +490,9 @@ new class extends Component {
                             <tr>
                                 <th scope="col"
                                     class="sticky left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Avatar</th>
+                                <th scope="col"
+                                    class="sticky left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Name</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -480,6 +532,23 @@ new class extends Component {
                         <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                             @forelse ($this->users as $user)
                                 <tr>
+                                    <td
+                                        class="sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
+                                        <div class="flex-shrink-0 h-10 w-10">
+                                            @if ($user->getFirstMediaUrl('avatar'))
+                                                <img class="h-10 w-10 rounded-full object-cover"
+                                                    src="{{ $user->getFirstMediaUrl('avatar') }}"
+                                                    alt="{{ $user->name }} avatar">
+                                            @else
+                                                <div
+                                                    class="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                                                    <span class="text-gray-600 dark:text-gray-300 font-medium text-sm">
+                                                        {{ strtoupper(substr($user->name, 0, 1)) }}
+                                                    </span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </td>
                                     <td
                                         class="sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
                                         {{ $user->name }}
@@ -588,7 +657,7 @@ new class extends Component {
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                    <td colspan="13" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                                         No users found matching your criteria.
                                     </td>
                                 </tr>
@@ -643,6 +712,54 @@ new class extends Component {
                                     <div class="px-6 py-4">
                                         <form wire:submit.prevent="{{ $editMode ? 'update' : 'create' }}"
                                             class="space-y-6">
+                                            <!-- Avatar Upload -->
+                                            <div class="flex items-center space-x-6">
+                                                <div class="flex-shrink-0">
+                                                    @if ($editMode && $user && $user->getFirstMediaUrl('avatar') && !$avatarToRemove)
+                                                        <img class="h-20 w-20 rounded-full object-cover"
+                                                            src="{{ $user->getFirstMediaUrl('avatar') }}"
+                                                            alt="Current avatar">
+                                                    @elseif($avatar)
+                                                        <img class="h-20 w-20 rounded-full object-cover"
+                                                            src="{{ $avatar->temporaryUrl() }}" alt="New avatar">
+                                                    @else
+                                                        <div
+                                                            class="h-20 w-20 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                                                            <span
+                                                                class="text-gray-600 dark:text-gray-300 font-medium text-xl">
+                                                                {{ $name ? strtoupper(substr($name, 0, 1)) : 'U' }}
+                                                            </span>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                                <div class="flex-1">
+                                                    <label
+                                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                        Profile Avatar
+                                                    </label>
+                                                    <div class="flex space-x-3">
+                                                        <div>
+                                                            <input type="file" wire:model="avatar"
+                                                                accept="image/*"
+                                                                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                                            @error('avatar')
+                                                                <p class="mt-1 text-sm text-red-600">{{ $message }}
+                                                                </p>
+                                                            @enderror
+                                                        </div>
+                                                        @if ($editMode && (($user && $user->getFirstMediaUrl('avatar')) || $avatar))
+                                                            <flux:button type="button" wire:click="removeAvatar"
+                                                                variant="ghost" size="sm" class="text-red-600">
+                                                                Remove Avatar
+                                                            </flux:button>
+                                                        @endif
+                                                    </div>
+                                                    <p class="mt-1 text-xs text-gray-500">
+                                                        Upload a profile picture. Max 2MB. JPG, PNG, GIF.
+                                                    </p>
+                                                </div>
+                                            </div>
+
                                             <div class="grid grid-cols-1 gap-6">
                                                 <!-- Name -->
                                                 <flux:input wire:model="name" :label="__('Name')" type="text"
@@ -777,22 +894,35 @@ new class extends Component {
                                             <div class="space-y-6">
                                                 <!-- User Information -->
                                                 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                                                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                                                        User Details</h3>
-                                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                        <div>
-                                                            <label
-                                                                class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</label>
-                                                            <p class="text-sm text-gray-900 dark:text-white">
-                                                                {{ $selectedUser->name }}</p>
+                                                    <div class="flex items-center space-x-4 mb-4">
+                                                        <!-- Avatar in View Modal -->
+                                                        <div class="flex-shrink-0">
+                                                            @if ($selectedUser->getFirstMediaUrl('avatar'))
+                                                                <img class="h-16 w-16 rounded-full object-cover"
+                                                                    src="{{ $selectedUser->getFirstMediaUrl('avatar') }}"
+                                                                    alt="{{ $selectedUser->name }} avatar">
+                                                            @else
+                                                                <div
+                                                                    class="h-16 w-16 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                                                                    <span
+                                                                        class="text-gray-600 dark:text-gray-300 font-medium text-lg">
+                                                                        {{ strtoupper(substr($selectedUser->name, 0, 1)) }}
+                                                                    </span>
+                                                                </div>
+                                                            @endif
                                                         </div>
                                                         <div>
-                                                            <label
-                                                                class="text-sm font-medium text-gray-500 dark:text-gray-400">Email</label>
-                                                            <p class="text-sm text-gray-900 dark:text-white">
+                                                            <h3
+                                                                class="text-lg font-medium text-gray-900 dark:text-white">
+                                                                {{ $selectedUser->name }}
+                                                            </h3>
+                                                            <p class="text-sm text-gray-500 dark:text-gray-400">
                                                                 {{ $selectedUser->email }}
                                                             </p>
                                                         </div>
+                                                    </div>
+
+                                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                         <div>
                                                             <label
                                                                 class="text-sm font-medium text-gray-500 dark:text-gray-400">Riscoin

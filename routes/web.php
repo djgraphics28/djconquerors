@@ -15,7 +15,7 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('dashboard', 'dashboard')->name('dashboard');
     Volt::route('genealogy', 'genealogy.index')->name('genealogy');
-    Volt::route('genealogy/{riscoinId}', 'genealogy.show')->name('genealogy.show');
+    Volt::route('genealogy/{riscoinId}', 'genealogy.index')->name('genealogy.show');
     Volt::route('my-team','my-team')->name('my-team');
     Volt::route('my-withdrawals', 'my-withdrawals')->name('my-withdrawals');
 
