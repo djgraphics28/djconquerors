@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -56,8 +57,13 @@ class User extends Authenticatable implements MustVerifyEmail {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'date_joined' => 'date',
+            'birth_date' => 'date',
+            'invested_amount' => 'decimal:2',
         ];
     }
+
+    protected $appends = ['age'];
 
     /**
      * Get the user's initials
@@ -142,5 +148,30 @@ class User extends Authenticatable implements MustVerifyEmail {
     public function inviter()
     {
         return $this->belongsTo(User::class, 'inviters_code', 'riscoin_id');
+    }
+
+    public function getAgeAttribute()
+    {
+        if (!$this->birth_date) {
+            return null;
+        }
+
+        $age = $this->birth_date->age;
+        return "{$age} years old";
+    }
+
+    public function getMonthsAndDaysSinceJoinedAttribute()
+    {
+        if (!$this->date_joined) {
+            return null;
+        }
+
+        $joinedDate = \Illuminate\Support\Carbon::parse($this->date_joined);
+        $now = now();
+
+        $months = $joinedDate->diffInMonths($now);
+        $days = $joinedDate->addMonths($months)->diffInDays($now);
+
+        return number_format($months) . " months and " . number_format($days) . " days";
     }
 }

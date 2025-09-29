@@ -19,6 +19,9 @@
                     @can('genealogy.view')
                         <flux:navlist.item icon="users" :href="route('genealogy')" :current="request()->routeIs('genealogy')" wire:navigate>{{ __('Genealogy') }}</flux:navlist.item>
                     @endcan
+                    @can('my-team.access')
+                        <flux:navlist.item icon="users" :href="route('my-team')" :current="request()->routeIs('my-team')" wire:navigate>{{ __('My Team') }}</flux:navlist.item>
+                    @endcan
                     @can('my-withdrawals.view')
                         <flux:navlist.item icon="credit-card" :href="route('my-withdrawals')" :current="request()->routeIs('my-withdrawals')" wire:navigate>{{ __('My Withdrawals') }}</flux:navlist.item>
                     @endcan
@@ -26,7 +29,7 @@
                         <flux:navlist.item icon="play-circle" :href="route('tutorials.index')" :current="request()->routeIs('tutorials.index')" wire:navigate>{{ __('Tutorials Management') }}</flux:navlist.item>
                     @endcan
                     @can('tutorials.access')
-                    <flux:navlist.item icon="video-camera" :href="route('tutorials.access')" :current="request()->routeIs('tutorials.access')" wire:navigate>{{ __('Tutorials') }}</flux:navlist.item>
+                        <flux:navlist.item icon="video-camera" :href="route('tutorials.access')" :current="request()->routeIs('tutorials.access')" wire:navigate>{{ __('Tutorials') }}</flux:navlist.item>
                     @endcan
                     @can('users.view')
                     <flux:navlist.item icon="user-circle" :href="route('users.index')" :current="request()->routeIs('users.index')" wire:navigate>{{ __('Users') }}</flux:navlist.item>

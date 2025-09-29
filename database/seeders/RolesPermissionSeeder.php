@@ -54,6 +54,11 @@ class RolesPermissionSeeder extends Seeder
 
             //Activity Logs
             'activity-logs.view',
+
+            //My Team
+            'my-team.access',
+            'my-team.view',
+            'my-team.edit',
         ];
 
         foreach ($adminPermissions as $permission) {
@@ -73,6 +78,8 @@ class RolesPermissionSeeder extends Seeder
             'my-withdrawals.delete',
             'genealogy.view',
             'tutorials.access',
+            'my-team.access',
+            'my-team.view'
         ]);
 
         $adminUser = User::where('email', 'admin@djconquerors.com')->first();

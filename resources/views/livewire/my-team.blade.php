@@ -267,7 +267,10 @@ new class extends Component {
 
     public function getUsersProperty()
     {
+        $userRiscoindId = User::find(auth()->user()->id)->riscoin_id;
         return User::with(['roles', 'inviter'])
+            ->where('inviters_code', $userRiscoindId)
+            ->where('inviters_code', '!=', '')
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('name', 'like', '%' . $this->search . '%')->orWhere('email', 'like', '%' . $this->search . '%');
@@ -285,7 +288,7 @@ new class extends Component {
             ->when($this->inviterFilter, function ($query) {
                 $query->where('inviters_code', $this->inviterFilter);
             })
-            ->orderBy('created_at', 'desc')
+            ->orderBy('date_joined', 'desc')
             ->paginate($this->perPage);
     }
 
@@ -346,12 +349,12 @@ new class extends Component {
             <div class="p-6 lg:p-8">
                 <!-- Header -->
                 <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Manage Users</h2>
-                    @can('users.create')
+                    <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">My Team</h2>
+                    {{-- @can('users.create')
                         <flux:button wire:click="openModal" variant="primary" data-test="new-user-button">
                             New User
                         </flux:button>
-                    @endcan
+                    @endcan --}}
                 </div>
 
                 @if (session()->has('message'))
@@ -378,11 +381,11 @@ new class extends Component {
                         </div>
 
                         <!-- Date Joined -->
-                        <div>
+                        {{-- <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date
                                 Joined</label>
                             <flux:input wire:model.live="dateJoined" type="date" data-test="date-joined-filter" />
-                        </div>
+                        </div> --}}
 
                         <!-- Status Filter -->
                         <div>
@@ -395,24 +398,6 @@ new class extends Component {
                             </flux:select>
                         </div>
 
-                        <!-- NEW: Inviter Filter -->
-                        <div>
-                            <label
-                                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Inviter</label>
-                            <flux:select wire:model.live="inviterFilter" data-test="inviter-filter">
-                                <option value="">All Inviters</option>
-                                @foreach ($inviters as $inviter)
-                                    <option value="{{ $inviter->riscoin_id }}">{{ $inviter->name }}
-                                        ({{ $inviter->riscoin_id }})
-                                    </option>
-                                @endforeach
-                            </flux:select>
-                        </div>
-                    </div>
-
-                    <!-- Second row for additional filters -->
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                        <!-- Rows Per Page -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rows Per
                                 Page</label>
@@ -424,179 +409,209 @@ new class extends Component {
                                 <option value="100">100</option>
                             </flux:select>
                         </div>
+
+                        <div class="mt-4 flex justify-end">
+                            <flux:button wire:click="resetFilters" variant="ghost" size="sm"
+                                data-test="reset-filters">
+                                Reset Filters
+                            </flux:button>
+                        </div>
+
+                        {{-- <!-- NEW: Inviter Filter -->
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Inviter</label>
+                            <flux:select wire:model.live="inviterFilter" data-test="inviter-filter">
+                                <option value="">All Inviters</option>
+                                @foreach ($inviters as $inviter)
+                                    <option value="{{ $inviter->riscoin_id }}">{{ $inviter->name }}
+                                        ({{ $inviter->riscoin_id }})
+                                    </option>
+                                @endforeach
+                            </flux:select>
+                        </div> --}}
                     </div>
 
+
                     <!-- Reset Filters -->
-                    <div class="mt-4 flex justify-end">
-                        <flux:button wire:click="resetFilters" variant="ghost" size="sm" data-test="reset-filters">
-                            Reset Filters
-                        </flux:button>
-                    </div>
+
                 </div>
 
                 <!-- Table -->
                 <div class="overflow-x-auto relative">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th scope="col"
-                                    class="sticky left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Name</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Email</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Is Verified?</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Age</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Roles</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Riscoin ID</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Invested Amount</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Date Joined</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Tenure</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Inviter</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Status</th>
-                                <th scope="col"
-                                    class="sticky right-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                            @forelse ($this->users as $user)
+                    @if ($this->users->isNotEmpty())
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <td
-                                        class="sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
-                                        {{ $user->name }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->email }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        @if ($user->email_verified_at)
-                                            <span
-                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                Verified
-                                            </span>
-                                        @else
-                                            <span
-                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                                Not Verified
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->age }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex flex-wrap gap-1">
-                                            @foreach ($user->roles as $role)
+                                    <th scope="col"
+                                        class="sticky left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Name</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Email</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Is Verified?</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Age</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Roles</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Riscoin ID</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Invested Amount</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Date Joined</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Tenure</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Inviter</th>
+                                    <th scope="col"
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Status</th>
+                                    <th scope="col"
+                                        class="sticky right-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                                @foreach ($this->users as $user)
+                                    <tr>
+                                        <td
+                                            class="sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
+                                            {{ $user->name }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            {{ $user->email }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            @if ($user->email_verified_at)
                                                 <span
-                                                    class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
-                                                    {{ $role->name }}
+                                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                    Verified
                                                 </span>
-                                            @endforeach
-                                            @if ($user->roles->isEmpty())
+                                            @else
                                                 <span
-                                                    class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
-                                                    No roles
+                                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                    Not Verified
                                                 </span>
                                             @endif
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->riscoin_id ?? 'N/A' }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        ${{ number_format($user->invested_amount, 2) }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->date_joined ? \Carbon\Carbon::parse($user->date_joined)->format('M j, Y') : 'N/A' }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->months_and_days_since_joined }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->inviter ? $user->inviter->name . ' (' . $user->inviter->riscoin_id . ')' : 'N/A' }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span
-                                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                            {{ $user->is_active ? 'Active' : 'Inactive' }}
-                                        </span>
-                                    </td>
-                                    <td
-                                        class="sticky right-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
-                                        <div class="flex space-x-2">
-                                            @can('users.view')
-                                                <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost"
-                                                    size="sm" data-test="view-user-{{ $user->id }}"
-                                                    title="View Info">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                        viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                </flux:button>
-                                            @endcan
-                                            @can('users.edit')
-                                                <flux:button wire:click="edit({{ $user->id }})" variant="ghost"
-                                                    size="sm" data-test="edit-user-{{ $user->id }}"
-                                                    title="Edit">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                        viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                    </svg>
-                                                </flux:button>
-                                            @endcan
-                                            @can('users.delete')
-                                                <flux:button wire:click="delete({{ $user->id }})" variant="ghost"
-                                                    size="sm"
-                                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                                    onclick="return confirm('Are you sure you want to delete this user?')"
-                                                    data-test="delete-user-{{ $user->id }}" title="Delete">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                        viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </flux:button>
-                                            @endcan
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="8" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-                                        No users found matching your criteria.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-                <!-- Pagination -->
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            {{ $user->age }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex flex-wrap gap-1">
+                                                @foreach ($user->roles as $role)
+                                                    <span
+                                                        class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
+                                                        {{ $role->name }}
+                                                    </span>
+                                                @endforeach
+                                                @if ($user->roles->isEmpty())
+                                                    <span
+                                                        class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                                        No roles
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            {{ $user->riscoin_id ?? 'N/A' }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            ${{ number_format($user->invested_amount, 2) }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            {{ $user->date_joined ? \Carbon\Carbon::parse($user->date_joined)->format('M j, Y') : 'N/A' }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            {{ $user->months_and_days_since_joined }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                            {{ $user->inviter ? $user->inviter->name . ' (' . $user->inviter->riscoin_id . ')' : 'N/A' }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span
+                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                                {{ $user->is_active ? 'Active' : 'Inactive' }}
+                                            </span>
+                                        </td>
+                                        <td
+                                            class="sticky right-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
+                                            <div class="flex space-x-2">
+                                                @can('my-team.view')
+                                                    <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost"
+                                                        size="sm" data-test="view-user-{{ $user->id }}"
+                                                        title="View Info">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                            viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2"
+                                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                        </svg>
+                                                    </flux:button>
+                                                @endcan
+                                                @can('my-team.edit')
+                                                    <flux:button wire:click="edit({{ $user->id }})" variant="ghost"
+                                                        size="sm" data-test="edit-user-{{ $user->id }}"
+                                                        title="Edit">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                            viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2"
+                                                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                        </svg>
+                                                    </flux:button>
+                                                @endcan
+                                                {{-- @can('my-team.delete')
+                                                    <flux:button wire:click="delete({{ $user->id }})" variant="ghost"
+                                                        size="sm"
+                                                        class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                                        onclick="return confirm('Are you sure you want to delete this user?')"
+                                                        data-test="delete-user-{{ $user->id }}" title="Delete">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                            viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2"
+                                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </flux:button>
+                                                @endcan --}}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @else
+                        <div class="text-center py-12 px-4">
+                            <svg class="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No team members found
+                            </h3>
+                            <p class="text-gray-600 dark:text-gray-400">
+                                @if ($search)
+                                    No team members match your search "{{ $search }}". Try different keywords.
+                                @else
+                                    No team members are available at the moment.
+                                @endif
+                            </p>
+                        </div>
+                    @endif
+                </div> <!-- Pagination -->
                 <div class="mt-6">
                     {{ $this->users->links() }}
                 </div>
