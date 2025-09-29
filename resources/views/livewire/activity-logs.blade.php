@@ -33,7 +33,7 @@ new class extends Component {
         <!-- Header -->
         <div class="mb-8">
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Activity Log</h1>
-            <p class="text-gray-600 dark:text-gray-400 mt-2">Monitor and search through system activities</p>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Monitor and search through system activities. View detailed information about actions taken across the system.</p>
         </div>
 
         <!-- Filters Section -->
@@ -54,7 +54,7 @@ new class extends Component {
                             type="text"
                             id="search"
                             wire:model.live="search"
-                            placeholder="Search by description..."
+                            placeholder="Search by activity description, user actions, or changes..."
                             class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                         >
                     </div>
@@ -63,7 +63,7 @@ new class extends Component {
                 <!-- Date From -->
                 <div class="flex-1">
                     <label for="dateFrom" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        From Date
+                        From Date (Activity Start)
                     </label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -83,7 +83,7 @@ new class extends Component {
                 <!-- Date To -->
                 <div class="flex-1">
                     <label for="dateTo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        To Date
+                        To Date (Activity End)
                     </label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -106,7 +106,7 @@ new class extends Component {
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                    Activities ({{ $this->activities->count() }})
+                    System Activities Log ({{ $this->activities->count() }} entries found)
                 </h2>
             </div>
 
@@ -115,10 +115,16 @@ new class extends Component {
                     <thead class="bg-gray-50 dark:bg-gray-700">
                         <tr>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Description
+                                Activity Details
                             </th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Date & Time
+                                Changes
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Previous Values
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Timestamp Information
                             </th>
                         </tr>
                     </thead>
@@ -127,20 +133,49 @@ new class extends Component {
                             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
                                 <td class="px-6 py-4">
                                     <div class="text-sm font-medium text-gray-900 dark:text-white">
-                                        {{ $activity->description }}
+                                        {{ ucfirst($activity->description) }} {{ class_basename($activity->subject_type) }}
                                     </div>
                                     @if($activity->causer)
                                         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            By: {{ $activity->causer->name ?? 'System' }}
+                                            Performed by: {{ $activity->causer->name ?? 'System Automated Process' }}
+                                        </div>
+                                    @endif
+                                    @if($activity->subject_type)
+                                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                            Model: {{ class_basename($activity->subject_type) }}
+                                        </div>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4">
+                                    @if($activity->properties && $activity->properties->has('attributes'))
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                                            @foreach($activity->properties->get('attributes', []) as $key => $value)
+                                                <div class="mb-1">
+                                                    <span class="font-medium">{{ ucfirst($key) }}:</span>
+                                                    {{ is_array($value) ? json_encode($value) : $value }}
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4">
+                                    @if($activity->properties && $activity->properties->has('old'))
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                                            @foreach($activity->properties->get('old', []) as $key => $value)
+                                                <div class="mb-1">
+                                                    <span class="font-medium">{{ ucfirst($key) }}:</span>
+                                                    {{ is_array($value) ? json_encode($value) : $value }}
+                                                </div>
+                                            @endforeach
                                         </div>
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="text-sm text-gray-900 dark:text-white">
-                                        {{ $activity->created_at->format('M j, Y') }}
+                                        Date: {{ $activity->created_at->format('M j, Y') }}
                                     </div>
                                     <div class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ $activity->created_at->format('g:i A') }}
+                                        Time: {{ $activity->created_at->format('g:i A') }}
                                     </div>
                                     <div class="text-xs text-blue-600 dark:text-blue-400 mt-1">
                                         {{ $activity->created_at->diffForHumans() }}
@@ -149,17 +184,17 @@ new class extends Component {
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="2" class="px-6 py-8 text-center">
+                                <td colspan="4" class="px-6 py-8 text-center">
                                     <div class="text-gray-500 dark:text-gray-400">
                                         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
-                                        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No activities found</h3>
+                                        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No Activity Records Found</h3>
                                         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                             @if($this->search || $this->dateFrom || $this->dateTo)
-                                                Try adjusting your search filters
+                                                Please try modifying your search criteria or adjusting the date range
                                             @else
-                                                No activities have been logged yet
+                                                No system activities have been recorded in the log yet
                                             @endif
                                         </p>
                                     </div>

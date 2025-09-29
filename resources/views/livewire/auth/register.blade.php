@@ -14,7 +14,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $password = '';
     public string $riscoin_id = '';
     public string $inviters_code = '';
-    public float $invested_amount = 0.0;
+    public $invested_amount = '';
     public string $password_confirmation = '';
     public string $date_joined = '';
     public string $birth_date = '';
@@ -35,10 +35,13 @@ new #[Layout('components.layouts.auth')] class extends Component {
             'date_joined' => ['nullable', 'date'],
             'birth_date' => ['nullable', 'date'],
             'phone_number' => ['nullable', 'string', 'max:20'],
-
+            'g-recaptcha-response' => ['required', 'captcha'],
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
+
+        $validated['riscoind_id'] = strtoupper($validated['riscoin_id']);
+        $validated['inviters_code'] = strtoupper($validated['inviters_code']);
 
         event(new Registered(($user = User::create($validated))));
 
@@ -154,6 +157,14 @@ new #[Layout('components.layouts.auth')] class extends Component {
             :placeholder="__('Confirm password')"
             viewable
         />
+
+        <div class="mb-3">
+            {!! NoCaptcha::renderJs() !!}
+            {!! NoCaptcha::display() !!}
+            @error('g-recaptcha-response')
+                <span class="text-red-500 text-sm">{{ $message }}</span>
+            @enderror
+        </div>
 
         <div class="flex items-center justify-end">
             <flux:button type="submit" variant="primary" class="w-full" data-test="register-user-button">
