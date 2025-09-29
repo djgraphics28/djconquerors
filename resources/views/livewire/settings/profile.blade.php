@@ -9,6 +9,12 @@ use Livewire\Volt\Component;
 new class extends Component {
     public string $name = '';
     public string $email = '';
+    public $riscoin_id = '';
+    public $inviters_code = '';
+    public $invested_amount = '';
+    public $date_joined = '';
+    public $birth_date = '';
+    public $phone_number = '';
 
     /**
      * Mount the component.
@@ -17,6 +23,12 @@ new class extends Component {
     {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->riscoin_id = Auth::user()->riscoin_id;
+        $this->inviters_code = Auth::user()->inviters_code;
+        $this->invested_amount = Auth::user()->invested_amount;
+        $this->date_joined = Auth::user()->date_joined;
+        $this->birth_date = Auth::user()->birth_date;
+        $this->phone_number = Auth::user()->phone_number;
     }
 
     /**
@@ -29,15 +41,17 @@ new class extends Component {
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
 
-            'email' => [
-                'required',
-                'string',
-                'lowercase',
-                'email',
-                'max:255',
-                Rule::unique(User::class)->ignore($user->id)
-            ],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class)->ignore($user->id)],
+            'phone_number' => ['required', 'string', 'max:20'],
+            'birth_date' => ['required', 'date'],
+            'date_joined' => ['required', 'date'],
+            'invested_amount' => ['required', 'numeric'],
+            'inviters_code' => ['required', 'string', 'max:255'],
+            'riscoin_id' => ['required', 'string', 'max:255'],
         ]);
+
+        $validated['riscoin_id'] = strtoupper($validated['riscoin_id']);
+        $validated['inviters_code'] = strtoupper($validated['inviters_code']);
 
         $user->fill($validated);
 
@@ -79,12 +93,13 @@ new class extends Component {
             <div>
                 <flux:input wire:model="email" :label="__('Email')" type="email" required autocomplete="email" />
 
-                @if (auth()->user() instanceof \Illuminate\Contracts\Auth\MustVerifyEmail &&! auth()->user()->hasVerifiedEmail())
+                @if (auth()->user() instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && !auth()->user()->hasVerifiedEmail())
                     <div>
                         <flux:text class="mt-4">
                             {{ __('Your email address is unverified.') }}
 
-                            <flux:link class="text-sm cursor-pointer" wire:click.prevent="resendVerificationNotification">
+                            <flux:link class="text-sm cursor-pointer"
+                                wire:click.prevent="resendVerificationNotification">
                                 {{ __('Click here to re-send the verification email.') }}
                             </flux:link>
                         </flux:text>
@@ -97,6 +112,13 @@ new class extends Component {
                     </div>
                 @endif
             </div>
+
+            <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')" type="text" disabled />
+            <flux:input wire:model="inviters_code" :label="__('Inviters Code')" type="text" disabled />
+            <flux:input wire:model="invested_amount" :label="__('Invested Amount (USD)')" type="text" disabled />
+            <flux:input wire:model="date_joined" :label="__('Date Joined')" type="text" disabled />
+            <flux:input wire:model="birth_date" :label="__('Birth Date')" type="text" />
+            <flux:input wire:model="phone_number" :label="__('Phone Number')" type="text" />
 
             <div class="flex items-center gap-4">
                 <div class="flex items-center justify-end">

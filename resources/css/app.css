@@ -64,7 +64,7 @@ select:focus[data-flux-control] {
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */
-.genealogy-level {
+/* .genealogy-level {
     position: relative;
     transition: all 0.3s ease;
 }
@@ -97,4 +97,4 @@ select:focus[data-flux-control] {
 /* Dark mode support */
 .dark .children-container::before {
     background: #4b5563;
-}
+} */
