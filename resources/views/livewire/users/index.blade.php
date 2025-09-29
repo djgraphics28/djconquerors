@@ -18,6 +18,7 @@ new class extends Component {
     public $invested_amount;
     public $is_active = true;
     public $roles = [];
+    public $inviters = [];
     public $selectedRoles = [];
     public $editMode = false;
     public $userId;
@@ -30,6 +31,7 @@ new class extends Component {
     public $search = '';
     public $dateJoined = '';
     public $statusFilter = '';
+    public $inviterFilter = '';
     public $perPage = 10;
 
     protected $queryString = [
@@ -37,11 +39,18 @@ new class extends Component {
         'dateJoined' => ['except' => ''],
         'statusFilter' => ['except' => ''],
         'perPage' => ['except' => 10],
+        'inviterFilter' => ['except' => ''],
     ];
 
     public function mount()
     {
         $this->loadRoles();
+        $this->loadInviters();
+    }
+
+    public function loadInviters()
+    {
+        $this->inviters = User::select('id', 'name', 'riscoin_id')->get();
     }
 
     public function loadRoles()
@@ -51,12 +60,7 @@ new class extends Component {
 
     public function loadActivityLogs($userId)
     {
-        $this->activityLogs = Activity::where('causer_id', $userId)
-            ->where('causer_type', User::class)
-            ->with('causer')
-            ->orderBy('created_at', 'desc')
-            ->limit(50)
-            ->get();
+        $this->activityLogs = Activity::where('causer_id', $userId)->where('causer_type', User::class)->with('causer')->orderBy('created_at', 'desc')->limit(50)->get();
     }
 
     public function viewUser($userId)
@@ -231,7 +235,7 @@ new class extends Component {
     // Reset filters
     public function resetFilters()
     {
-        $this->reset(['search', 'dateJoined', 'statusFilter']);
+        $this->reset(['search', 'dateJoined', 'statusFilter', 'inviterFilter']);
         $this->resetPage();
     }
 
@@ -255,11 +259,10 @@ new class extends Component {
 
     public function getUsersProperty()
     {
-        return User::with('roles')
+        return User::with(['roles', 'inviter'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
-                    $q->where('name', 'like', '%' . $this->search . '%')
-                      ->orWhere('email', 'like', '%' . $this->search . '%');
+                    $q->where('name', 'like', '%' . $this->search . '%')->orWhere('email', 'like', '%' . $this->search . '%');
                 });
             })
             ->when($this->dateJoined, function ($query) {
@@ -270,6 +273,9 @@ new class extends Component {
             })
             ->when($this->statusFilter === 'inactive', function ($query) {
                 $query->where('is_active', false);
+            })
+            ->when($this->inviterFilter, function ($query) {
+                $query->where('inviters_code', $this->inviterFilter);
             })
             ->orderBy('created_at', 'desc')
             ->paginate($this->perPage);
@@ -319,10 +325,15 @@ new class extends Component {
     {
         $this->resetPage();
     }
+
+    public function updatingInviterFilter()
+    {
+        $this->resetPage();
+    }
 }; ?>
 
 <div class="py-12">
-    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+    <div class="max-w-12xl mx-auto sm:px-6 lg:px-2">
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-xl sm:rounded-lg">
             <div class="p-6 lg:p-8">
                 <!-- Header -->
@@ -352,20 +363,23 @@ new class extends Component {
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <!-- Search -->
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search</label>
+                            <label
+                                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search</label>
                             <flux:input wire:model.live.debounce.500ms="search" type="text"
                                 placeholder="Search by name or email..." data-test="search-input" />
                         </div>
 
                         <!-- Date Joined -->
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date Joined</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date
+                                Joined</label>
                             <flux:input wire:model.live="dateJoined" type="date" data-test="date-joined-filter" />
                         </div>
 
                         <!-- Status Filter -->
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                            <label
+                                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
                             <flux:select wire:model.live="statusFilter" data-test="status-filter">
                                 <option value="">All Status</option>
                                 <option value="active">Active</option>
@@ -373,9 +387,26 @@ new class extends Component {
                             </flux:select>
                         </div>
 
+                        <!-- NEW: Inviter Filter -->
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Inviter</label>
+                            <flux:select wire:model.live="inviterFilter" data-test="inviter-filter">
+                                <option value="">All Inviters</option>
+                                @foreach ($inviters as $inviter)
+                                    <option value="{{ $inviter->riscoin_id }}">{{ $inviter->name }}
+                                        ({{ $inviter->riscoin_id }})</option>
+                                @endforeach
+                            </flux:select>
+                        </div>
+                    </div>
+
+                    <!-- Second row for additional filters -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                         <!-- Rows Per Page -->
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rows Per Page</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rows Per
+                                Page</label>
                             <flux:select wire:model.live="perPage" data-test="per-page-selector">
                                 <option value="5">5</option>
                                 <option value="10">10</option>
@@ -399,14 +430,33 @@ new class extends Component {
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Roles</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Riscoin ID</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Invested Amount</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date Joined</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Name</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Email</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Roles</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Riscoin ID</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Invested Amount</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Date Joined</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Inviter</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Status</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Actions</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
@@ -421,12 +471,14 @@ new class extends Component {
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex flex-wrap gap-1">
                                             @foreach ($user->roles as $role)
-                                                <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
+                                                <span
+                                                    class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
                                                     {{ $role->name }}
                                                 </span>
                                             @endforeach
                                             @if ($user->roles->isEmpty())
-                                                <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                                <span
+                                                    class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
                                                     No roles
                                                 </span>
                                             @endif
@@ -441,29 +493,55 @@ new class extends Component {
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->created_at->format('M j, Y') }}
                                     </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                        {{ $user->inviter ? $user->inviter->name . ' (' . $user->inviter->riscoin_id . ')' : 'N/A' }}
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                        <span
+                                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
                                             {{ $user->is_active ? 'Active' : 'Inactive' }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex space-x-2">
                                             @can('users.view')
-                                                <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost" size="sm" data-test="view-user-{{ $user->id }}">
-                                                    View Info
+                                                <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost"
+                                                    size="sm" data-test="view-user-{{ $user->id }}"
+                                                    title="View Info">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    </svg>
                                                 </flux:button>
                                             @endcan
                                             @can('users.edit')
-                                                <flux:button wire:click="edit({{ $user->id }})" variant="ghost" size="sm" data-test="edit-user-{{ $user->id }}">
-                                                    Edit
+                                                <flux:button wire:click="edit({{ $user->id }})" variant="ghost"
+                                                    size="sm" data-test="edit-user-{{ $user->id }}"
+                                                    title="Edit">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                    </svg>
                                                 </flux:button>
                                             @endcan
                                             @can('users.delete')
-                                                <flux:button wire:click="delete({{ $user->id }})" variant="ghost" size="sm"
+                                                <flux:button wire:click="delete({{ $user->id }})" variant="ghost"
+                                                    size="sm"
                                                     class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                                                     onclick="return confirm('Are you sure you want to delete this user?')"
-                                                    data-test="delete-user-{{ $user->id }}">
-                                                    Delete
+                                                    data-test="delete-user-{{ $user->id }}" title="Delete">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
                                                 </flux:button>
                                             @endcan
                                         </div>
@@ -510,17 +588,21 @@ new class extends Component {
 
                         <!-- Invested Amount -->
                         <flux:input wire:model="invested_amount" :label="__('Invested Amount')" type="number"
-                            step="0.01" :placeholder="__('0.00')" prefix="$" data-test="invested-amount-input" />
+                            step="0.01" :placeholder="__('0.00')" prefix="$"
+                            data-test="invested-amount-input" />
 
                         <!-- Roles -->
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Roles</label>
+                            <label
+                                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Roles</label>
                             <div class="space-y-2">
                                 @foreach ($roles as $role)
                                     <label class="flex items-center">
-                                        <input type="checkbox" wire:model="selectedRoles" value="{{ $role->name }}"
+                                        <input type="checkbox" wire:model="selectedRoles"
+                                            value="{{ $role->name }}"
                                             class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 capitalize">{{ $role->name }}</span>
+                                        <span
+                                            class="ml-2 text-sm text-gray-700 dark:text-gray-300 capitalize">{{ $role->name }}</span>
                                     </label>
                                 @endforeach
                                 @if ($roles->isEmpty())
@@ -531,7 +613,8 @@ new class extends Component {
 
                         <!-- Active Status -->
                         <div class="flex items-center">
-                            <flux:checkbox wire:model="is_active" :label="__('Active User')" data-test="is-active-checkbox" />
+                            <flux:checkbox wire:model="is_active" :label="__('Active User')"
+                                data-test="is-active-checkbox" />
                         </div>
 
                         <!-- Action Buttons -->
@@ -555,43 +638,57 @@ new class extends Component {
                                 <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">User Details</h3>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
-                                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</label>
+                                        <label
+                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">Name</label>
                                         <p class="text-sm text-gray-900 dark:text-white">{{ $selectedUser->name }}</p>
                                     </div>
                                     <div>
-                                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Email</label>
-                                        <p class="text-sm text-gray-900 dark:text-white">{{ $selectedUser->email }}</p>
+                                        <label
+                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">Email</label>
+                                        <p class="text-sm text-gray-900 dark:text-white">{{ $selectedUser->email }}
+                                        </p>
                                     </div>
                                     <div>
-                                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Riscoin ID</label>
-                                        <p class="text-sm text-gray-900 dark:text-white">{{ $selectedUser->riscoin_id ?? 'N/A' }}</p>
+                                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Riscoin
+                                            ID</label>
+                                        <p class="text-sm text-gray-900 dark:text-white">
+                                            {{ $selectedUser->riscoin_id ?? 'N/A' }}</p>
                                     </div>
                                     <div>
-                                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Invested Amount</label>
-                                        <p class="text-sm text-gray-900 dark:text-white">${{ number_format($selectedUser->invested_amount, 2) }}</p>
+                                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Invested
+                                            Amount</label>
+                                        <p class="text-sm text-gray-900 dark:text-white">
+                                            ${{ number_format($selectedUser->invested_amount, 2) }}</p>
                                     </div>
                                     <div>
-                                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Date Joined</label>
-                                        <p class="text-sm text-gray-900 dark:text-white">{{ $selectedUser->created_at->format('M j, Y g:i A') }}</p>
+                                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Date
+                                            Joined</label>
+                                        <p class="text-sm text-gray-900 dark:text-white">
+                                            {{ $selectedUser->created_at->format('M j, Y g:i A') }}</p>
                                     </div>
                                     <div>
-                                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</label>
+                                        <label
+                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</label>
                                         <p class="text-sm">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $selectedUser->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                            <span
+                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $selectedUser->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
                                                 {{ $selectedUser->is_active ? 'Active' : 'Inactive' }}
                                             </span>
                                         </p>
                                     </div>
                                     <div>
-                                        <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Roles</label>
+                                        <label
+                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">Roles</label>
                                         <div class="flex flex-wrap gap-1 mt-1">
                                             @foreach ($selectedUser->roles as $role)
-                                                <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
+                                                <span
+                                                    class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
                                                     {{ $role->name }}
                                                 </span>
                                             @endforeach
                                             @if ($selectedUser->roles->isEmpty())
-                                                <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                                <span
+                                                    class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
                                                     No roles
                                                 </span>
                                             @endif
@@ -602,41 +699,56 @@ new class extends Component {
 
                             <!-- Withdrawals -->
                             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Withdrawal History</h3>
+                                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Withdrawal History
+                                </h3>
                                 <div class="overflow-x-auto">
                                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
                                         <thead class="bg-gray-100 dark:bg-gray-600">
                                             <tr>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Transaction ID</th>
+                                                <th
+                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                    Date</th>
+                                                <th
+                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                    Amount</th>
+                                                <th
+                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                    Status</th>
+                                                <th
+                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                    Transaction ID</th>
                                             </tr>
                                         </thead>
-                                        <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-700 dark:divide-gray-600">
+                                        <tbody
+                                            class="bg-white divide-y divide-gray-200 dark:bg-gray-700 dark:divide-gray-600">
                                             @forelse ($selectedUser->withdrawals ?? [] as $withdrawal)
                                                 <tr>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                    <td
+                                                        class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                                         {{ $withdrawal->created_at->format('M j, Y H:i') }}
                                                     </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                    <td
+                                                        class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                                         ${{ number_format($withdrawal->amount, 2) }}
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                                        <span
+                                                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                                                             @if ($withdrawal->status === 'completed') bg-green-100 text-green-800
                                                             @elseif($withdrawal->status === 'pending') bg-yellow-100 text-yellow-800
                                                             @else bg-red-100 text-red-800 @endif">
                                                             {{ ucfirst($withdrawal->status) }}
                                                         </span>
                                                     </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                    <td
+                                                        class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                                         {{ $withdrawal->transaction_id ?? 'N/A' }}
                                                     </td>
                                                 </tr>
                                             @empty
                                                 <tr>
-                                                    <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                                                    <td colspan="4"
+                                                        class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                                                         No withdrawal history found
                                                     </td>
                                                 </tr>
@@ -648,7 +760,8 @@ new class extends Component {
 
                             <!-- Activity Logs -->
                             <div>
-                                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Activity Logs</h3>
+                                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Activity Logs
+                                </h3>
 
                                 @if ($activityLogs->count() > 0)
                                     <div class="space-y-3 max-h-96 overflow-y-auto">
@@ -669,14 +782,20 @@ new class extends Component {
                                                             @php $changedFields = $this->getChangedFields($log); @endphp
                                                             @if (count($changedFields) > 0)
                                                                 <div class="mt-2 text-xs">
-                                                                    <p class="font-medium text-gray-700 dark:text-gray-300">Changes:</p>
+                                                                    <p
+                                                                        class="font-medium text-gray-700 dark:text-gray-300">
+                                                                        Changes:</p>
                                                                     <ul class="mt-1 space-y-1">
                                                                         @foreach ($changedFields as $field => $changes)
-                                                                            <li class="text-gray-600 dark:text-gray-400">
-                                                                                <span class="font-medium">{{ ucfirst(str_replace('_', ' ', $field)) }}:</span>
-                                                                                <span class="line-through text-red-500">{{ $changes['from'] ?? 'Empty' }}</span>
+                                                                            <li
+                                                                                class="text-gray-600 dark:text-gray-400">
+                                                                                <span
+                                                                                    class="font-medium">{{ ucfirst(str_replace('_', ' ', $field)) }}:</span>
+                                                                                <span
+                                                                                    class="line-through text-red-500">{{ $changes['from'] ?? 'Empty' }}</span>
                                                                                 →
-                                                                                <span class="text-green-500">{{ $changes['to'] ?? 'Empty' }}</span>
+                                                                                <span
+                                                                                    class="text-green-500">{{ $changes['to'] ?? 'Empty' }}</span>
                                                                             </li>
                                                                         @endforeach
                                                                     </ul>
@@ -691,13 +810,17 @@ new class extends Component {
                                 @else
                                     <div class="text-center py-8">
                                         <div class="text-gray-400 dark:text-gray-500 mb-4">
-                                            <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    stroke-width="1.5"
                                                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                             </svg>
                                         </div>
-                                        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No activity logs found</h3>
-                                        <p class="text-gray-500 dark:text-gray-400">This user hasn't performed any activities yet.</p>
+                                        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No activity
+                                            logs found</h3>
+                                        <p class="text-gray-500 dark:text-gray-400">This user hasn't performed any
+                                            activities yet.</p>
                                     </div>
                                 @endif
                             </div>

@@ -138,4 +138,9 @@ class User extends Authenticatable implements MustVerifyEmail {
         ->logOnly(['name', 'email', 'riscoin_id', 'inviters_code', 'invested_amount', 'is_active', 'date_joined', 'birth_date', 'phone_number']);
         // Chain fluent methods for configuration options
     }
+
+    public function inviter()
+    {
+        return $this->belongsTo(User::class, 'inviters_code', 'riscoin_id');
+    }
 }
