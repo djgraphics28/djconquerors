@@ -35,7 +35,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
             'date_joined' => ['nullable', 'date'],
             'birth_date' => ['nullable', 'date'],
             'phone_number' => ['nullable', 'string', 'max:20'],
-            'g-recaptcha-response' => ['required', 'captcha'],
+            // 'gRecaptcha-response' => ['required', 'captcha'],
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -158,13 +158,13 @@ new #[Layout('components.layouts.auth')] class extends Component {
             viewable
         />
 
-        <div class="mb-3">
+        {{-- <div class="mb-3">
             {!! NoCaptcha::renderJs() !!}
             {!! NoCaptcha::display() !!}
             @error('g-recaptcha-response')
                 <span class="text-red-500 text-sm">{{ $message }}</span>
             @enderror
-        </div>
+        </div> --}}
 
         <div class="flex items-center justify-end">
             <flux:button type="submit" variant="primary" class="w-full" data-test="register-user-button">
