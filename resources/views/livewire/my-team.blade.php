@@ -378,9 +378,25 @@ new class extends Component {
     }
 }; ?>
 
-<div class="max-w-12xl mx-auto sm:px-6 lg:px-2">
-    <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-xl sm:rounded-lg">
-        <div class="p-6 lg:p-8">
+<div class="max-w-10xl mx-auto">
+    <!-- Breadcrumb Navigation -->
+    <nav class="flex mb-6" aria-label="Breadcrumb">
+        <ol class="flex items-center space-x-2 text-sm">
+            <li>
+                <a href="{{ route('my-team') }}"
+                    class="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    My Team
+                </a>
+            </li>
+        </ol>
+    </nav>
+    <div>
+        <div>
             <!-- Header -->
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">My Team</h2>
@@ -448,7 +464,7 @@ new class extends Component {
                                     class="sticky left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Avatar</th>
                                 <th scope="col"
-                                    class="sticky left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    class="md:sticky left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Name</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -481,7 +497,7 @@ new class extends Component {
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Status</th>
                                 <th scope="col"
-                                    class="sticky right-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    class="md:sticky right-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Actions</th>
                             </tr>
                         </thead>
@@ -506,7 +522,7 @@ new class extends Component {
                                         </div>
                                     </td>
                                     <td
-                                        class="sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
+                                        class="md:sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
                                         {{ $user->name }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
@@ -566,7 +582,7 @@ new class extends Component {
                                         </span>
                                     </td>
                                     <td
-                                        class="sticky right-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
+                                        class="md:sticky right-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
                                         <div class="flex space-x-2">
                                             @can('my-team.view')
                                                 <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost"
@@ -889,7 +905,7 @@ new class extends Component {
                                                             class="text-sm font-medium text-gray-500 dark:text-gray-400">Date
                                                             Joined</label>
                                                         <p class="text-sm text-gray-900 dark:text-white">
-                                                            {{ $selectedUser->created_at->format('M j, Y g:i A') }}
+                                                            {{ $selectedUser->date_joined->format('M j, Y') }}
                                                         </p>
                                                     </div>
                                                     <div>
