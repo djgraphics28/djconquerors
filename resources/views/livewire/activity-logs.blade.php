@@ -29,7 +29,7 @@ new class extends Component {
 }; ?>
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-    <div class="max-w-7xl mx-auto">
+    <div class="max-w-12xl mx-auto">
         <!-- Header -->
         <div class="mb-8">
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Activity Log</h1>
