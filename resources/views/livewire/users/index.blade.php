@@ -387,6 +387,30 @@ new class extends Component {
     {
         $this->resetPage();
     }
+
+    public function copyWelcomeMessage($userId)
+    {
+        $user = User::find($userId);
+
+        if (!$user) {
+            return;
+        }
+
+        $message =
+            "Welcome to DJ Conquerors! 🍾
+Let's grow, conquer, and succeed together 💪🔥
+
+*{$user->name}*
+Date invested: " .
+            ($user->date_joined ? \Carbon\Carbon::parse($user->date_joined)->format('M j, Y') : 'N/A') .
+            "
+Amount invested: $" .
+            number_format($user->invested_amount, 2) .
+            ' USDT';
+
+        $this->dispatch('copyToClipboard', message: $message);
+        session()->flash('message', 'Welcome message copied to clipboard!');
+    }
 }; ?>
 
 <div class="max-w-10xl mx-auto">
@@ -625,8 +649,22 @@ new class extends Component {
                                             {{ $user->is_active ? 'Active' : 'Inactive' }}
                                         </span>
                                     </td>
-                                    <td class="md:sticky md:right-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
+                                    <td
+                                        class="md:sticky md:right-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
                                         <div class="flex space-x-2">
+                                            @can('users.copy-welcome-message')
+                                                <flux:button wire:click="copyWelcomeMessage({{ $user->id }})"
+                                                    variant="ghost" size="sm"
+                                                    data-test="copy-welcome-message-{{ $user->id }}"
+                                                    title="Copy Welcome Message">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                                    </svg>
+                                                </flux:button>
+                                            @endcan
                                             @can('users.view')
                                                 <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost"
                                                     size="sm" data-test="view-user-{{ $user->id }}"
@@ -968,7 +1006,7 @@ new class extends Component {
                                                                 {{ $selectedUser->inviter->name }}
                                                             </p>
 
-                                                            <small>{{ $selectedUser->inviters_code}}</small>
+                                                            <small>{{ $selectedUser->inviters_code }}</small>
                                                         </div>
                                                         <div>
                                                             <label
@@ -1159,4 +1197,43 @@ new class extends Component {
             </div>
         </div>
     </div>
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('copyToClipboard', async (event) => {
+                try {
+                    await navigator.clipboard.writeText(event.message);
+                    if (window.showToast) {
+                        window.showToast('Welcome message copied to clipboard!', 'success');
+                    } else {
+                        // Fallback for older browsers
+                        const textArea = document.createElement('textarea');
+                        textArea.value = event.message;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                        alert('Welcome message copied to clipboard!');
+                    }
+                } catch (err) {
+                    console.error('Failed to copy:', err);
+                    // Fallback copy method
+                    const textArea = document.createElement('textarea');
+                    textArea.value = event.message;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        if (window.showToast) {
+                            window.showToast('Welcome message copied to clipboard!', 'success');
+                        } else {
+                            alert('Welcome message copied to clipboard!');
+                        }
+                    } catch (err) {
+                        alert('Failed to copy to clipboard. Please try again.');
+                    }
+                    document.body.removeChild(textArea);
+                }
+            });
+        });
+    </script>
 </div>
