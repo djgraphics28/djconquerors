@@ -201,6 +201,7 @@ new class extends Component {
                             :showChildren="true"
                             :showSuperior="!!$superiorNode"
                             :superior="$superiorNode"
+                            :isSuperiorNode="false"
                         />
                     </div>
                 </div>
