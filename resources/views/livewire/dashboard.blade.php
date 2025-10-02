@@ -5,6 +5,7 @@ use App\Models\User;
 use App\Models\Withdrawal;
 use App\Models\Investment;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 new class extends Component {
     public $totalTeamWithdrawals = 0;
@@ -13,6 +14,8 @@ new class extends Component {
     public $totalTeamFirstInvestments = 0;
     public $currentNode;
     public $riscoinId;
+    public $birthdayCelebrators = [];
+    public $membershipAnniversaries = [];
 
     public function mount($riscoinId = null)
     {
@@ -33,6 +36,7 @@ new class extends Component {
 
         $this->riscoinId = $riscoinId;
         $this->calculateStatistics();
+        $this->calculateSpecialOccasions();
     }
 
     private function calculateStatistics()
@@ -64,6 +68,71 @@ new class extends Component {
         // Calculate total team withdrawals
         $this->totalTeamWithdrawals = Withdrawal::whereIn('user_id', $teamMemberIds)
             ->sum('amount');
+    }
+
+    private function calculateSpecialOccasions()
+    {
+        // Get all team member IDs
+        $teamMemberIds = $this->getAllTeamMemberIds($this->currentNode->id);
+
+        // Get current month and year
+        $currentMonth = now()->month;
+        $currentYear = now()->year;
+
+        // Get birthday celebrators with their details
+        $this->birthdayCelebrators = User::whereIn('id', $teamMemberIds)
+            ->whereNotNull('birth_date')
+            ->get()
+            ->filter(function($user) use ($currentMonth) {
+                $birthday = Carbon::parse($user->birth_date);
+                return $birthday->month == $currentMonth;
+            })
+            ->map(function($user) {
+                return [
+                    'name' => $user->name,
+                    'birth_date' => Carbon::parse($user->birth_date)->format('M d'),
+                    'avatar' => $user->getFirstMediaUrl('avatar') ?: $this->getDefaultAvatar(),
+                    'riscoin_id' => $user->riscoin_id
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        // Get membership anniversaries with their details
+        $this->membershipAnniversaries = User::whereIn('id', $teamMemberIds)
+            ->whereNotNull('date_joined')
+            ->get()
+            ->filter(function($user) {
+                $joinDate = Carbon::parse($user->date_joined);
+                $monthsDifference = $joinDate->diffInMonths(now());
+
+                // Check if it's exactly n months since joining (same day of month)
+                return $monthsDifference > 0 && $joinDate->day == now()->day;
+            })
+            ->map(function($user) {
+                $joinDate = Carbon::parse($user->date_joined);
+                $monthsWithTeam = number_format($joinDate->diffInMonths(now()));
+
+                return [
+                    'name' => $user->name,
+                    'join_date' => $joinDate->format('M d, Y'),
+                    'months_with_team' => $monthsWithTeam,
+                    'avatar' => $user->getFirstMediaUrl('avatar') ?: $this->getDefaultAvatar(),
+                    'riscoin_id' => $user->riscoin_id
+                ];
+            })
+            ->values()
+            ->toArray();
+    }
+
+    private function getDefaultAvatar()
+    {
+        // Return a default avatar URL or SVG
+        return 'data:image/svg+xml;base64,' . base64_encode('
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+        ');
     }
 
     private function getAllTeamMemberIds($userId)
@@ -179,6 +248,100 @@ new class extends Component {
                     <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Team Investments</h3>
                     <p class="text-3xl font-bold text-orange-600 dark:text-orange-400 mt-2">${{ number_format($totalTeamFirstInvestments, 2) }}</p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Cards for Special Occasions -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Birthday Celebrators Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-pink-100 dark:bg-pink-900 mr-4">
+                        <svg class="w-6 h-6 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Birthday Celebrators</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">This month</p>
+                    </div>
+                    <div class="ml-auto bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400 px-3 py-1 rounded-full text-sm font-semibold">
+                        {{ count($birthdayCelebrators) }}
+                    </div>
+                </div>
+            </div>
+            <div class="p-6">
+                @if(count($birthdayCelebrators) > 0)
+                    <div class="space-y-3">
+                        @foreach($birthdayCelebrators as $celebrator)
+                            <div class="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                <img class="w-10 h-10 rounded-full mr-3" src="{{ $celebrator['avatar'] }}" alt="{{ $celebrator['name'] }}">
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 dark:text-white">{{ $celebrator['name'] }}</h4>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                                        Birthday: {{ $celebrator['birth_date'] }} •
+                                        ID: {{ $celebrator['riscoin_id'] }}
+                                    </p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-center py-8">
+                        <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        <p class="mt-2 text-gray-500 dark:text-gray-400">No birthdays this month</p>
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        <!-- Membership Anniversaries Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900 mr-4">
+                        <svg class="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Membership</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Monthly milestones</p>
+                    </div>
+                    <div class="ml-auto bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full text-sm font-semibold">
+                        {{ count($membershipAnniversaries) }}
+                    </div>
+                </div>
+            </div>
+            <div class="p-6">
+                @if(count($membershipAnniversaries) > 0)
+                    <div class="space-y-3">
+                        @foreach($membershipAnniversaries as $member)
+                            <div class="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                <img class="w-10 h-10 rounded-full mr-3" src="{{ $member['avatar'] }}" alt="{{ $member['name'] }}">
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 dark:text-white">{{ $member['name'] }}</h4>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                                        Joined: {{ $member['join_date'] }} •
+                                        {{ $member['months_with_team'] }} month{{ $member['months_with_team'] > 1 ? 's' : '' }} with team
+                                    </p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-center py-8">
+                        <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        <p class="mt-2 text-gray-500 dark:text-gray-400">No anniversaries today</p>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
