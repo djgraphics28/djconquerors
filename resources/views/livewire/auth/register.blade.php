@@ -20,6 +20,13 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $birth_date = '';
     public string $phone_number = '';
 
+    public function mount(): void
+    {
+        if (request()->has('ref')) {
+            $this->inviters_code = request()->get('ref');
+        }
+    }
+
     /**
      * Handle an incoming registration request.
      */
