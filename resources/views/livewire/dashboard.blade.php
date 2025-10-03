@@ -162,6 +162,20 @@ new class extends Component {
 
         return array_unique($memberIds);
     }
+
+    public function getRandomBirthdayMessage($name)
+    {
+        $messages = [
+            "Happy Birthday, {$name}!\n\nOn your special day, we want you to know how much you are loved and appreciated. May your heart be filled with joy, your year ahead with blessings, and your life with endless happiness.\n\nWishing you all the very best today and always.\n\nWith love,\nDJ Conquerors Family",
+            "Happy Birthday, {$name}!\n\nHope your day is as amazing as you are! Sending you lots of love and good vibes on your special day.\n\nCheers,\nDJ Conquerors Family",
+            "It's your birthday, {$name}! Time to conquer the day! 🎉\n\nGet ready for cake, good music, and great times! We hope your day is filled with fantastic moments and unforgettable memories. Let's make some noise!\n\nAll the best,\nDJ Conquerors Family",
+            "A very happy birthday to you, {$name}.\n\nOn this wonderful day, we're reminded of how grateful we are to have you in our lives/family. May you be surrounded by love, laughter, and everything that brings you happiness.\n\nWarmest wishes on your birthday.\n\nSincerely,\nDJ Conquerors Family",
+            "🎂 HAPPY BIRTHDAY, {$name}! 🎶\n\nAnother year older, wiser, and more awesome! The DJ Conquerors Family is wishing you a day full of good tunes, great company, and non-stop fun. Have a blast!\n\nMuch love,\nDJ Conquerors Family",
+            "Dear {$name},\n\nWe extend our warmest wishes to you on the occasion of your birthday. May this new year of your life bring you success, health, and profound happiness.\n\nBest regards,\nDJ Conquerors Family",
+        ];
+
+        return $messages[array_rand($messages)];
+    }
 }; ?>
 
 <div>
@@ -308,8 +322,39 @@ new class extends Component {
                                     \Carbon\Carbon::parse($celebrator['birth_date'])->format('m-d') ===
                                     now()->format('m-d');
                             @endphp
-                            <div
-                                class="flex items-center p-3 {{ $isBirthdayToday ? 'bg-pink-50 dark:bg-pink-900/20 border-2 border-pink-200 dark:border-pink-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg">
+                            <div x-data="{
+                                copied: false,
+                                async copyToClipboard() {
+                                    try {
+                                        // Call the Livewire method to get the message
+                                        const message = await $wire.getRandomBirthdayMessage('{{ $celebrator['name'] }}');
+
+                                        // Use the modern Clipboard API
+                                        await navigator.clipboard.writeText(message);
+
+                                        // Show feedback
+                                        this.copied = true;
+                                        setTimeout(() => {
+                                            this.copied = false;
+                                        }, 2000);
+                                    } catch (err) {
+                                        // Fallback for older browsers
+                                        console.error('Failed to copy: ', err);
+                                        const textArea = document.createElement('textarea');
+                                        textArea.value = await $wire.getRandomBirthdayMessage('{{ $celebrator['name'] }}');
+                                        document.body.appendChild(textArea);
+                                        textArea.select();
+                                        document.execCommand('copy');
+                                        document.body.removeChild(textArea);
+
+                                        this.copied = true;
+                                        setTimeout(() => {
+                                            this.copied = false;
+                                        }, 2000);
+                                    }
+                                }
+                            }" @click="copyToClipboard()"
+                                class="flex items-center p-3 {{ $isBirthdayToday ? 'bg-pink-50 dark:bg-pink-900/20 border-2 border-pink-200 dark:border-pink-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition duration-200 relative">
                                 <img class="w-10 h-10 rounded-full mr-3" src="{{ $celebrator['avatar'] }}"
                                     alt="{{ $celebrator['name'] }}">
                                 <div class="flex-1">
@@ -329,6 +374,11 @@ new class extends Component {
                                                 Today! 🎉</span>
                                         @endif
                                     </p>
+                                </div>
+                                <!-- Copy feedback -->
+                                <div x-show="copied" x-transition
+                                    class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg">
+                                    <span class="text-white font-semibold">Copied to clipboard! 📋</span>
                                 </div>
                             </div>
                         @endforeach
