@@ -469,8 +469,20 @@ new class extends Component {
                                 copied: false,
                                 async copyToClipboard() {
                                     try {
+                                        // Prepare the member data for Livewire method
+                                        const memberData = {
+                                            name: '{{ $member['name'] }}',
+                                            join_date: '{{ $member['join_date'] }}',
+                                            months_with_team: '{{ $member['months_with_team'] }}',
+                                            avatar: '{{ $member['avatar'] }}',
+                                            riscoin_id: '{{ $member['riscoin_id'] }}',
+                                            invested_amount: '{{ $member['invested_amount'] }}',
+                                            date_joined: '{{ $member['date_joined'] }}',
+                                            is_today_joined: {{ $isTodayJoined ? 'true' : 'false' }}
+                                        };
+
                                         // Call the Livewire method to get the message
-                                        const message = await $wire.getMembershipAnniversaryMessage(@json($member));
+                                        const message = await $wire.getMembershipAnniversaryMessage(memberData);
 
                                         // Use the modern Clipboard API
                                         await navigator.clipboard.writeText(message);
@@ -483,8 +495,21 @@ new class extends Component {
                                     } catch (err) {
                                         // Fallback for older browsers
                                         console.error('Failed to copy: ', err);
+
+                                        // Prepare member data for fallback
+                                        const memberData = {
+                                            name: '{{ $member['name'] }}',
+                                            join_date: '{{ $member['join_date'] }}',
+                                            months_with_team: '{{ $member['months_with_team'] }}',
+                                            avatar: '{{ $member['avatar'] }}',
+                                            riscoin_id: '{{ $member['riscoin_id'] }}',
+                                            invested_amount: '{{ $member['invested_amount'] }}',
+                                            date_joined: '{{ $member['date_joined'] }}',
+                                            is_today_joined: {{ $isTodayJoined ? 'true' : 'false' }}
+                                        };
+
                                         const textArea = document.createElement('textarea');
-                                        textArea.value = await $wire.getMembershipAnniversaryMessage(@json($member));
+                                        textArea.value = await $wire.getMembershipAnniversaryMessage(memberData);
                                         document.body.appendChild(textArea);
                                         textArea.select();
                                         document.execCommand('copy');
