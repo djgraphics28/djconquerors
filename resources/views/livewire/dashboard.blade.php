@@ -97,6 +97,8 @@ new class extends Component {
                     'birth_date' => Carbon::parse($user->birth_date)->format('M d'),
                     'avatar' => $user->getFirstMediaUrl('avatar') ?: $this->getDefaultAvatar(),
                     'riscoin_id' => $user->riscoin_id,
+                    'invested_amount' => $user->invested_amount,
+                    'date_joined' => $user->date_joined,
                 ];
             })
             ->values()
@@ -123,6 +125,9 @@ new class extends Component {
                     'months_with_team' => $monthsWithTeam,
                     'avatar' => $user->getFirstMediaUrl('avatar') ?: $this->getDefaultAvatar(),
                     'riscoin_id' => $user->riscoin_id,
+                    'invested_amount' => $user->invested_amount,
+                    'date_joined' => $user->date_joined,
+                    'is_today_joined' => $joinDate->format('Y-m-d') === now()->format('Y-m-d'),
                 ];
             })
             ->values()
@@ -175,6 +180,38 @@ new class extends Component {
         ];
 
         return $messages[array_rand($messages)];
+    }
+
+    public function getMembershipAnniversaryMessage($member)
+    {
+        $name = $member['name'];
+        $joinDate = Carbon::parse($member['date_joined'])->format('M j, Y');
+        $investedAmount = $member['invested_amount'] ?? 0;
+
+        // If joined today
+        if ($member['is_today_joined']) {
+            return "Welcome to DJ Conquerors! 🍾\nLet's grow, conquer, and succeed together 💪🔥\n\n{$name}\nDate invested: {$joinDate}\nAmount invested: \${$investedAmount} USDT";
+        }
+
+        // Monthly milestone messages
+        $messages = [
+            "🎯 Monthly Milestone Unlocked!\nTeam DJ Conquerors, we've made another month of progress, passion, and perseverance. Let's celebrate the wins, learn from the challenges, and keep pushing forward together!\nLet's conquer more milestones ahead.\n— DJ Conquerors Team 💪",
+
+            "🔥 This month was an incredible one for DJ Conquerors!\nEvery challenge faced and every goal achieved shows our unstoppable spirit. Here's to more victories, stronger teamwork, and endless success in the coming months!\nProudly,\nDJ Conquerors Family",
+
+            "💥 Cheers to our Monthly Milestone!\nWe've proven once again that dedication and unity make us unstoppable. Let's keep the fire burning as we set our sights on even greater goals.\nKeep conquering,\nDJ Conquerors",
+
+            "👏 Monthly Milestone Celebration!\nEach member of DJ Conquerors played a part in this success story. Thank you for your hard work, energy, and passion. Together, we rise — higher and stronger every month.\nWith appreciation,\nDJ Conquerors Team",
+
+            "🚀 This Month Was One to Remember!\nWe hit our targets, strengthened our bond, and kept our Conqueror spirit alive. Let's take this momentum into the next chapter — the journey continues!\nMuch respect,\nDJ Conquerors Family",
+
+            "🌟 DJ Conquerors Monthly Milestone!\nAnother month of teamwork, dedication, and breakthroughs! Let's celebrate our success and prepare to conquer new horizons ahead.\nWith gratitude,\nDJ Conquerors Team",
+        ];
+
+        $selectedMessage = $messages[array_rand($messages)];
+
+        // Add member-specific information
+        return "{$selectedMessage}\n\n🎊 Celebrating {$member['months_with_team']} month" . ($member['months_with_team'] > 1 ? 's' : '') . " with {$name}!\nJoined: {$joinDate}\nInvestment: \${$investedAmount} USDT";
     }
 }; ?>
 
@@ -423,16 +460,69 @@ new class extends Component {
                 @if (count($membershipAnniversaries) > 0)
                     <div class="space-y-3">
                         @foreach ($membershipAnniversaries as $member)
-                            <div class="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            @php
+                                $isTodayJoined =
+                                    \Carbon\Carbon::parse($member['date_joined'])->format('Y-m-d') ===
+                                    now()->format('Y-m-d');
+                            @endphp
+                            <div x-data="{
+                                copied: false,
+                                async copyToClipboard() {
+                                    try {
+                                        // Call the Livewire method to get the message
+                                        const message = await $wire.getMembershipAnniversaryMessage(@json($member));
+
+                                        // Use the modern Clipboard API
+                                        await navigator.clipboard.writeText(message);
+
+                                        // Show feedback
+                                        this.copied = true;
+                                        setTimeout(() => {
+                                            this.copied = false;
+                                        }, 2000);
+                                    } catch (err) {
+                                        // Fallback for older browsers
+                                        console.error('Failed to copy: ', err);
+                                        const textArea = document.createElement('textarea');
+                                        textArea.value = await $wire.getMembershipAnniversaryMessage(@json($member));
+                                        document.body.appendChild(textArea);
+                                        textArea.select();
+                                        document.execCommand('copy');
+                                        document.body.removeChild(textArea);
+
+                                        this.copied = true;
+                                        setTimeout(() => {
+                                            this.copied = false;
+                                        }, 2000);
+                                    }
+                                }
+                            }" @click="copyToClipboard()"
+                                class="flex items-center p-3 {{ $isTodayJoined ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition duration-200 relative">
                                 <img class="w-10 h-10 rounded-full mr-3" src="{{ $member['avatar'] }}"
                                     alt="{{ $member['name'] }}">
                                 <div class="flex-1">
-                                    <h4 class="font-medium text-gray-900 dark:text-white">{{ $member['name'] }}</h4>
+                                    <h4 class="font-medium text-gray-900 dark:text-white flex items-center">
+                                        {{ $member['name'] }}
+                                        @if ($isTodayJoined)
+                                            <span class="ml-2 inline-flex">
+                                                🎊🎉✨
+                                            </span>
+                                        @endif
+                                    </h4>
                                     <p class="text-sm text-gray-500 dark:text-gray-400">
                                         Joined: {{ $member['join_date'] }} •
                                         {{ $member['months_with_team'] }}
                                         month{{ $member['months_with_team'] > 1 ? 's' : '' }} with team
+                                        @if ($isTodayJoined)
+                                            <span class="ml-2 text-indigo-600 dark:text-indigo-400 font-medium">Joined
+                                                Today! 🎉</span>
+                                        @endif
                                     </p>
+                                </div>
+                                <!-- Copy feedback -->
+                                <div x-show="copied" x-transition
+                                    class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg">
+                                    <span class="text-white font-semibold">Copied to clipboard! 📋</span>
                                 </div>
                             </div>
                         @endforeach
