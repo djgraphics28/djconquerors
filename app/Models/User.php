@@ -40,6 +40,8 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         'date_joined',
         'birth_date',
         'phone_number',
+        'is_birthday_mention',
+        'is_monthly_milestone_mention',
     ];
 
     /**
