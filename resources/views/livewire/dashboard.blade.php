@@ -99,6 +99,7 @@ new class extends Component {
                     'riscoin_id' => $user->riscoin_id,
                     'invested_amount' => $user->invested_amount,
                     'date_joined' => $user->date_joined,
+                    'is_birthday_mention' => $user->is_birthday_mention == 1 ? true : false,
                 ];
             })
             ->values()
@@ -128,6 +129,7 @@ new class extends Component {
                     'invested_amount' => $user->invested_amount,
                     'date_joined' => $user->date_joined,
                     'is_today_joined' => $joinDate->format('Y-m-d') === now()->format('Y-m-d'),
+                    'is_monthly_milestone_mention' => $user->is_monthly_milestone_mention == 1 ? true : false,
                 ];
             })
             ->values()
@@ -211,7 +213,7 @@ new class extends Component {
         $selectedMessage = $messages[array_rand($messages)];
 
         // Add member-specific information
-        return "{$selectedMessage}\n\n🎊 Celebrating {$member['months_with_team']} month" . ($member['months_with_team'] > 1 ? 's' : '') . " with {$name}!\nJoined: {$joinDate}\nInvestment: \${$investedAmount} USDT";
+        return "{$selectedMessage}\n\n🎊 Celebrating {$member['months_with_team']} month" . ($member['months_with_team'] > 1 ? 's' : '') . " with {$name}!\nJoined: {$joinDate}";
     }
 }; ?>
 
@@ -362,6 +364,7 @@ new class extends Component {
                             <div x-data="{
                                 copied: false,
                                 async copyToClipboard() {
+                                    if (!{{ $celebrator['is_birthday_mention'] }}) return;
                                     try {
                                         // Call the Livewire method to get the message
                                         const message = await $wire.getRandomBirthdayMessage('{{ $celebrator['name'] }}');
@@ -391,7 +394,7 @@ new class extends Component {
                                     }
                                 }
                             }" @click="copyToClipboard()"
-                                class="flex items-center p-3 {{ $isBirthdayToday ? 'bg-pink-50 dark:bg-pink-900/20 border-2 border-pink-200 dark:border-pink-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition duration-200 relative">
+                                class="flex items-center p-3 {{ $isBirthdayToday ? 'bg-pink-50 dark:bg-pink-900/20 border-2 border-pink-200 dark:border-pink-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg {{ $celebrator['is_birthday_mention'] ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600' : 'cursor-not-allowed opacity-75' }} transition duration-200 relative">
                                 <img class="w-10 h-10 rounded-full mr-3" src="{{ $celebrator['avatar'] }}"
                                     alt="{{ $celebrator['name'] }}">
                                 <div class="flex-1">
@@ -468,6 +471,7 @@ new class extends Component {
                             <div x-data="{
                                 copied: false,
                                 async copyToClipboard() {
+                                    if (!{{ $member['is_monthly_milestone_mention'] }}) return;
                                     try {
                                         // Prepare the member data for Livewire method
                                         const memberData = {
@@ -522,7 +526,7 @@ new class extends Component {
                                     }
                                 }
                             }" @click="copyToClipboard()"
-                                class="flex items-center p-3 {{ $isTodayJoined ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition duration-200 relative">
+                                class="flex items-center p-3 {{ $isTodayJoined ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg {{ $member['is_monthly_milestone_mention'] ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600' : 'cursor-not-allowed opacity-75' }} transition duration-200 relative">
                                 <img class="w-10 h-10 rounded-full mr-3" src="{{ $member['avatar'] }}"
                                     alt="{{ $member['name'] }}">
                                 <div class="flex-1">
