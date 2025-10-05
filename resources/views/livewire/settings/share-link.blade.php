@@ -48,12 +48,12 @@ new class extends Component {
 <section class="w-full">
     @include('partials.settings-heading')
 
-    <x-settings.layout :heading="__('Invite Link')" :subheading="__('Share your invite link to invite others')">
+    <x-settings.layout :heading="__('Invite Link')" :subheading="__('Share your invite link to your personal invite')">
         <div class="flex flex-col w-full mx-auto space-y-6 text-sm" wire:cloak>
             <div class="space-y-4">
-                <flux:text>
+                {{-- <flux:text>
                     {{ __('Share your invite link with friends and earn rewards when they sign up using your link.') }}
-                </flux:text>
+                </flux:text> --}}
 
                 <!-- Invite Link Section -->
                 <div class="space-y-4">

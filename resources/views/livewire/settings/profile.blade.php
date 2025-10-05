@@ -21,6 +21,8 @@ new class extends Component {
     public $avatar = null;
     public $uploadProgress = 0;
     public $isUploading = false;
+    public $isBirthdayMention = true;
+    public $isMonthlyMilestoneMention = true;
 
     /**
      * Mount the component.
@@ -37,6 +39,8 @@ new class extends Component {
         $this->date_joined = $user->date_joined;
         $this->birth_date = $user->birth_date;
         $this->phone_number = $user->phone_number;
+        $this->isBirthdayMention = $user->is_birthday_mention == 1 ? true : false;
+        $this->isMonthlyMilestoneMention = $user->is_monthly_milestone_mention == 1 ? true : false;
 
         // dd($user->getFirstMediaUrl('avatar'));
     }
@@ -88,6 +92,8 @@ new class extends Component {
 
         $validated['riscoin_id'] = strtoupper($validated['riscoin_id']);
         $validated['inviters_code'] = strtoupper($validated['inviters_code']);
+        $validated['is_birthday_mention'] = $this->isBirthdayMention;
+        $validated['is_monthly_milestone_mention'] = $this->isMonthlyMilestoneMention;
 
         $user->fill($validated);
 
@@ -308,6 +314,18 @@ new class extends Component {
             <flux:input wire:model="birth_date" :label="__('Birth Date')" type="date" />
             <flux:input wire:model="phone_number" :label="__('Phone Number')" type="tel" />
 
+            {{-- Mentions --}}
+            <div class="flex flex-col gap-4">
+                <label class="flex items-center">
+                    <input type="checkbox" wire:model="isBirthdayMention" class="form-checkbox h-5 w-5 text-blue-600">
+                    <span class="ml-2">{{ __('Do you want to be greeted on your Birthday?') }}</span> </label>
+                <label class="flex items-center">
+                    <input type="checkbox" wire:model="isMonthlyMilestoneMention"
+                        class="form-checkbox h-5 w-5 text-blue-600">
+                    <span class="ml-2">{{ __('Do you want to be mentioned on Monthly Milestones?') }}</span>
+                </label>
+            </div>
+
             <div class="flex items-center gap-4">
                 <div class="flex items-center justify-end">
                     <flux:button variant="primary" type="submit" class="w-full" data-test="update-profile-button"
@@ -332,6 +350,6 @@ new class extends Component {
             </div>
         </form>
 
-        <livewire:settings.delete-user-form />
+        {{-- <livewire:settings.delete-user-form /> --}}
     </x-settings.layout>
 </section>
