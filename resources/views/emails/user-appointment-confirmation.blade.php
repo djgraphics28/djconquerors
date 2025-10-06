@@ -10,6 +10,7 @@ Your appointment has been successfully booked! Here are your appointment details
 - **Appointment Type:** {{ $appointmentType }}
 - **Date:** {{ $appointment->start_time->format('l, F j, Y') }}
 - **Time:** {{ $appointment->start_time->format('g:i A') }} - {{ $appointment->end_time->format('g:i A') }}
+- **Venue:** {{ ucfirst($appointment->venue) }}
 - **Status:** {{ ucfirst($appointment->status) }}
 
 @if($appointment->notes)

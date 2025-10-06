@@ -16,6 +16,7 @@ class Appointment extends Model
         'status',
         'is_sure_investor',
         'notes',
+        'venue'
     ];
 
     protected $casts = [
