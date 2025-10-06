@@ -61,6 +61,19 @@ class RolesPermissionSeeder extends Seeder
             'my-team.access',
             'my-team.view',
             'my-team.edit',
+
+            //Apointments
+            'appointments.book',
+            'appointments.view',
+            'appointments.create',
+            'appointments.edit',
+            'appointments.delete',
+
+            //Email Receivers
+            'email-receivers.view',
+            'email-receivers.create',
+            'email-receivers.edit',
+            'email-receivers.delete',
         ];
 
         foreach ($adminPermissions as $permission) {
@@ -81,7 +94,8 @@ class RolesPermissionSeeder extends Seeder
             'genealogy.view',
             'tutorials.access',
             'my-team.access',
-            'my-team.view'
+            'my-team.view',
+            'appointments.book',
         ]);
 
         $adminUser = User::where('email', 'admin@djconquerors.com')->first();

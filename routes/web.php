@@ -19,7 +19,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('my-team','my-team')->name('my-team');
     Volt::route('my-withdrawals', 'my-withdrawals')->name('my-withdrawals');
 
-    // Volt::route('my-withdrawals/{id}', 'my-withdrawals.show')->name('my-withdrawals.show');
+    Volt::route('book-appointment', 'appointments.create')->name('appointments.create');
+    Volt::route('appointments', 'appointments.index')->name('appointments.index');
 
     Volt::route('users', 'users.index')->name('users.index');
 
@@ -30,6 +31,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('tutorials-access', 'tutorials.access')->name('tutorials.access');
 
     Volt::route('activity-logs', 'activity-logs')->name('activity-logs');
+
+    Volt::route('email-receivers', 'email-receiver')->name('email-receivers');
 
     Route::redirect('settings', 'settings/profile');
 
