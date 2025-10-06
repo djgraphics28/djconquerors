@@ -176,8 +176,11 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         $joinedDate = \Illuminate\Support\Carbon::parse($this->date_joined);
         $now = now();
 
-        $months = $joinedDate->diffInMonths($now);
-        $days = $joinedDate->addMonths($months)->diffInDays($now);
+        // Calculate total difference in months and days
+        $diff = $joinedDate->diff($now);
+
+        $months = $diff->y * 12 + $diff->m;
+        $days = $diff->d;
 
         return number_format($months) . " months and " . number_format($days) . " days";
     }
