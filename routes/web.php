@@ -15,7 +15,8 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('dashboard', 'dashboard')->name('dashboard');
     Volt::route('genealogy', 'genealogy.index')->name('genealogy');
-    Volt::route('genealogy/{riscoinId}', 'genealogy.show')->name('genealogy.show');
+    Volt::route('genealogy/{riscoinId}', 'genealogy.index')->name('genealogy.show');
+    Volt::route('my-team','my-team')->name('my-team');
     Volt::route('my-withdrawals', 'my-withdrawals')->name('my-withdrawals');
 
     // Volt::route('my-withdrawals/{id}', 'my-withdrawals.show')->name('my-withdrawals.show');
@@ -35,6 +36,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('settings/profile', 'settings.profile')->name('profile.edit');
     Volt::route('settings/password', 'settings.password')->name('password.edit');
     Volt::route('settings/appearance', 'settings.appearance')->name('appearance.edit');
+    Volt::route('settings/share-link', 'settings.share-link')->name('share-link');
 
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(

@@ -2,21 +2,27 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Carbon\Carbon;
 use Illuminate\Support\Str;
+use Spatie\Image\Enums\Fit;
+use Spatie\MediaLibrary\HasMedia;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\MediaLibrary\InteractsWithMedia;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
-class User extends Authenticatable implements MustVerifyEmail {
+class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles;
     use LogsActivity;
+    use InteractsWithMedia;
 
     /**
      * The attributes that are mass assignable.
@@ -34,6 +40,8 @@ class User extends Authenticatable implements MustVerifyEmail {
         'date_joined',
         'birth_date',
         'phone_number',
+        'is_birthday_mention',
+        'is_monthly_milestone_mention',
     ];
 
     /**
@@ -56,8 +64,13 @@ class User extends Authenticatable implements MustVerifyEmail {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'date_joined' => 'date',
+            'birth_date' => 'date',
+            'invested_amount' => 'decimal:2',
         ];
     }
+
+    protected $appends = ['age'];
 
     /**
      * Get the user's initials
@@ -137,5 +150,56 @@ class User extends Authenticatable implements MustVerifyEmail {
         return LogOptions::defaults()
         ->logOnly(['name', 'email', 'riscoin_id', 'inviters_code', 'invested_amount', 'is_active', 'date_joined', 'birth_date', 'phone_number']);
         // Chain fluent methods for configuration options
+    }
+
+    public function inviter()
+    {
+        return $this->belongsTo(User::class, 'inviters_code', 'riscoin_id');
+    }
+
+    public function getAgeAttribute()
+    {
+        if (!$this->birth_date) {
+            return null;
+        }
+
+        $age = $this->birth_date->age;
+        return "{$age} years old";
+    }
+
+    public function getMonthsAndDaysSinceJoinedAttribute()
+    {
+        if (!$this->date_joined) {
+            return null;
+        }
+
+        $joinedDate = \Illuminate\Support\Carbon::parse($this->date_joined);
+        $now = now();
+
+        // Calculate total difference in months and days
+        $diff = $joinedDate->diff($now);
+
+        $months = $diff->y * 12 + $diff->m;
+        $days = $diff->d;
+
+        return number_format($months) . " months and " . number_format($days) . " days";
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this
+            ->addMediaConversion('preview')
+            ->fit(Fit::Contain, 300, 300)
+            ->nonQueued();
+    }
+
+    public function getNameAttribute($value)
+    {
+        return Str::title($value);
+    }
+
+    public function superior()
+    {
+        return $this->belongsTo(User::class, 'inviters_code', 'riscoin_id');
     }
 }
