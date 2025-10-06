@@ -28,6 +28,7 @@ class RolesPermissionSeeder extends Seeder
             'users.delete',
             'users.disable-enable',
             'users.cop-welcome-message',
+            'users.verify-email',
 
             //Roles
             'roles.view',
