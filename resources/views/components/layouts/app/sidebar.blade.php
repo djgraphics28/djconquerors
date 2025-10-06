@@ -26,7 +26,7 @@
                         <flux:navlist.item icon="credit-card" :href="route('my-withdrawals')" :current="request()->routeIs('my-withdrawals')" wire:navigate>{{ __('My Withdrawals') }}</flux:navlist.item>
                     @endcan
                     @can('appointments.book')
-                        <flux:navlist.item icon="calendar" :href="route('appointments.create')" :current="request()->routeIs('book-appointment')" wire:navigate>{{ __('Book An Appointment') }}</flux:navlist.item>
+                        <flux:navlist.item icon="calendar" :href="route('appointments.book')" :current="request()->routeIs('book-appointment')" wire:navigate>{{ __('Book An Appointment') }}</flux:navlist.item>
                     @endcan
                     @can('appointments.view')
                         <flux:navlist.item icon="calendar" :href="route('appointments.index')" :current="request()->routeIs('appointments')" wire:navigate>{{ __('Manage Appointments') }}</flux:navlist.item>

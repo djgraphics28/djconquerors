@@ -16,6 +16,7 @@ new class extends Component {
     public $selectedSlot = null;
     public $isSureInvestor = null;
     public $notes = '';
+    public $venue = '';
     public $availableSlots = [];
     public $appointments = [];
     public $calendarDays = [];
@@ -187,7 +188,7 @@ new class extends Component {
 
     public function bookAppointment()
     {
-        if (!$this->selectedDate || !$this->selectedSlot || is_null($this->isSureInvestor)) {
+        if (!$this->selectedDate || !$this->selectedSlot || is_null($this->isSureInvestor) || $this->venue == "") {
             $this->addError('booking', 'Please complete all required steps.');
             return;
         }
@@ -211,6 +212,7 @@ new class extends Component {
                 'start_time' => $startDateTime,
                 'end_time' => $endDateTime,
                 'notes' => $this->notes,
+                'venue' => $this->venue,
                 'is_sure_investor' => $this->isSureInvestor,
                 'status' => 'pending',
             ]);
@@ -254,6 +256,7 @@ new class extends Component {
                     'end_time' => $appointment->end_time->format('g:i A'),
                     'status' => $appointment->status,
                     'notes' => $appointment->notes,
+                    'venue' => $appointment->venue,
                     'booked_by' => $appointment->user->name,
                 ];
             })
@@ -388,6 +391,9 @@ new class extends Component {
                                         </p>
                                         <p class="text-sm text-gray-600 dark:text-gray-400">
                                             Booked by: {{ $appointment['booked_by'] }}
+                                        </p>
+                                         <p class="text-sm text-gray-600 dark:text-gray-400">
+                                            Venue: {{ $appointment['venue'] }}
                                         </p>
                                         @if ($appointment['notes'])
                                             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -628,6 +634,17 @@ new class extends Component {
                                         </button>
                                     @endforeach
                                 </div>
+                            </div>
+
+                            {{-- Venue --}}
+                            <div class="mb-6">
+                                <label for="venue"
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Venue / Location
+                                </label>
+                                <input type="text" wire:model="venue" id="venue"
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                                    placeholder="Enter venue details...">
                             </div>
 
                             <!-- Notes -->
