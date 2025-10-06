@@ -25,6 +25,12 @@
                     @can('my-withdrawals.view')
                         <flux:navlist.item icon="credit-card" :href="route('my-withdrawals')" :current="request()->routeIs('my-withdrawals')" wire:navigate>{{ __('My Withdrawals') }}</flux:navlist.item>
                     @endcan
+                    @can('appointments.book')
+                        <flux:navlist.item icon="calendar" :href="route('appointments.create')" :current="request()->routeIs('book-appointment')" wire:navigate>{{ __('Book An Appointment') }}</flux:navlist.item>
+                    @endcan
+                    @can('appointments.view')
+                        <flux:navlist.item icon="calendar" :href="route('appointments.index')" :current="request()->routeIs('appointments')" wire:navigate>{{ __('Manage Appointments') }}</flux:navlist.item>
+                    @endcan
                     @can('tutorials.view')
                         <flux:navlist.item icon="play-circle" :href="route('tutorials.index')" :current="request()->routeIs('tutorials.index')" wire:navigate>{{ __('Tutorials Management') }}</flux:navlist.item>
                     @endcan
@@ -39,6 +45,9 @@
                     @endcan
                     @can('activity-logs.view')
                         <flux:navlist.item icon="clipboard" :href="route('activity-logs')" :current="request()->routeIs('activity-logs')" wire:navigate>{{ __('Activity Logs') }}</flux:navlist.item>
+                    @endcan
+                    @can('email-receivers.view')
+                        <flux:navlist.item icon="envelope" :href="route('email-receivers')" :current="request()->routeIs('email-receivers')" wire:navigate>{{ __('Email Receivers') }}</flux:navlist.item>
                     @endcan
                     </flux:navlist.group>
             </flux:navlist>
