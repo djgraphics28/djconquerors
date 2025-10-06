@@ -73,9 +73,142 @@ new class extends Component {
 
     public function viewUser($userId)
     {
-        $this->selectedUser = User::with('roles')->find($userId);
+        $this->selectedUser = User::with(['roles', 'withdrawals'])->find($userId);
         $this->loadActivityLogs($userId);
         $this->showViewModal = true;
+    }
+
+    // Get total withdrawals amount for a user (only paid status)
+    public function getTotalWithdrawals($userId)
+    {
+        $user = User::with('withdrawals')->find($userId);
+        if (!$user || !$user->withdrawals) {
+            return 0;
+        }
+
+        return $user->withdrawals->where('status', 'paid')->sum('amount');
+    }
+
+    // Get capital recovery status
+    public function getCapitalRecoveryStatus($userId)
+    {
+        $user = User::find($userId);
+        if (!$user) {
+            return [
+                'status' => 'unknown',
+                'label' => 'Unknown',
+                'color' => 'gray',
+            ];
+        }
+
+        $totalWithdrawals = $this->getTotalWithdrawals($userId);
+        $investedAmount = $user->invested_amount ?? 0;
+
+        if ($investedAmount == 0) {
+            return [
+                'status' => 'no_investment',
+                'label' => 'No Investment',
+                'color' => 'gray',
+            ];
+        }
+
+        if ($totalWithdrawals < $investedAmount) {
+            $percentage = ($totalWithdrawals / $investedAmount) * 100;
+            return [
+                'status' => 'recovering',
+                'label' => 'Recovering (' . number_format($percentage, 1) . '%)',
+                'color' => 'yellow',
+            ];
+        } else {
+            return [
+                'status' => 'recovered',
+                'label' => 'Capital Recovered',
+                'color' => 'green',
+            ];
+        }
+    }
+
+    // Get all team members recursively (direct invites + their invites + their invites, etc.)
+    public function getAllTeamMembers($riscoinId)
+    {
+        $allMembers = collect();
+
+        // Get direct invites
+        $directInvites = User::with(['roles', 'inviter'])
+            ->where('inviters_code', $riscoinId)
+            ->where('inviters_code', '!=', '')
+            ->get();
+
+        foreach ($directInvites as $invite) {
+            $allMembers->push($invite);
+            // Recursively get invites of this invite
+            $nestedInvites = $this->getAllTeamMembers($invite->riscoin_id);
+            $allMembers = $allMembers->merge($nestedInvites);
+        }
+
+        return $allMembers;
+    }
+
+    // Get team level for display (1 for direct, 2 for their invites, etc.)
+    public function getTeamLevel($userId, $currentUserRiscoinId)
+    {
+        $level = 1;
+        $user = User::find($userId);
+
+        if (!$user || !$user->inviters_code) {
+            return $level;
+        }
+
+        // If user's inviter is the current user, it's level 1
+        if ($user->inviters_code === $currentUserRiscoinId) {
+            return $level;
+        }
+
+        // Otherwise, find the level by checking the hierarchy
+        $currentInviterCode = $user->inviters_code;
+        $level = 2; // Start from level 2 since we already checked level 1
+
+        while ($currentInviterCode && $currentInviterCode !== $currentUserRiscoinId) {
+            $inviter = User::where('riscoin_id', $currentInviterCode)->first();
+            if (!$inviter || !$inviter->inviters_code) {
+                break;
+            }
+
+            if ($inviter->inviters_code === $currentUserRiscoinId) {
+                return $level;
+            }
+
+            $currentInviterCode = $inviter->inviters_code;
+            $level++;
+
+            // Safety check to prevent infinite loops
+            if ($level > 10) {
+                break;
+            }
+        }
+
+        return $level;
+    }
+
+    // Get total team count for a user (recursive)
+    public function getTeamCount($userId)
+    {
+        $user = User::find($userId);
+        if (!$user) {
+            return 0;
+        }
+
+        $directInvites = User::where('inviters_code', $user->riscoin_id)->count();
+        $totalCount = $directInvites;
+
+        // Get direct invites to calculate their teams recursively
+        $directUsers = User::where('inviters_code', $user->riscoin_id)->get();
+
+        foreach ($directUsers as $directUser) {
+            $totalCount += $this->getTeamCount($directUser->id);
+        }
+
+        return $totalCount;
     }
 
     public function rules()
@@ -302,10 +435,21 @@ new class extends Component {
 
     public function getUsersProperty()
     {
-        $userRiscoindId = User::find(auth()->user()->id)->riscoin_id;
-        return User::with(['roles', 'inviter'])
-            ->where('inviters_code', $userRiscoindId)
-            ->where('inviters_code', '!=', '')
+        $currentUser = User::find(auth()->user()->id);
+        $userRiscoindId = $currentUser->riscoin_id;
+
+        // Get all team members (direct invites + their invites recursively)
+        $allTeamMembers = $this->getAllTeamMembers($userRiscoindId);
+
+        // Convert to query for filtering and pagination
+        $userIds = $allTeamMembers->pluck('id')->toArray();
+
+        if (empty($userIds)) {
+            return new \Illuminate\Pagination\LengthAwarePaginator([], 0, $this->perPage);
+        }
+
+        return User::with(['roles', 'inviter', 'withdrawals'])
+            ->whereIn('id', $userIds)
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('name', 'like', '%' . $this->search . '%')->orWhere('email', 'like', '%' . $this->search . '%');
@@ -462,10 +606,16 @@ new class extends Component {
                             <tr>
                                 <th scope="col"
                                     class="sticky left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Level</th>
+                                <th scope="col"
+                                    class="sticky left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Avatar</th>
                                 <th scope="col"
                                     class="md:sticky left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Name</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Inviter</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Email</th>
@@ -486,13 +636,22 @@ new class extends Component {
                                     Invested Amount</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Total Withdrawals
+                                </th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Capital Status
+                                </th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Team Size</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Date Joined</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Tenure</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Inviter</th>
+
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Status</th>
@@ -503,10 +662,29 @@ new class extends Component {
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                             @foreach ($this->users as $user)
-                                <tr>
+                                @php
+                                    $currentUserRiscoinId = auth()->user()->riscoin_id;
+                                    $teamLevel = $this->getTeamLevel($user->id, $currentUserRiscoinId);
+                                @endphp
+                                <tr
+                                    class="{{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
                                     <td
-                                        class="sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
-                                        <div class="flex-shrink-0 h-10 w-10">
+                                        class="sticky left-0 z-10 px-6 py-4 whitespace-nowrap text-center
+                                        {{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
+                                        <span
+                                            class="inline-flex items-center justify-center w-8 h-8 rounded-full
+                                            @if ($teamLevel === 1) bg-blue-100 text-blue-800
+                                            @elseif($teamLevel === 2) bg-green-100 text-green-800
+                                            @elseif($teamLevel === 3) bg-yellow-100 text-yellow-800
+                                            @else bg-purple-100 text-purple-800 @endif
+                                            text-sm font-medium">
+                                            {{ $teamLevel }}
+                                        </span>
+                                    </td>
+                                    <td
+                                        class="sticky left-0 z-10 px-6 py-4 whitespace-nowrap
+                                        {{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
+                                        <div class="flex-shrink-0 h-10 w-10 {{ $teamLevel > 1 ? 'ml-4' : '' }}">
                                             @if ($user->getFirstMediaUrl('avatar'))
                                                 <img class="h-10 w-10 rounded-full object-cover"
                                                     src="{{ $user->getFirstMediaUrl('avatar') }}"
@@ -522,8 +700,12 @@ new class extends Component {
                                         </div>
                                     </td>
                                     <td
-                                        class="md:sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
+                                        class="md:sticky left-0 z-10 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white
+                                        {{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
                                         {{ $user->name }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                        {{ $user->inviter ? $user->inviter->name . ' (' . $user->inviter->riscoin_id . ')' : 'N/A' }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->email }}
@@ -567,14 +749,33 @@ new class extends Component {
                                         ${{ number_format($user->invested_amount, 2) }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                        ${{ number_format($this->getTotalWithdrawals($user->id), 2) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        @php
+                                            $capitalStatus = $this->getCapitalRecoveryStatus($user->id);
+                                        @endphp
+                                        <span
+                                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                                @if ($capitalStatus['color'] === 'green') bg-green-100 text-green-800
+                                                @elseif($capitalStatus['color'] === 'yellow') bg-yellow-100 text-yellow-800
+                                                @else bg-gray-100 text-gray-800 @endif">
+                                            {{ $capitalStatus['label'] }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                        <div class="flex items-center space-x-1">
+                                            <span class="font-medium">{{ $this->getTeamCount($user->id) }}</span>
+                                            <span class="text-xs text-gray-400">members</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->date_joined ? \Carbon\Carbon::parse($user->date_joined)->format('M j, Y') : 'N/A' }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->months_and_days_since_joined }}
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->inviter ? $user->inviter->name . ' (' . $user->inviter->riscoin_id . ')' : 'N/A' }}
-                                    </td>
+
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <span
                                             class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
@@ -582,7 +783,8 @@ new class extends Component {
                                         </span>
                                     </td>
                                     <td
-                                        class="md:sticky right-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
+                                        class="md:sticky right-0 z-10 px-6 py-4 whitespace-nowrap
+                                        {{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
                                         <div class="flex space-x-2">
                                             @can('my-team.view')
                                                 <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost"
@@ -902,6 +1104,33 @@ new class extends Component {
                                                     </div>
                                                     <div>
                                                         <label
+                                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">Total
+                                                            Withdrawals</label>
+                                                        <p class="text-sm text-gray-900 dark:text-white">
+                                                            ${{ number_format($this->getTotalWithdrawals($selectedUser->id), 2) }}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <label
+                                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">Capital
+                                                            Status</label>
+                                                        <p class="text-sm">
+                                                            @php
+                                                                $capitalStatus = $this->getCapitalRecoveryStatus(
+                                                                    $selectedUser->id,
+                                                                );
+                                                            @endphp
+                                                            <span
+                                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                                                    @if ($capitalStatus['color'] === 'green') bg-green-100 text-green-800
+                                                                    @elseif($capitalStatus['color'] === 'yellow') bg-yellow-100 text-yellow-800
+                                                                    @else bg-gray-100 text-gray-800 @endif">
+                                                                {{ $capitalStatus['label'] }}
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <label
                                                             class="text-sm font-medium text-gray-500 dark:text-gray-400">Date
                                                             Joined</label>
                                                         <p class="text-sm text-gray-900 dark:text-white">
@@ -1094,6 +1323,7 @@ new class extends Component {
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
