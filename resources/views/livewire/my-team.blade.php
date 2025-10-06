@@ -1198,7 +1198,7 @@ new class extends Component {
                                                                 <tr>
                                                                     <td
                                                                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                                                        {{ $withdrawal->created_at->format('M j, Y H:i') }}
+                                                                        {{ Carbon\Carbon::parse($withdrawal->paid_date)->format('M j, Y  ') }}
                                                                     </td>
                                                                     <td
                                                                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
