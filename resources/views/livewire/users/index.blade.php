@@ -411,6 +411,27 @@ Amount invested: $" .
         $this->dispatch('copyToClipboard', message: $message);
         session()->flash('message', 'Welcome message copied to clipboard!');
     }
+
+    public function verifyEmail($id)
+    {
+        $user = User::find($id);
+
+        if (!$user) {
+            session()->flash('error', 'User not found.');
+            return;
+        }
+
+        $user->email_verified_at = now();
+        $user->save();
+
+        // Log the email verification
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($user)
+            ->log('verified email');
+
+        session()->flash('message', 'Email verified successfully.');
+    }
 }; ?>
 
 <div class="max-w-10xl mx-auto">
@@ -665,7 +686,18 @@ Amount invested: $" .
                                                     </svg>
                                                 </flux:button>
                                             @endcan
-                                            @can('users.view')
+                                            @can('users.verify-email')
+                                                <flux:button wire:click="verifyEmail({{ $user->id }})"
+                                                    variant="ghost" size="sm"
+                                                    data-test="verify-email-{{ $user->id }}" title="Verify Email">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                </flux:button>
+                                                @endcan @can('users.view')
                                                 <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost"
                                                     size="sm" data-test="view-user-{{ $user->id }}"
                                                     title="View Info">
