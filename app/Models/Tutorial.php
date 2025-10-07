@@ -15,5 +15,6 @@ class Tutorial extends Model
         'video_url',
         'thumbnail_url',
         'is_published',
+        'video_type'
     ];
 }

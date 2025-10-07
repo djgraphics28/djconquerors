@@ -8,6 +8,7 @@ new class extends Component {
     public $title;
     public $description;
     public $video_url;
+    public $video_type = 'youtube'; // Default to youtube
     public $thumbnail_url;
     public $is_published = false;
     public $isOpen = false;
@@ -39,6 +40,7 @@ new class extends Component {
     {
         $this->validate([
             'title' => 'required|min:3',
+            'video_type' => 'required|in:youtube,drive',
             'video_url' => 'required|url',
             'thumbnail_url' => 'nullable|url',
             'description' => 'nullable',
@@ -48,6 +50,7 @@ new class extends Component {
             'title' => $this->title,
             'description' => $this->description,
             'video_url' => $this->video_url,
+            'video_type' => $this->video_type,
             'thumbnail_url' => $this->thumbnail_url,
             'is_published' => $this->is_published,
         ]);
@@ -65,6 +68,7 @@ new class extends Component {
         $this->title = $tutorial->title;
         $this->description = $tutorial->description;
         $this->video_url = $tutorial->video_url;
+        $this->video_type = $tutorial->video_type;
         $this->thumbnail_url = $tutorial->thumbnail_url;
         $this->is_published = $tutorial->is_published;
 
@@ -75,6 +79,7 @@ new class extends Component {
     {
         $this->validate([
             'title' => 'required|min:3',
+            'video_type' => 'required|in:youtube,drive',
             'video_url' => 'required|url',
             'thumbnail_url' => 'nullable|url',
             'description' => 'nullable',
@@ -85,6 +90,7 @@ new class extends Component {
             'title' => $this->title,
             'description' => $this->description,
             'video_url' => $this->video_url,
+            'video_type' => $this->video_type,
             'thumbnail_url' => $this->thumbnail_url,
             'is_published' => $this->is_published,
         ]);
@@ -128,13 +134,44 @@ new class extends Component {
 
     public function getVideoEmbedUrl($url)
     {
-        $videoId = $this->getVideoId($url);
-        if (str_contains($url, 'youtube')) {
-            return "https://www.youtube.com/embed/{$videoId}";
-        } elseif (str_contains($url, 'vimeo')) {
-            return "https://player.vimeo.com/video/{$videoId}";
+        // Auto-detect video type from URL if not set
+        $videoType = $this->video_type;
+
+        if (str_contains($url, 'drive.google.com')) {
+            $videoType = 'drive';
+        } elseif (str_contains($url, 'youtube.com') || str_contains($url, 'youtu.be')) {
+            $videoType = 'youtube';
         }
+
+        if ($videoType === 'youtube') {
+            $videoId = $this->getVideoId($url);
+            return $videoId ? "https://www.youtube.com/embed/{$videoId}" : null;
+        } elseif ($videoType === 'drive') {
+            // Convert Google Drive URL to embed format
+            return $this->convertDriveToEmbed($url);
+        }
+
         return null;
+    }
+
+    private function convertDriveToEmbed($url)
+    {
+        // Handle different Google Drive URL formats
+        if (str_contains($url, '/file/d/')) {
+            // Format: https://drive.google.com/file/d/FILE_ID/view
+            preg_match('/\/file\/d\/([a-zA-Z0-9_-]+)/', $url, $matches);
+            if (isset($matches[1])) {
+                return "https://drive.google.com/file/d/{$matches[1]}/preview";
+            }
+        } elseif (str_contains($url, 'id=')) {
+            // Format: https://drive.google.com/open?id=FILE_ID
+            preg_match('/[?&]id=([a-zA-Z0-9_-]+)/', $url, $matches);
+            if (isset($matches[1])) {
+                return "https://drive.google.com/file/d/{$matches[1]}/preview";
+            }
+        }
+
+        return $url;
     }
 
     private function resetInputs()
@@ -142,6 +179,7 @@ new class extends Component {
         $this->title = '';
         $this->description = '';
         $this->video_url = '';
+        $this->video_type = 'youtube';
         $this->thumbnail_url = '';
         $this->is_published = false;
         $this->tutorialId = null;
@@ -346,6 +384,30 @@ new class extends Component {
                                                         <textarea wire:model="description" rows="4"
                                                             class="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                                             placeholder="Enter tutorial description"></textarea>
+                                                    </div>
+
+                                                    <!-- Video Type -->
+                                                    <div>
+                                                        <label
+                                                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Video
+                                                            Type</label>
+                                                        <div class="flex space-x-4">
+                                                            <label class="inline-flex items-center">
+                                                                <input type="radio" wire:model="video_type"
+                                                                    value="youtube"
+                                                                    class="text-blue-600 focus:ring-blue-500">
+                                                                <span
+                                                                    class="ml-2 text-gray-700 dark:text-gray-300">YouTube</span>
+                                                            </label>
+                                                            <label class="inline-flex items-center">
+                                                                <input type="radio" wire:model="video_type"
+                                                                    value="drive"
+                                                                    class="text-blue-600 focus:ring-blue-500">
+                                                                <span
+                                                                    class="ml-2 text-gray-700 dark:text-gray-300">Google
+                                                                    Drive</span>
+                                                            </label>
+                                                        </div>
                                                     </div>
 
                                                     <!-- Video URL -->
