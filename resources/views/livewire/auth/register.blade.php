@@ -50,6 +50,14 @@ new #[Layout('components.layouts.auth')] class extends Component {
         $validated['riscoind_id'] = strtoupper($validated['riscoin_id']);
         $validated['inviters_code'] = strtoupper($validated['inviters_code']);
 
+        //check if inviters code exists
+        $checkInvitersCode = User::where('riscoin_id', $validated['inviters_code'])->first();
+        if (!$checkInvitersCode) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'inviters_code' => 'Invalid inviter code. Please enter a valid code.',
+            ]);
+        }
+
         event(new Registered(($user = User::create($validated))));
 
         //add role to user
@@ -69,101 +77,39 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
     <form method="POST" wire:submit="register" class="flex flex-col gap-6">
         <!-- Name -->
-        <flux:input
-            wire:model="name"
-            :label="__('Name')"
-            type="text"
-            required
-            autofocus
-            autocomplete="name"
-            :placeholder="__('Full name')"
-        />
+        <flux:input wire:model="name" :label="__('Name')" type="text" required autofocus autocomplete="name"
+            :placeholder="__('Full name')" />
 
         <!-- Email Address -->
-        <flux:input
-            wire:model="email"
-            :label="__('Email address')"
-            type="email"
-            required
-            autocomplete="email"
-            placeholder="email@example.com"
-        />
+        <flux:input wire:model="email" :label="__('Email address')" type="email" required autocomplete="email"
+            placeholder="email@example.com" />
 
         <!-- Riscoin ID -->
-        <flux:input
-            wire:model="riscoin_id"
-            :label="__('Riscoin ID')"
-            type="text"
-            required
-            autocomplete="riscoin_id"
-            :placeholder="__('Riscoin ID')"
-        />
+        <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')" type="text" required autocomplete="riscoin_id"
+            :placeholder="__('Riscoin ID')" />
         <!-- Inviters Code -->
-        <flux:input
-            wire:model="inviters_code"
-            :label="__('Inviters Code')"
-            type="text"
-            required
-            autocomplete="inviters_code"
-            :placeholder="__('Inviters Code')"
-        />
+        <flux:input wire:model="inviters_code" :label="__('Inviters Code')" type="text" required
+            autocomplete="inviters_code" :placeholder="__('Inviters Code')" />
         <!-- Invested Amount -->
-        <flux:input
-            wire:model="invested_amount"
-            :label="__('Invested Amount (USD)')"
-            type="number"
-            step="0.01"
-            required
-            autocomplete="invested_amount"
-            :placeholder="__('Invested Amount')"
-            prefix="$"
-        />
+        <flux:input wire:model="invested_amount" :label="__('Invested Amount (USD)')" type="number" step="0.01"
+            required autocomplete="invested_amount" :placeholder="__('Invested Amount')" prefix="$" />
         <!-- Date Joined -->
-        <flux:input
-            wire:model="date_joined"
-            :label="__('Date Joined')"
-            type="date"
-            autocomplete="date_joined"
-            :placeholder="__('Date Joined')"
-        />
+        <flux:input wire:model="date_joined" :label="__('Date Joined')" type="date" autocomplete="date_joined"
+            :placeholder="__('Date Joined')" />
         <!-- Birth Date -->
-        <flux:input
-            wire:model="birth_date"
-            :label="__('Birth Date')"
-            type="date"
-            autocomplete="birth_date"
-            :placeholder="__('Birth Date')"
-        />
+        <flux:input wire:model="birth_date" :label="__('Birth Date')" type="date" autocomplete="birth_date"
+            :placeholder="__('Birth Date')" />
         <!-- Phone Number -->
-        <flux:input
-            wire:model="phone_number"
-            :label="__('Phone Number')"
-            type="text"
-            autocomplete="phone_number"
-            :placeholder="__('Phone Number')"
-        />
+        <flux:input wire:model="phone_number" :label="__('Phone Number')" type="text" autocomplete="phone_number"
+            :placeholder="__('Phone Number')" />
 
         <!-- Password -->
-        <flux:input
-            wire:model="password"
-            :label="__('Password')"
-            type="password"
-            required
-            autocomplete="new-password"
-            :placeholder="__('Password')"
-            viewable
-        />
+        <flux:input wire:model="password" :label="__('Password')" type="password" required autocomplete="new-password"
+            :placeholder="__('Password')" viewable />
 
         <!-- Confirm Password -->
-        <flux:input
-            wire:model="password_confirmation"
-            :label="__('Confirm password')"
-            type="password"
-            required
-            autocomplete="new-password"
-            :placeholder="__('Confirm password')"
-            viewable
-        />
+        <flux:input wire:model="password_confirmation" :label="__('Confirm password')" type="password" required
+            autocomplete="new-password" :placeholder="__('Confirm password')" viewable />
 
         {{-- <div class="mb-3">
             {!! NoCaptcha::renderJs() !!}
