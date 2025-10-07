@@ -14,6 +14,7 @@ new class extends Component {
     public $user;
     public $name;
     public $email;
+    public $phone_number;
     public $riscoin_id;
     public $password;
     public $inviters_code;
@@ -116,6 +117,7 @@ new class extends Component {
         $userData = [
             'name' => $this->name,
             'email' => $this->email,
+            'phone_number' => $this->phone_number,
             'riscoin_id' => $this->riscoin_id,
             'password' => bcrypt($this->password),
             'inviters_code' => $this->inviters_code,
@@ -164,6 +166,7 @@ new class extends Component {
         $this->user = $user;
         $this->name = $user->name;
         $this->email = $user->email;
+        $this->phone_number = $user->phone_number;
         $this->riscoin_id = $user->riscoin_id;
         $this->inviters_code = $user->inviters_code;
         $this->invested_amount = $user->invested_amount;
@@ -182,6 +185,7 @@ new class extends Component {
         $updateData = [
             'name' => $this->name,
             'email' => $this->email,
+            'phone_number' => $this->phone_number,
             'riscoin_id' => $this->riscoin_id,
             'inviters_code' => $this->inviters_code,
             'invested_amount' => $this->invested_amount ?? 0,
@@ -855,6 +859,11 @@ Amount invested: $" .
                                                     required :placeholder="__('Enter email address')"
                                                     data-test="email-input" />
 
+                                                <!-- Phone Number -->
+                                                <flux:input wire:model="phone_number" :label="__('Phone Number')"
+                                                    type="text" :placeholder="__('Enter phone number')"
+                                                    data-test="phone-input" />
+
                                                 <!-- Riscoin ID -->
                                                 <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')"
                                                     type="text" :placeholder="__('Enter Riscoin ID')"
@@ -1002,6 +1011,9 @@ Amount invested: $" .
                                                             </h3>
                                                             <p class="text-sm text-gray-500 dark:text-gray-400">
                                                                 {{ $selectedUser->email }}
+                                                            </p>
+                                                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                                {{ $selectedUser->phone_number }}
                                                             </p>
                                                         </div>
                                                     </div>
