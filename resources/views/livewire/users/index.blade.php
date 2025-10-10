@@ -170,8 +170,8 @@ new class extends Component {
         $this->riscoin_id = $user->riscoin_id;
         $this->inviters_code = $user->inviters_code;
         $this->invested_amount = $user->invested_amount;
-        $this->birth_date = $user->birth_date;
-        $this->date_joined = $user->date_joined;
+        $this->birth_date = $user->birth_date ? $user->birth_date->format('Y-m-d') : null;
+        $this->date_joined = $user->date_joined ? $user->date_joined->format('Y-m-d') :
         $this->is_active = $user->is_active;
         $this->selectedRoles = $user->roles->pluck('name')->toArray();
         $this->avatarToRemove = false;
@@ -189,6 +189,8 @@ new class extends Component {
             'riscoin_id' => $this->riscoin_id,
             'inviters_code' => $this->inviters_code,
             'invested_amount' => $this->invested_amount ?? 0,
+            'date_joined' => $this->date_joined,
+            'birth_date' => $this->birth_date,
             'is_active' => $this->is_active,
         ];
 
