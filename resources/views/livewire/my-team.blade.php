@@ -671,7 +671,7 @@ new class extends Component {
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Email</th>
-                                 <th scope="col"
+                                <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Invested Amount</th>
                                 <th scope="col"
@@ -756,7 +756,9 @@ new class extends Component {
                                         class="md:sticky left-0 z-10 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white
                                         {{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
                                         {{ $user->name }}
-                                    </td>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            <small>Last Logged In: {{ $user->last_login }}</small>
+                                        </div>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->inviter ? $user->inviter->name . ' (' . $user->inviter->riscoin_id . ')' : 'N/A' }}
                                     </td>

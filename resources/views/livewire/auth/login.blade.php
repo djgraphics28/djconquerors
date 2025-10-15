@@ -46,12 +46,17 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
         Auth::login($user, $this->remember);
 
+        // Update last login
+        Auth::user()->update([
+            'last_login_at' => now(),
+            'last_login_ip' => request()->ip(),
+        ]);
+
         RateLimiter::clear($this->throttleKey());
         Session::regenerate();
 
         $this->redirectIntended(default: route('dashboard', absolute: false), navigate: true);
     }
-
     /**
      * Validate the user's credentials.
      */

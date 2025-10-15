@@ -43,6 +43,8 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         'phone_number',
         'is_birthday_mention',
         'is_monthly_milestone_mention',
+        'last_login_at',
+        'last_login_ip',
     ];
 
     /**
@@ -68,6 +70,7 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
             'date_joined' => 'date',
             'birth_date' => 'date',
             'invested_amount' => 'decimal:2',
+            'last_login_at' => 'datetime',
         ];
     }
 
@@ -267,5 +270,23 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
             $q->where('is_active', true)
               ->where('receive_appointment_notifications', true);
         });
+    }
+
+    /**
+     * Get the last login with fallback to updated_at
+     */
+    public function getLastLoginAttribute()
+    {
+        $loginTime = $this->last_login_at ?? $this->updated_at;
+
+        return $loginTime ? $loginTime->diffForHumans() : 'Never logged in';
+    }
+
+    /**
+     * Get the actual last login timestamp (for internal use)
+     */
+    public function getLastLoginTimestampAttribute()
+    {
+        return $this->last_login_at ?? $this->updated_at;
     }
 }

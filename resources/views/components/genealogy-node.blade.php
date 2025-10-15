@@ -74,6 +74,9 @@
             <!-- User Info -->
             <div class="mt-2 text-center max-w-xs">
                 <div class="font-semibold dark:text-white text-sm">{{ $node->name ?? 'N/A' }}</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    <small>Last seen online: {{ $node->last_login }}</small>
+                </div>
                 <div class="text-xs text-gray-600 dark:text-gray-400">ID: {{ $node->riscoin_id ?? 'N/A' }}</div>
                 <div class="text-xs text-green-600 dark:text-green-400 font-medium">
                     ${{ number_format($node->invested_amount ?? 0, 2) }}</div>

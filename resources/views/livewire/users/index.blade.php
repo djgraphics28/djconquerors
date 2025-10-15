@@ -619,6 +619,9 @@ Amount invested: $" .
                                     <td
                                         class="md:sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
                                         {{ $user->name }}
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            <small>Last Logged In: {{ $user->last_login }}</small>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->email }}
