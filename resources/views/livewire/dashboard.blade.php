@@ -328,70 +328,68 @@ new class extends Component {
         </div>
     </div>
 
-    @can('dashboard.copyMessageToMartin')
-        <!-- Copy Support Form to Clipboard -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
-            <div x-data="{
-                copied: false,
-                copySupportForm() {
-                    // Create the message text
-                    const message = `Support Team:{{ $currentNode->support_team }}
-            Inviter's Riscoin ID: {{ $currentNode->inviter_code }}
-            Riscoin Account ID: {{ $currentNode->riscoin_id }}
-            Deposit Amount: ${{ number_format($currentNode->invested_amount ?? 0, 2) }}
-            Your Name: {{ $currentNode->name }}
-            Occupation: {{ $currentNode->occupation ?? 'Not specified' }}
-            Gender: {{ $currentNode->gender ?? 'Not specified' }}
-            Age: {{ $currentNode->age ?? 'Not specified' }}`;
+   @can('dashboard.copyMessageToMartin')
+<!-- Copy Support Form to Clipboard -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+    <div x-data="{
+        copied: false,
+        copySupportForm() {
+            const message = `Support Team: {{ $currentNode->support_team }}
+Inviter's Riscoin ID: {{ $currentNode->inviter_code }}
+Riscoin Account ID: {{ $currentNode->riscoin_id }}
+Deposit Amount: ${{ number_format($currentNode->invested_amount ?? 0, 2) }}
+Your Name: {{ $currentNode->name }}
+Occupation: {{ $currentNode->occupation ?? 'Not specified' }}
+Gender: {{ $currentNode->gender ?? 'Not specified' }}
+Age: {{ $currentNode->age ?? 'Not specified' }}`;
 
-                    // Try modern clipboard API first
-                    if (navigator.clipboard && window.isSecureContext) {
-                        navigator.clipboard.writeText(message).then(() => {
-                            this.copied = true;
-                            setTimeout(() => this.copied = false, 2000);
-                        });
-                    } else {
-                        // Fallback for older browsers
-                        const textArea = document.createElement('textarea');
-                        textArea.value = message;
-                        textArea.style.position = 'fixed';
-                        textArea.style.opacity = '0';
-                        document.body.appendChild(textArea);
-                        textArea.select();
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(message).then(() => {
+                    this.copied = true;
+                    setTimeout(() => this.copied = false, 2000);
+                });
+            } else {
+                const textArea = document.createElement('textarea');
+                textArea.value = message;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
 
-                        try {
-                            document.execCommand('copy');
-                            this.copied = true;
-                            setTimeout(() => this.copied = false, 2000);
-                        } catch (err) {
-                            console.error('Copy failed:', err);
-                        }
-
-                        document.body.removeChild(textArea);
-                    }
+                try {
+                    document.execCommand('copy');
+                    this.copied = true;
+                    setTimeout(() => this.copied = false, 2000);
+                } catch (err) {
+                    console.error('Copy failed:', err);
                 }
-            }" class="relative">
-                <button @click="copySupportForm()"
-                    class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 font-medium">
-                    Copy Support Form to Clipboard
-                </button>
 
-                <!-- Copy feedback -->
-                <div x-show="copied" x-transition:enter="transition ease-out duration-300"
-                    x-transition:enter-start="opacity-0 transform scale-95"
-                    x-transition:enter-end="opacity-100 transform scale-100"
-                    x-transition:leave="transition ease-in duration-200"
-                    x-transition:leave-start="opacity-100 transform scale-100"
-                    x-transition:leave-end="opacity-0 transform scale-95"
-                    class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg">
-                    <span class="text-white font-semibold">Copied to clipboard! 📋</span>
-                </div>
-            </div>
+                document.body.removeChild(textArea);
+            }
+        }
+    }" class="relative">
+        <button @click="copySupportForm()"
+            class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 font-medium">
+            Copy Support Form to Clipboard
+        </button>
 
-            <!-- Preview of what will be copied -->
-            <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preview:</h4>
-                <pre class="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line">Support Team: {{ $currentNode->support_team }}
+        <!-- Copy feedback -->
+        <div x-show="copied" x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0 transform scale-95"
+            x-transition:enter-end="opacity-100 transform scale-100"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100 transform scale-100"
+            x-transition:leave-end="opacity-0 transform scale-95"
+            class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg">
+            <span class="text-white font-semibold">Copied to clipboard! 📋</span>
+        </div>
+    </div>
+
+    <!-- Preview of what will be copied -->
+    <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preview:</h4>
+        <pre class="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line">
+Support Team: {{ $currentNode->support_team }}
 Inviter's Riscoin ID: {{ $currentNode->inviter_code }}
 Riscoin Account ID: {{ $currentNode->riscoin_id }}
 Deposit Amount: ${{ number_format($currentNode->invested_amount ?? 0, 2) }}
@@ -399,9 +397,9 @@ Your Name: {{ $currentNode->name }}
 Occupation: {{ $currentNode->occupation ?? 'Not specified' }}
 Gender: {{ $currentNode->gender ?? 'Not specified' }}
 Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
-            </div>
-        </div>
-    @endcan
+    </div>
+</div>
+@endcan
 
     <!-- New Cards for Special Occasions -->
     @can('dashboard.viewSpecialOccasions')
