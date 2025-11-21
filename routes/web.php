@@ -30,6 +30,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Volt::route('tutorials-access', 'tutorials.access')->name('tutorials.access');
 
+    Volt::route('guide', 'guide.index')->name('guide.index');
+    Volt::route('guide/{class}', 'guide.info')->name('guide.info');
+
+    Volt::route('guide-access', 'guide.access')->name('guide.access');
+    Volt::route('guide-access/{class}', 'guide.show')->name('guide.show');
+
     Volt::route('activity-logs', 'activity-logs')->name('activity-logs');
 
     Volt::route('email-receivers', 'email-receiver')->name('email-receivers');

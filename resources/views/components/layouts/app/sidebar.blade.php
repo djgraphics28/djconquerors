@@ -37,11 +37,17 @@
                     @can('tutorials.access')
                         <flux:navlist.item icon="video-camera" :href="route('tutorials.access')" :current="request()->routeIs('tutorials.access')" wire:navigate>{{ __('Tutorials') }}</flux:navlist.item>
                     @endcan
+                    @can('guide.view')
+                        <flux:navlist.item icon="book-open" :href="route('guide.index')" :current="request()->routeIs('guide.index')" wire:navigate>{{ __('Guide Management') }}</flux:navlist.item>
+                    @endcan
+                    @can('guide.access')
+                        <flux:navlist.item icon="book-open" :href="route('guide.access')" :current="request()->routeIs('guide.access')" wire:navigate>{{ __('Guide') }}</flux:navlist.item>
+                    @endcan
                     @can('users.view')
-                    <flux:navlist.item icon="user-circle" :href="route('users.index')" :current="request()->routeIs('users.index')" wire:navigate>{{ __('Users') }}</flux:navlist.item>
+                        <flux:navlist.item icon="user-circle" :href="route('users.index')" :current="request()->routeIs('users.index')" wire:navigate>{{ __('Users') }}</flux:navlist.item>
                     @endcan
                     @can('roles.view')
-                    <flux:navlist.item icon="shield-check" :href="route('roles.index')" :current="request()->routeIs('roles.index')" wire:navigate>{{ __('Roles & Permissions') }}</flux:navlist.item>
+                        <flux:navlist.item icon="shield-check" :href="route('roles.index')" :current="request()->routeIs('roles.index')" wire:navigate>{{ __('Roles & Permissions') }}</flux:navlist.item>
                     @endcan
                     @can('activity-logs.view')
                         <flux:navlist.item icon="clipboard" :href="route('activity-logs')" :current="request()->routeIs('activity-logs')" wire:navigate>{{ __('Activity Logs') }}</flux:navlist.item>
