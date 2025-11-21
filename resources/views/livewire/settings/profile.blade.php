@@ -23,6 +23,8 @@ new class extends Component {
     public $isUploading = false;
     public $isBirthdayMention = true;
     public $isMonthlyMilestoneMention = true;
+    public $gender = '';
+    public $occupation = '';
 
     /**
      * Mount the component.
@@ -36,11 +38,12 @@ new class extends Component {
         $this->riscoin_id = $user->riscoin_id;
         $this->inviters_code = $user->inviters_code;
         $this->invested_amount = $user->invested_amount;
-        $this->date_joined = $user->date_joined;
-        $this->birth_date = $user->birth_date;
-        $this->phone_number = $user->phone_number;
+        $this->date_joined = date('Y-m-d', strtotime($user->date_joined));
+        $this->birth_date = date('Y-m-d', strtotime($user->birth_date));        $this->phone_number = $user->phone_number;
         $this->isBirthdayMention = $user->is_birthday_mention == 1 ? true : false;
         $this->isMonthlyMilestoneMention = $user->is_monthly_milestone_mention == 1 ? true : false;
+        $this->gender = $user->gender;
+        $this->occupation = $user->occupation;
 
         // dd($user->getFirstMediaUrl('avatar'));
     }
@@ -88,6 +91,8 @@ new class extends Component {
             'inviters_code' => ['required', 'string', 'max:255'],
             'riscoin_id' => ['required', 'string', 'max:255'],
             'avatar' => ['nullable', 'image', 'max:10240'],
+            'gender' => ['required', 'string', 'max:50'],
+            'occupation' => ['required', 'string', 'max:100'],
         ]);
 
         $validated['riscoin_id'] = strtoupper($validated['riscoin_id']);
@@ -310,9 +315,19 @@ new class extends Component {
             <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')" type="text" disabled />
             <flux:input wire:model="inviters_code" :label="__('Inviters Code')" type="text" disabled />
             <flux:input wire:model="invested_amount" :label="__('Invested Amount (USD)')" type="text" disabled />
-            <flux:input wire:model="date_joined" :label="__('Date Joined')" type="text" disabled />
+            <flux:input wire:model="date_joined" :label="__('Date Joined')" type="date" disabled />
             <flux:input wire:model="birth_date" :label="__('Birth Date')" type="date" />
             <flux:input wire:model="phone_number" :label="__('Phone Number')" type="tel" />
+            <!-- Gender -->
+            <flux:select wire:model="gender" :label="__('Gender')" required data-test="gender-select">
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+            </flux:select>
+            <!-- Occupation -->
+            <flux:input wire:model="occupation" :label="__('Occupation')" type="text" required autocomplete="occupation"
+                :placeholder="__('Occupation')" />
+
 
             {{-- Mentions --}}
             <div class="flex flex-col gap-4">

@@ -5,6 +5,7 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Spatie\Image\Enums\Fit;
+use Laravel\Sanctum\HasApiTokens;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Permission\Traits\HasRoles;
@@ -24,6 +25,7 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles;
     use LogsActivity;
     use InteractsWithMedia;
+    use HasApiTokens;
 
     /**
      * The attributes that are mass assignable.
@@ -45,6 +47,9 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         'is_monthly_milestone_mention',
         'last_login_at',
         'last_login_ip',
+        'gender',
+        'occupation',
+        'support_team',
     ];
 
     /**

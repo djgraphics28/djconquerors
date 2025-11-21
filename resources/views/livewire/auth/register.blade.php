@@ -19,6 +19,8 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $date_joined = '';
     public string $birth_date = '';
     public string $phone_number = '';
+    public string $gender = '';
+    public string $occupation = '';
 
     public function mount(): void
     {
@@ -42,6 +44,8 @@ new #[Layout('components.layouts.auth')] class extends Component {
             'date_joined' => ['nullable', 'date'],
             'birth_date' => ['nullable', 'date'],
             'phone_number' => ['nullable', 'string', 'max:20'],
+            'gender' => ['required', 'string', 'max:50'],
+            'occupation' => ['required', 'string', 'max:100'],
             // 'gRecaptcha-response' => ['required', 'captcha'],
         ]);
 
@@ -102,6 +106,15 @@ new #[Layout('components.layouts.auth')] class extends Component {
         <!-- Phone Number -->
         <flux:input wire:model="phone_number" :label="__('Phone Number')" type="text" autocomplete="phone_number"
             :placeholder="__('Phone Number')" />
+        <!-- Gender -->
+        <flux:select wire:model="gender" :label="__('Gender')" required data-test="gender-select">
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+        </flux:select>
+        <!-- Occupation -->
+        <flux:input wire:model="occupation" :label="__('Occupation')" type="text" required autocomplete="occupation"
+            :placeholder="__('Occupation')" />
 
         <!-- Password -->
         <flux:input wire:model="password" :label="__('Password')" type="password" required autocomplete="new-password"
