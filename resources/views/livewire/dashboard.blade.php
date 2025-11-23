@@ -391,11 +391,12 @@ Age: {{ $currentNode->age ?? 'Not specified' }}`;
         <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preview:</h4>
         <pre class="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line">
 Support Team: {{ $currentNode->support_team }}
-Inviter's Riscoin ID: {{ $currentNode->inviter_code }}
+Inviter's Riscoin ID: {{ $currentNode->inviters_code }}
 Riscoin Account ID: {{ $currentNode->riscoin_id }}
 Deposit Amount: ${{ number_format($currentNode->invested_amount ?? 0, 2) }}
 Your Name: {{ $currentNode->name }}
 Occupation: {{ $currentNode->occupation ?? 'Not specified' }}
+Language: English/Tagalog
 Gender: {{ $currentNode->gender ?? 'Not specified' }}
 Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
     </div>
