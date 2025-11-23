@@ -335,12 +335,13 @@ new class extends Component {
         copied: false,
         copySupportForm() {
             const message = `Support Team: {{ $currentNode->support_team }}
-Inviter's Riscoin ID: {{ $currentNode->inviter_code }}
+Inviter's Riscoin ID: {{ $currentNode->inviters_code }}
 Riscoin Account ID: {{ $currentNode->riscoin_id }}
 Deposit Amount: ${{ number_format($currentNode->invested_amount ?? 0, 2) }}
 Your Name: {{ $currentNode->name }}
 Occupation: {{ $currentNode->occupation ?? 'Not specified' }}
 Gender: {{ $currentNode->gender ?? 'Not specified' }}
+Language: English/Tagalog
 Age: {{ $currentNode->age ?? 'Not specified' }}`;
 
             if (navigator.clipboard && window.isSecureContext) {
