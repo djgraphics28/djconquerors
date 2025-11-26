@@ -20,6 +20,8 @@ class RolesPermissionSeeder extends Seeder
         $adminPermissions = [
             //Dashboard
             'dashboard.view',
+            'dashboard.viewSpecialOccasions',
+            'dashboard.copyMessageToMartin',
 
             //Users
             'users.view',
@@ -61,6 +63,28 @@ class RolesPermissionSeeder extends Seeder
             'my-team.access',
             'my-team.view',
             'my-team.edit',
+
+            //Apointments
+            'appointments.book',
+            'appointments.view',
+            'appointments.create',
+            'appointments.edit',
+            'appointments.delete',
+
+            //Email Receivers
+            'email-receivers.view',
+            'email-receivers.create',
+            'email-receivers.edit',
+            'email-receivers.delete',
+
+            //Guide Management
+            'guide.view',
+            'guide.create',
+            'guide.edit',
+            'guide.delete',
+
+            //Guide Access
+            'guide.access',
         ];
 
         foreach ($adminPermissions as $permission) {
@@ -81,7 +105,9 @@ class RolesPermissionSeeder extends Seeder
             'genealogy.view',
             'tutorials.access',
             'my-team.access',
-            'my-team.view'
+            'my-team.view',
+            'appointments.book',
+            // 'guide.access',
         ]);
 
         $adminUser = User::where('email', 'admin@djconquerors.com')->first();

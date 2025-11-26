@@ -40,12 +40,14 @@ new class extends Component {
     public $dateJoined = '';
     public $statusFilter = '';
     public $inviterFilter = '';
+    public $capitalRecoveryFilter = '';
     public $perPage = 10;
 
     protected $queryString = [
         'search' => ['except' => ''],
         'dateJoined' => ['except' => ''],
         'statusFilter' => ['except' => ''],
+        'capitalRecoveryFilter' => ['except' => ''],
         'perPage' => ['except' => 10],
         'inviterFilter' => ['except' => ''],
     ];
@@ -126,6 +128,38 @@ new class extends Component {
                 'color' => 'green',
             ];
         }
+    }
+
+    private function getFilteredUserIdsByCapitalRecovery()
+    {
+        $currentUser = User::find(auth()->user()->id);
+        $userRiscoindId = $currentUser->riscoin_id;
+        $allTeamMembers = $this->getAllTeamMembers($userRiscoindId);
+        $filteredUserIds = [];
+
+        foreach ($allTeamMembers as $user) {
+            $capitalStatus = $this->getCapitalRecoveryStatus($user->id);
+
+            switch ($this->capitalRecoveryFilter) {
+                case 'recovered':
+                    if ($capitalStatus['status'] === 'recovered') {
+                        $filteredUserIds[] = $user->id;
+                    }
+                    break;
+                case 'recovering':
+                    if ($capitalStatus['status'] === 'recovering') {
+                        $filteredUserIds[] = $user->id;
+                    }
+                    break;
+                case 'no_investment':
+                    if ($capitalStatus['status'] === 'no_investment') {
+                        $filteredUserIds[] = $user->id;
+                    }
+                    break;
+            }
+        }
+
+        return $filteredUserIds;
     }
 
     // Get all team members recursively (direct invites + their invites + their invites, etc.)
@@ -411,7 +445,7 @@ new class extends Component {
     // Reset filters
     public function resetFilters()
     {
-        $this->reset(['search', 'dateJoined', 'statusFilter', 'inviterFilter']);
+        $this->reset(['search', 'dateJoined', 'statusFilter', 'capitalRecoveryFilter', 'inviterFilter']);
         $this->resetPage();
     }
 
@@ -466,6 +500,12 @@ new class extends Component {
             })
             ->when($this->inviterFilter, function ($query) {
                 $query->where('inviters_code', $this->inviterFilter);
+            })
+            ->when($this->capitalRecoveryFilter, function ($query) {
+                // NEW: Capital recovery filter
+                $query->whereIn('id', function ($subquery) {
+                    $subquery->select('id')->from('users')->whereIn('id', $this->getFilteredUserIdsByCapitalRecovery());
+                });
             })
             ->orderBy('date_joined', 'desc')
             ->paginate($this->perPage);
@@ -560,7 +600,7 @@ new class extends Component {
 
             <!-- Filters -->
             <div class="mb-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4"> <!-- Changed to 5 columns -->
                     <!-- Search -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search</label>
@@ -575,6 +615,18 @@ new class extends Component {
                             <option value="">All Status</option>
                             <option value="active">Active</option>
                             <option value="inactive">Inactive</option>
+                        </flux:select>
+                    </div>
+
+                    <!-- NEW: Capital Recovery Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Capital
+                            Status</label>
+                        <flux:select wire:model.live="capitalRecoveryFilter" data-test="capital-recovery-filter">
+                            <option value="">All Capital Status</option>
+                            <option value="recovered">Capital Recovered</option>
+                            <option value="recovering">Recovering</option>
+                            {{-- <option value="no_investment">No Investment</option> --}}
                         </flux:select>
                     </div>
 
@@ -621,6 +673,17 @@ new class extends Component {
                                     Email</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Invested Amount</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Total Withdrawals
+                                </th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Capital Status
+                                </th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Is Verified?</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -631,17 +694,7 @@ new class extends Component {
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Riscoin ID</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Invested Amount</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Total Withdrawals
-                                </th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Capital Status
-                                </th>
+
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Team Size</th>
@@ -703,12 +756,32 @@ new class extends Component {
                                         class="md:sticky left-0 z-10 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white
                                         {{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
                                         {{ $user->name }}
-                                    </td>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            <small>Last Logged In: {{ $user->last_login }}</small>
+                                        </div>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->inviter ? $user->inviter->name . ' (' . $user->inviter->riscoin_id . ')' : 'N/A' }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->email }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                        ${{ number_format($user->invested_amount, 2) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                        ${{ number_format($this->getTotalWithdrawals($user->id), 2) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        @php
+                                            $capitalStatus = $this->getCapitalRecoveryStatus($user->id);
+                                        @endphp
+                                        <span
+                                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                                @if ($capitalStatus['color'] === 'green') bg-green-100 text-green-800
+                                                @elseif($capitalStatus['color'] === 'yellow') bg-yellow-100 text-yellow-800
+                                                @else bg-gray-100 text-gray-800 @endif">
+                                            {{ $capitalStatus['label'] }}
+                                        </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         @if ($user->email_verified_at)
@@ -745,24 +818,8 @@ new class extends Component {
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->riscoin_id ?? 'N/A' }}
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        ${{ number_format($user->invested_amount, 2) }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        ${{ number_format($this->getTotalWithdrawals($user->id), 2) }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        @php
-                                            $capitalStatus = $this->getCapitalRecoveryStatus($user->id);
-                                        @endphp
-                                        <span
-                                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                                @if ($capitalStatus['color'] === 'green') bg-green-100 text-green-800
-                                                @elseif($capitalStatus['color'] === 'yellow') bg-yellow-100 text-yellow-800
-                                                @else bg-gray-100 text-gray-800 @endif">
-                                            {{ $capitalStatus['label'] }}
-                                        </span>
-                                    </td>
+
+
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         <div class="flex items-center space-x-1">
                                             <span class="font-medium">{{ $this->getTeamCount($user->id) }}</span>

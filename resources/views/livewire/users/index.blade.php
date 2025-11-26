@@ -14,6 +14,7 @@ new class extends Component {
     public $user;
     public $name;
     public $email;
+    public $phone_number;
     public $riscoin_id;
     public $password;
     public $inviters_code;
@@ -116,6 +117,7 @@ new class extends Component {
         $userData = [
             'name' => $this->name,
             'email' => $this->email,
+            'phone_number' => $this->phone_number,
             'riscoin_id' => $this->riscoin_id,
             'password' => bcrypt($this->password),
             'inviters_code' => $this->inviters_code,
@@ -164,11 +166,12 @@ new class extends Component {
         $this->user = $user;
         $this->name = $user->name;
         $this->email = $user->email;
+        $this->phone_number = $user->phone_number;
         $this->riscoin_id = $user->riscoin_id;
         $this->inviters_code = $user->inviters_code;
         $this->invested_amount = $user->invested_amount;
-        $this->birth_date = $user->birth_date;
-        $this->date_joined = $user->date_joined;
+        $this->birth_date = $user->birth_date ? $user->birth_date->format('Y-m-d') : null;
+        $this->date_joined = $user->date_joined ? $user->date_joined->format('Y-m-d') :
         $this->is_active = $user->is_active;
         $this->selectedRoles = $user->roles->pluck('name')->toArray();
         $this->avatarToRemove = false;
@@ -182,9 +185,12 @@ new class extends Component {
         $updateData = [
             'name' => $this->name,
             'email' => $this->email,
+            'phone_number' => $this->phone_number,
             'riscoin_id' => $this->riscoin_id,
             'inviters_code' => $this->inviters_code,
             'invested_amount' => $this->invested_amount ?? 0,
+            'date_joined' => $this->date_joined,
+            'birth_date' => $this->birth_date,
             'is_active' => $this->is_active,
         ];
 
@@ -613,6 +619,9 @@ Amount invested: $" .
                                     <td
                                         class="md:sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
                                         {{ $user->name }}
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            <small>Last Logged In: {{ $user->last_login }}</small>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->email }}
@@ -855,6 +864,11 @@ Amount invested: $" .
                                                     required :placeholder="__('Enter email address')"
                                                     data-test="email-input" />
 
+                                                <!-- Phone Number -->
+                                                <flux:input wire:model="phone_number" :label="__('Phone Number')"
+                                                    type="text" :placeholder="__('Enter phone number')"
+                                                    data-test="phone-input" />
+
                                                 <!-- Riscoin ID -->
                                                 <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')"
                                                     type="text" :placeholder="__('Enter Riscoin ID')"
@@ -1002,6 +1016,9 @@ Amount invested: $" .
                                                             </h3>
                                                             <p class="text-sm text-gray-500 dark:text-gray-400">
                                                                 {{ $selectedUser->email }}
+                                                            </p>
+                                                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                                {{ $selectedUser->phone_number }}
                                                             </p>
                                                         </div>
                                                     </div>
