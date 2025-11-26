@@ -1,1 +1,0 @@
-"serviceWorker"in navigator&&navigator.serviceWorker.register("/sw.js",{scope:"/"}).then(function(r){console.log("SW registered successfully!")}).catch(function(r){console.log("SW registration failed")});
