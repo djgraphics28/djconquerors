@@ -216,7 +216,6 @@ new class extends Component {
         return "{$selectedMessage}\n\n🎊 Celebrating {$member['months_with_team']} month" . ($member['months_with_team'] > 1 ? 's' : '') . " with {$name}!\nJoined: {$joinDate}";
     }
 }; ?>
-
 <div>
     <!-- Breadcrumb Navigation -->
     <nav class="flex mb-6" aria-label="Breadcrumb">
@@ -235,18 +234,6 @@ new class extends Component {
             @endif
         </ol>
     </nav>
-
-    <!-- Page Header -->
-    {{-- <div class="mb-6">
-        <h1 class="text-2xl font-bold dark:text-white">
-            @if ($riscoinId)
-                Team Statistics: {{ $currentNode->name }} ({{ $currentNode->riscoin_id }})
-            @else
-                My Team Statistics
-            @endif
-        </h1>
-        <p class="text-gray-600 dark:text-gray-400 mt-2">Real-time team performance metrics</p>
-    </div> --}}
 
     <!-- Statistics Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -333,47 +320,94 @@ new class extends Component {
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
             <div x-data="{
                 copied: false,
-                copySupportForm() {
-                    // Create the message text
-                    const message = `Support Team:{{ $currentNode->support_team }}
-            Inviter's Riscoin ID: {{ $currentNode->inviter_code }}
-            Riscoin Account ID: {{ $currentNode->riscoin_id }}
-            Deposit Amount: ${{ number_format($currentNode->invested_amount ?? 0, 2) }}
-            Your Name: {{ $currentNode->name }}
-            Occupation: {{ $currentNode->occupation ?? 'Not specified' }}
-            Gender: {{ $currentNode->gender ?? 'Not specified' }}
-            Age: {{ $currentNode->age ?? 'Not specified' }}`;
+                async copySupportForm() {
+                    const message = `Support Team: {{ $currentNode->support_team }}
+                        Inviter's Riscoin ID: {{ $currentNode->inviter_code }}
+                        Riscoin Account ID: {{ $currentNode->riscoin_id }}
+                        Deposit Amount: ${{ number_format($currentNode->invested_amount ?? 0, 2) }}
+                        Your Name: {{ $currentNode->name }}
+                        Occupation: {{ $currentNode->occupation ?? 'Not specified' }}
+                        Gender: {{ $currentNode->gender ?? 'Not specified' }}
+                        Nationality: Filipino
+                        Languages Spoken: English, Filipino
+                        Age: {{ $currentNode->age ?? 'Not specified' }}`;
 
-                    // Try modern clipboard API first
-                    if (navigator.clipboard && window.isSecureContext) {
-                        navigator.clipboard.writeText(message).then(() => {
-                            this.copied = true;
-                            setTimeout(() => this.copied = false, 2000);
-                        });
-                    } else {
-                        // Fallback for older browsers
+                    await this.copyTextToClipboard(message);
+                },
+                async copyTextToClipboard(text) {
+                    try {
+                        // Modern clipboard API with proper mobile support
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            await navigator.clipboard.writeText(text);
+                            this.showCopyFeedback();
+                            return true;
+                        }
+                    } catch (err) {
+                        console.log('Modern clipboard API failed, trying fallback...');
+                    }
+
+                    // Fallback method for mobile and older browsers
+                    return this.fallbackCopyTextToClipboard(text);
+                },
+                fallbackCopyTextToClipboard(text) {
+                    try {
+                        // Create a temporary textarea element
                         const textArea = document.createElement('textarea');
-                        textArea.value = message;
+                        textArea.value = text;
+
+                        // Make the textarea out of viewport
                         textArea.style.position = 'fixed';
+                        textArea.style.left = '-999999px';
+                        textArea.style.top = '-999999px';
                         textArea.style.opacity = '0';
+                        textArea.style.pointerEvents = 'none';
+
                         document.body.appendChild(textArea);
+
+                        // For mobile devices, we need to focus and select
+                        textArea.focus();
                         textArea.select();
 
-                        try {
-                            document.execCommand('copy');
-                            this.copied = true;
-                            setTimeout(() => this.copied = false, 2000);
-                        } catch (err) {
-                            console.error('Copy failed:', err);
-                        }
+                        // For iOS
+                        textArea.setSelectionRange(0, 99999);
 
+                        const successful = document.execCommand('copy');
                         document.body.removeChild(textArea);
+
+                        if (successful) {
+                            this.showCopyFeedback();
+                            return true;
+                        } else {
+                            this.showCopyError();
+                            return false;
+                        }
+                    } catch (err) {
+                        console.error('Fallback copy failed:', err);
+                        this.showCopyError();
+                        return false;
                     }
+                },
+                showCopyFeedback() {
+                    this.copied = true;
+                    setTimeout(() => {
+                        this.copied = false;
+                    }, 2000);
+                },
+                showCopyError() {
+                    // You can add error feedback here if needed
+                    console.error('Copy to clipboard failed');
+                    alert('Copy failed. Please select and copy the text manually.');
                 }
             }" class="relative">
-                <button @click="copySupportForm()"
-                    class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 font-medium">
-                    Copy Support Form to Clipboard
+                <button @click="copySupportForm()" :disabled="copied"
+                    class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span x-show="!copied">Copy Support Form to Clipboard</span>
+                    <span x-show="copied" class="flex items-center justify-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Copied!
+                    </span>
                 </button>
 
                 <!-- Copy feedback -->
@@ -384,7 +418,12 @@ new class extends Component {
                     x-transition:leave-start="opacity-100 transform scale-100"
                     x-transition:leave-end="opacity-0 transform scale-95"
                     class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg">
-                    <span class="text-white font-semibold">Copied to clipboard! 📋</span>
+                    <span class="text-white font-semibold flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Copied to clipboard! 📋
+                    </span>
                 </div>
             </div>
 
@@ -398,6 +437,8 @@ Deposit Amount: ${{ number_format($currentNode->invested_amount ?? 0, 2) }}
 Your Name: {{ $currentNode->name }}
 Occupation: {{ $currentNode->occupation ?? 'Not specified' }}
 Gender: {{ $currentNode->gender ?? 'Not specified' }}
+Nationality: Filipino
+Languages Spoken: English, Filipino
 Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
             </div>
         </div>
@@ -409,22 +450,25 @@ Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
             <!-- Birthday Celebrators Card -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
                 <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                    <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-pink-100 dark:bg-pink-900 mr-4">
-                            <svg class="w-6 h-6 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor"
-                                viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Birthday Celebrators</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">This month</p>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-pink-100 dark:bg-pink-900 mr-4">
+                                <svg class="w-6 h-6 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Birthday Celebrators
+                                </h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">This month</p>
+                            </div>
                         </div>
                         <div
-                            class="ml-auto bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400 px-3 py-1 rounded-full text-sm font-semibold">
+                            class="bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400 px-3 py-1 rounded-full text-sm font-semibold">
                             {{ count($birthdayCelebrators) }}
                         </div>
                     </div>
@@ -440,50 +484,89 @@ Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
                                 @endphp
                                 <div x-data="{
                                     copied: false,
+                                    showTextArea: false,
+                                    messageText: '',
                                     async copyToClipboard() {
                                         if (!{{ $celebrator['is_birthday_mention'] }}) return;
+
                                         try {
-                                            // Call the Livewire method to get the message
-                                            const message = await $wire.getRandomBirthdayMessage('{{ $celebrator['name'] }}');
+                                            // Get the message from Livewire
+                                            this.messageText = await $wire.getRandomBirthdayMessage('{{ $celebrator['name'] }}');
 
-                                            // Use the modern Clipboard API
-                                            await navigator.clipboard.writeText(message);
+                                            // Try modern clipboard API first
+                                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                try {
+                                                    await navigator.clipboard.writeText(this.messageText);
+                                                    this.showSuccess();
+                                                    return;
+                                                } catch (clipboardError) {
+                                                    console.log('Clipboard API failed, trying fallback...');
+                                                }
+                                            }
 
-                                            // Show feedback
-                                            this.copied = true;
-                                            setTimeout(() => {
-                                                this.copied = false;
-                                            }, 2000);
-                                        } catch (err) {
-                                            // Fallback for older browsers
-                                            console.error('Failed to copy: ', err);
-                                            const textArea = document.createElement('textarea');
-                                            textArea.value = await $wire.getRandomBirthdayMessage('{{ $celebrator['name'] }}');
-                                            document.body.appendChild(textArea);
+                                            // Fallback for iOS and other browsers
+                                            this.showTextArea = true;
+                                            await this.$nextTick();
+
+                                            const textArea = this.$refs.textArea{{ $loop->index }};
+                                            textArea.focus();
                                             textArea.select();
-                                            document.execCommand('copy');
-                                            document.body.removeChild(textArea);
 
-                                            this.copied = true;
+                                            // For iOS
+                                            textArea.setSelectionRange(0, 99999);
+
+                                            try {
+                                                const successful = document.execCommand('copy');
+                                                if (successful) {
+                                                    this.showSuccess();
+                                                } else {
+                                                    this.showManualCopy();
+                                                }
+                                            } catch (execError) {
+                                                this.showManualCopy();
+                                            }
+
+                                            // Hide textarea after a delay
                                             setTimeout(() => {
-                                                this.copied = false;
-                                            }, 2000);
+                                                this.showTextArea = false;
+                                            }, 1500);
+
+                                        } catch (err) {
+                                            console.error('Copy failed:', err);
+                                            this.showManualCopy();
                                         }
+                                    },
+                                    showSuccess() {
+                                        this.copied = true;
+                                        setTimeout(() => {
+                                            this.copied = false;
+                                        }, 2000);
+                                    },
+                                    showManualCopy() {
+                                        // Show the textarea for manual copy
+                                        this.showTextArea = true;
+                                        setTimeout(() => {
+                                            this.showTextArea = false;
+                                        }, 5000);
+                                    },
+                                    manualCopy() {
+                                        const textArea = this.$refs.textArea{{ $loop->index }};
+                                        textArea.focus();
+                                        textArea.select();
+                                        textArea.setSelectionRange(0, 99999);
                                     }
-                                }" @click="copyToClipboard()"
-                                    class="flex items-center p-3 {{ $isBirthdayToday ? 'bg-pink-50 dark:bg-pink-900/20 border-2 border-pink-200 dark:border-pink-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg {{ $celebrator['is_birthday_mention'] ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600' : 'cursor-not-allowed opacity-75' }} transition duration-200 relative">
+                                }"
+                                    class="group flex items-center p-3 {{ $isBirthdayToday ? 'bg-pink-50 dark:bg-pink-900/20 border-2 border-pink-200 dark:border-pink-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg transition duration-200 relative">
                                     <img class="w-10 h-10 rounded-full mr-3" src="{{ $celebrator['avatar'] }}"
                                         alt="{{ $celebrator['name'] }}">
-                                    <div class="flex-1">
-                                        <h4 class="font-medium text-gray-900 dark:text-white flex items-center">
+                                    <div class="flex-1 min-w-0">
+                                        <h4 class="font-medium text-gray-900 dark:text-white flex items-center truncate">
                                             {{ $celebrator['name'] }}
                                             @if ($isBirthdayToday)
-                                                <span class="ml-2 inline-flex">
-                                                    🎈🎂✨
-                                                </span>
+                                                <span class="ml-2 inline-flex">🎈🎂✨</span>
                                             @endif
                                         </h4>
-                                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                                        <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
                                             Birthday: {{ $celebrator['birth_date'] }} •
                                             ID: {{ $celebrator['riscoin_id'] }}
                                             @if ($isBirthdayToday)
@@ -492,10 +575,66 @@ Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
                                             @endif
                                         </p>
                                     </div>
+
+                                    @if ($celebrator['is_birthday_mention'])
+                                        <button @click="copyToClipboard()" :disabled="copied || showTextArea"
+                                            class="ml-3 p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title="Copy birthday message">
+                                            <svg x-show="!copied && !showTextArea" class="w-5 h-5" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            <svg x-show="copied" class="w-5 h-5 text-green-500" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            <svg x-show="showTextArea" class="w-5 h-5 text-yellow-500 animate-pulse"
+                                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </button>
+                                    @else
+                                        <div class="ml-3 p-2 text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                                            title="Copy disabled">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                    @endif
+
+                                    <!-- Hidden textarea for manual copy -->
+                                    <div x-show="showTextArea" x-transition class="absolute inset-0 z-20">
+                                        <div
+                                            class="absolute inset-0 bg-yellow-100 dark:bg-yellow-900/30 border-2 border-yellow-400 rounded-lg p-2">
+                                            <p class="text-xs text-yellow-800 dark:text-yellow-200 mb-1 font-medium">
+                                                Select and copy the text below:
+                                            </p>
+                                            <textarea x-ref="textArea{{ $loop->index }}" x-model="messageText"
+                                                class="w-full h-20 text-xs bg-white dark:bg-gray-800 border border-yellow-300 dark:border-yellow-600 rounded p-2 resize-none"
+                                                @click="manualCopy()" readonly></textarea>
+                                            <button @click="showTextArea = false"
+                                                class="mt-1 px-2 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition-colors">
+                                                Close
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <!-- Copy feedback -->
                                     <div x-show="copied" x-transition
-                                        class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg">
-                                        <span class="text-white font-semibold">Copied to clipboard! 📋</span>
+                                        class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg z-10">
+                                        <span class="text-white font-semibold flex items-center">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            Copied! 📋
+                                        </span>
                                     </div>
                                 </div>
                             @endforeach
@@ -517,21 +656,23 @@ Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
             <!-- Membership Anniversaries Card -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
                 <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                    <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900 mr-4">
-                            <svg class="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none"
-                                stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
-                                </path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Membership</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Monthly milestones</p>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900 mr-4">
+                                <svg class="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                                    </path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Membership</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Monthly milestones</p>
+                            </div>
                         </div>
                         <div
-                            class="ml-auto bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full text-sm font-semibold">
+                            class="bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full text-sm font-semibold">
                             {{ count($membershipAnniversaries) }}
                         </div>
                     </div>
@@ -547,10 +688,12 @@ Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
                                 @endphp
                                 <div x-data="{
                                     copied: false,
+                                    showTextArea: false,
+                                    messageText: '',
                                     async copyToClipboard() {
                                         if (!{{ $member['is_monthly_milestone_mention'] }}) return;
+
                                         try {
-                                            // Prepare the member data for Livewire method
                                             const memberData = {
                                                 name: '{{ $member['name'] }}',
                                                 join_date: '{{ $member['join_date'] }}',
@@ -562,60 +705,83 @@ Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
                                                 is_today_joined: {{ $isTodayJoined ? 'true' : 'false' }}
                                             };
 
-                                            // Call the Livewire method to get the message
-                                            const message = await $wire.getMembershipAnniversaryMessage(memberData);
+                                            // Get the message from Livewire
+                                            this.messageText = await $wire.getMembershipAnniversaryMessage(memberData);
 
-                                            // Use the modern Clipboard API
-                                            await navigator.clipboard.writeText(message);
+                                            // Try modern clipboard API first
+                                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                try {
+                                                    await navigator.clipboard.writeText(this.messageText);
+                                                    this.showSuccess();
+                                                    return;
+                                                } catch (clipboardError) {
+                                                    console.log('Clipboard API failed, trying fallback...');
+                                                }
+                                            }
 
-                                            // Show feedback
-                                            this.copied = true;
-                                            setTimeout(() => {
-                                                this.copied = false;
-                                            }, 2000);
-                                        } catch (err) {
-                                            // Fallback for older browsers
-                                            console.error('Failed to copy: ', err);
+                                            // Fallback for iOS and other browsers
+                                            this.showTextArea = true;
+                                            await this.$nextTick();
 
-                                            // Prepare member data for fallback
-                                            const memberData = {
-                                                name: '{{ $member['name'] }}',
-                                                join_date: '{{ $member['join_date'] }}',
-                                                months_with_team: '{{ $member['months_with_team'] }}',
-                                                avatar: '{{ $member['avatar'] }}',
-                                                riscoin_id: '{{ $member['riscoin_id'] }}',
-                                                invested_amount: '{{ $member['invested_amount'] }}',
-                                                date_joined: '{{ $member['date_joined'] }}',
-                                                is_today_joined: {{ $isTodayJoined ? 'true' : 'false' }}
-                                            };
-
-                                            const textArea = document.createElement('textarea');
-                                            textArea.value = await $wire.getMembershipAnniversaryMessage(memberData);
-                                            document.body.appendChild(textArea);
+                                            const textArea = this.$refs.textArea{{ $loop->index }};
+                                            textArea.focus();
                                             textArea.select();
-                                            document.execCommand('copy');
-                                            document.body.removeChild(textArea);
 
-                                            this.copied = true;
+                                            // For iOS
+                                            textArea.setSelectionRange(0, 99999);
+
+                                            try {
+                                                const successful = document.execCommand('copy');
+                                                if (successful) {
+                                                    this.showSuccess();
+                                                } else {
+                                                    this.showManualCopy();
+                                                }
+                                            } catch (execError) {
+                                                this.showManualCopy();
+                                            }
+
+                                            // Hide textarea after a delay
                                             setTimeout(() => {
-                                                this.copied = false;
-                                            }, 2000);
+                                                this.showTextArea = false;
+                                            }, 1500);
+
+                                        } catch (err) {
+                                            console.error('Copy failed:', err);
+                                            this.showManualCopy();
                                         }
+                                    },
+                                    showSuccess() {
+                                        this.copied = true;
+                                        setTimeout(() => {
+                                            this.copied = false;
+                                        }, 2000);
+                                    },
+                                    showManualCopy() {
+                                        // Show the textarea for manual copy
+                                        this.showTextArea = true;
+                                        setTimeout(() => {
+                                            this.showTextArea = false;
+                                        }, 5000);
+                                    },
+                                    manualCopy() {
+                                        const textArea = this.$refs.textArea{{ $loop->index }};
+                                        textArea.focus();
+                                        textArea.select();
+                                        textArea.setSelectionRange(0, 99999);
                                     }
-                                }" @click="copyToClipboard()"
-                                    class="flex items-center p-3 {{ $isTodayJoined ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg {{ $member['is_monthly_milestone_mention'] ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600' : 'cursor-not-allowed opacity-75' }} transition duration-200 relative">
+                                }"
+                                    class="group flex items-center p-3 {{ $isTodayJoined ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg transition duration-200 relative">
                                     <img class="w-10 h-10 rounded-full mr-3" src="{{ $member['avatar'] }}"
                                         alt="{{ $member['name'] }}">
-                                    <div class="flex-1">
-                                        <h4 class="font-medium text-gray-900 dark:text-white flex items-center">
+                                    <div class="flex-1 min-w-0">
+                                        <h4 class="font-medium text-gray-900 dark:text-white flex items-center truncate">
                                             {{ $member['name'] }}
                                             @if ($isTodayJoined)
-                                                <span class="ml-2 inline-flex">
-                                                    🎊🎉✨
-                                                </span>
+                                                <span class="ml-2 inline-flex">🎊🎉✨</span>
                                             @endif
                                         </h4>
-                                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                                        <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
                                             Joined: {{ $member['join_date'] }} •
                                             {{ $member['months_with_team'] }}
                                             month{{ $member['months_with_team'] > 1 ? 's' : '' }} with team
@@ -625,10 +791,66 @@ Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
                                             @endif
                                         </p>
                                     </div>
+
+                                    @if ($member['is_monthly_milestone_mention'])
+                                        <button @click="copyToClipboard()" :disabled="copied || showTextArea"
+                                            class="ml-3 p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title="Copy anniversary message">
+                                            <svg x-show="!copied && !showTextArea" class="w-5 h-5" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            <svg x-show="copied" class="w-5 h-5 text-green-500" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            <svg x-show="showTextArea" class="w-5 h-5 text-yellow-500 animate-pulse"
+                                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </button>
+                                    @else
+                                        <div class="ml-3 p-2 text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                                            title="Copy disabled">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                    @endif
+
+                                    <!-- Hidden textarea for manual copy -->
+                                    <div x-show="showTextArea" x-transition class="absolute inset-0 z-20">
+                                        <div
+                                            class="absolute inset-0 bg-yellow-100 dark:bg-yellow-900/30 border-2 border-yellow-400 rounded-lg p-2">
+                                            <p class="text-xs text-yellow-800 dark:text-yellow-200 mb-1 font-medium">
+                                                Select and copy the text below:
+                                            </p>
+                                            <textarea x-ref="textArea{{ $loop->index }}" x-model="messageText"
+                                                class="w-full h-20 text-xs bg-white dark:bg-gray-800 border border-yellow-300 dark:border-yellow-600 rounded p-2 resize-none"
+                                                @click="manualCopy()" readonly></textarea>
+                                            <button @click="showTextArea = false"
+                                                class="mt-1 px-2 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition-colors">
+                                                Close
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <!-- Copy feedback -->
                                     <div x-show="copied" x-transition
-                                        class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg">
-                                        <span class="text-white font-semibold">Copied to clipboard! 📋</span>
+                                        class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg z-10">
+                                        <span class="text-white font-semibold flex items-center">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            Copied! 📋
+                                        </span>
                                     </div>
                                 </div>
                             @endforeach
