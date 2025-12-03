@@ -31,6 +31,7 @@ class RolesPermissionSeeder extends Seeder
             'users.disable-enable',
             'users.cop-welcome-message',
             'users.verify-email',
+            'users.promote',
 
             //Roles
             'roles.view',
@@ -85,6 +86,12 @@ class RolesPermissionSeeder extends Seeder
 
             //Guide Access
             'guide.access',
+
+            //Managesrs
+            'managers.view',
+            'managers.create',
+            'managers.edit',
+            'managers.delete',
         ];
 
         foreach ($adminPermissions as $permission) {
