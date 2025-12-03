@@ -72,6 +72,11 @@
                     <flux:navlist.item icon="users" :href="route('my-team')" :current="request()->routeIs('my-team')"
                         wire:navigate>{{ __('My Team') }}</flux:navlist.item>
                 @endcan
+                @can('managers.view')
+                    <flux:navlist.item icon="briefcase" :href="route('managers.index')"
+                        :current="request()->routeIs('managers.index')" wire:navigate>{{ __('Managers') }}
+                    </flux:navlist.item>
+                @endcan
                 @can('my-withdrawals.view')
                     <flux:navlist.item icon="credit-card" :href="route('my-withdrawals')"
                         :current="request()->routeIs('my-withdrawals')" wire:navigate>{{ __('My Withdrawals') }}
