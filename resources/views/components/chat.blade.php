@@ -1,4 +1,4 @@
-  <!-- Floating Chat Button -->
+  {{-- <!-- Floating Chat Button -->
 <style>
     .chat-fab {
         position: fixed;
@@ -67,4 +67,4 @@
         </svg>
         <span>DJ Messenger</span>
     </a>
-</div>
+</div> --}}
