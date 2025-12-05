@@ -19,13 +19,13 @@ new class extends Component {
 
         <form id="calcForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4" onsubmit="return false;">
             <label class="flex flex-col text-sm">
-                <span class="text-xs text-gray-500 dark:text-gray-400 mb-1">Invested Amount</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400 mb-1">Invested Amount or Current Assets</span>
                 <input id="invested" type="number" step="0.01" min="0" value="1000"
                     class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring" />
             </label>
 
             <label class="flex flex-col text-sm">
-                <span class="text-xs text-gray-500 dark:text-gray-400 mb-1">First Recharge Reward</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400 mb-1">First Recharge Reward (this is for new invite)</span>
                 <input id="firstReward" type="number" step="0.01" min="0" value="0"
                     class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring" />
             </label>
