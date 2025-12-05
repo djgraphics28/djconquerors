@@ -49,6 +49,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Volt::route('managers', 'managers.index')->name('managers.index');
 
+    // Compound Interest Calculator
+    Volt::route('compound-calculator', 'compound-interest-calculator')->name('compound-calculator');
+
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(
             when(

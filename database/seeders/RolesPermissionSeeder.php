@@ -92,6 +92,10 @@ class RolesPermissionSeeder extends Seeder
             'managers.create',
             'managers.edit',
             'managers.delete',
+
+            // Compound Interest Calculator
+            'calculator.view',
+            'calculator.access',
         ];
 
         foreach ($adminPermissions as $permission) {
@@ -115,6 +119,10 @@ class RolesPermissionSeeder extends Seeder
             'my-team.view',
             'appointments.book',
             // 'guide.access',
+
+            // Compound Interest Calculator
+            'calculator.view',
+            'calculator.access',
         ]);
 
         $adminUser = User::where('email', 'admin@djconquerors.com')->first();
