@@ -131,6 +131,12 @@
                         :current="request()->routeIs('email-receivers')" wire:navigate>{{ __('Email Receivers') }}
                     </flux:navlist.item>
                 @endcan
+
+                @can('calculator.view')
+                    <flux:navlist.item icon="chart-bar" :href="route('compound-calculator')"
+                        :current="request()->routeIs('compound-calculator')" wire:navigate>{{ __('Compound Calculator') }}
+                    </flux:navlist.item>
+                @endcan
             </flux:navlist.group>
         </flux:navlist>
 
