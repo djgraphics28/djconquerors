@@ -96,6 +96,9 @@ class RolesPermissionSeeder extends Seeder
             // Compound Interest Calculator
             'calculator.view',
             'calculator.access',
+
+            //Tracker
+            'tracker.view',
         ];
 
         foreach ($adminPermissions as $permission) {

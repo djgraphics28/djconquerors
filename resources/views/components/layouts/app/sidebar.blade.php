@@ -137,6 +137,12 @@
                         :current="request()->routeIs('compound-calculator')" wire:navigate>{{ __('Compound Calculator') }}
                     </flux:navlist.item>
                 @endcan
+
+                @can('tracker.view')
+                    <flux:navlist.item icon="chart-pie" :href="route('tracker.calculator')"
+                        :current="request()->routeIs('tracker.calculator')" wire:navigate>{{ __('Calculator Usage Tracker') }}
+                    </flux:navlist.item>
+                @endcan
             </flux:navlist.group>
         </flux:navlist>
 
