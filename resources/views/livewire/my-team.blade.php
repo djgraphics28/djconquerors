@@ -7,6 +7,7 @@ use Spatie\Activitylog\Models\Activity;
 use Livewire\WithPagination;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 new class extends Component {
     use WithPagination, WithFileUploads;
@@ -28,8 +29,16 @@ new class extends Component {
     public $userId;
     public $showModal = false;
     public $showViewModal = false;
+    public $showAssistantModal = false;
     public $activityLogs = [];
     public $selectedUser = null;
+    public $assistants = [];
+
+    // Assistant selection
+    public $assistantUserId;
+    public $assistantTargetUserId;
+    public $assistantTargetUser = null;
+    public $assistantSearch = '';
 
     // Media properties
     public $avatar;
@@ -56,6 +65,18 @@ new class extends Component {
     {
         $this->loadRoles();
         $this->loadInviters();
+        $this->loadAssistants();
+    }
+
+    public function loadAssistants()
+    {
+        // Load full user models excluding authenticated user and target user
+        $this->assistants = User::where('is_active', true)
+            ->where('id', '!=', 1) // Exclude super admin
+            ->when($this->assistantTargetUserId, function ($query) {
+                $query->where('id', '!=', $this->assistantTargetUserId);
+            })
+            ->get();
     }
 
     public function loadInviters()
@@ -78,6 +99,17 @@ new class extends Component {
         $this->selectedUser = User::with(['roles', 'withdrawals'])->find($userId);
         $this->loadActivityLogs($userId);
         $this->showViewModal = true;
+    }
+
+    public function addAssistant($userId)
+    {
+        // Set the target user that will receive the assistant
+        $this->assistantTargetUserId = $userId;
+        $this->assistantTargetUser = User::find($userId);
+        // If target already has an assistant, preselect it
+        $this->assistantUserId = $this->assistantTargetUser->assistant_id ?? null;
+        $this->assistantSearch = '';
+        $this->showAssistantModal = true;
     }
 
     // Get total withdrawals amount for a user (only paid status)
@@ -440,6 +472,77 @@ new class extends Component {
         $this->showViewModal = false;
         $this->selectedUser = null;
         $this->activityLogs = [];
+    }
+
+    public function closeAssistantModal()
+    {
+        $this->showAssistantModal = false;
+        $this->resetForm();
+    }
+
+    // Select an assistant from the list
+    public function selectAssistant($assistantId)
+    {
+        $this->assistantUserId = $assistantId;
+    }
+
+    // Add/assign assistant to the target user
+    public function addAssistantUser()
+    {
+        if (!$this->assistantTargetUserId) {
+            session()->flash('error', 'Target user not set.');
+            return;
+        }
+
+        if (!$this->assistantUserId) {
+            session()->flash('error', 'Please select an assistant.');
+            return;
+        }
+
+        $target = User::find($this->assistantTargetUserId);
+        if (!$target) {
+            session()->flash('error', 'Target user not found.');
+            return;
+        }
+
+        $target->assistant_id = $this->assistantUserId;
+        $target->save();
+
+        // Update local target user for immediate UI reflection
+        if ($this->assistantTargetUser && $this->assistantTargetUser->id === $target->id) {
+            $this->assistantTargetUser->assistant_id = $this->assistantUserId;
+        }
+
+        session()->flash('message', 'Assistant assigned successfully.');
+        // $this->closeAssistantModal();
+    }
+
+    // Filter assistants by search
+    public function getFilteredAssistantsProperty()
+    {
+        $search = trim(strtolower($this->assistantSearch));
+        if ($search === '') {
+            return $this->assistants;
+        }
+
+        return $this->assistants->filter(function ($u) use ($search) {
+            return Str::contains(strtolower($u->name ?? ''), $search) || Str::contains(strtolower($u->email ?? ''), $search) || Str::contains(strtolower($u->riscoin_id ?? ''), $search);
+        });
+    }
+
+    // Sample text for textarea
+    public function getAssistantSampleTextProperty()
+    {
+        $depositorId = $this->assistantTargetUser->riscoin_id ?? 'N/A';
+        $inviterId = $this->assistantTargetUser->inviters_code ?? 'N/A';
+
+        $assistantUser = $this->assistantUserId ? User::find($this->assistantUserId) : null;
+        // prefer riscoin_id if available, otherwise fallback to id
+        $assistantId = $assistantUser ? $assistantUser->riscoin_id ?? $assistantUser->id : 'N/A';
+
+        $now = now()->toIsoString();
+
+        return "Depositors ID : {$depositorId}\n\nInviters ID : {$inviterId}\n\nAssistants ID : {$assistantId}\n\n";
     }
 
     // Reset filters
@@ -843,6 +946,19 @@ new class extends Component {
                                         class="md:sticky right-0 z-10 px-6 py-4 whitespace-nowrap
                                         {{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
                                         <div class="flex space-x-2">
+                                            @if (auth()->user()->riscoin_id === $user->inviters_code || auth()->user()->hasRole('admin'))
+                                                <flux:button wire:click="addAssistant({{ $user->id }})"
+                                                    variant="ghost" size="sm"
+                                                    data-test="view-user-{{ $user->id }}"
+                                                    title="Add Assistant ID">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                                    </svg>
+                                                </flux:button>
+                                            @endif
                                             @can('my-team.view')
                                                 <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost"
                                                     size="sm" data-test="view-user-{{ $user->id }}"
@@ -1381,6 +1497,141 @@ new class extends Component {
                 </div>
             </div>
 
+            <!-- Add Assistant User Modal - Right Side Panel -->
+            <div x-data="{ open: @entangle('showAssistantModal') }" x-show="open" x-on:keydown.escape.window="open = false"
+                class="fixed inset-0 z-50 overflow-hidden" style="display: none;">
+                <!-- Overlay --> <!-- Overlay -->
+                <div x-show="open" x-transition:enter="ease-in-out duration-500"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in-out duration-500" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    class="absolute inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 transition-opacity"
+                    x-on:click="open = false">
+                </div>
+
+                <!-- Modal Panel -->
+                <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
+                    <div x-show="open"
+                        x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
+                        x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+                        x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700"
+                        x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+                        class="w-screen max-w-2xl">
+                        <div class="h-full flex flex-col bg-white dark:bg-gray-800 shadow-xl">
+                            <!-- Header -->
+                            <div
+                                class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                                    Add Assistant User
+                                </h2>
+                                <div class="text-sm text-gray-500">Target:
+                                    {{ $this->assistantTargetUser ? $this->assistantTargetUser->name : 'None' }}</div>
+                                <button wire:click="closeAssistantModal"
+                                    class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- Content -->
+                            <div class="flex-1 overflow-y-auto">
+                                <div class="px-6 py-4">
+                                    <div class="w-full">
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            {{ __('Search & Select Assistant') }}
+                                        </label>
+
+                                        <input type="text" wire:model.live="assistantSearch"
+                                            placeholder="Search users by name, email or riscoin id"
+                                            class="mt-1 block w-full pl-3 pr-3 py-2 text-base border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" />
+
+                                        <div class="mt-3 grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+                                            @foreach ($this->filteredAssistants as $a)
+                                                <button type="button"
+                                                    wire:click="selectAssistant({{ $a->id }})"
+                                                    class="w-full flex items-center space-x-3 px-3 py-2 rounded-md text-left border border-transparent hover:bg-gray-50 dark:hover:bg-gray-700 {{ $assistantUserId == $a->id ? 'bg-indigo-700 dark:bg-indigo-700' : '' }}">
+                                                    <div class="flex-shrink-0 h-8 w-8">
+                                                        @if ($a->getFirstMediaUrl('avatar'))
+                                                            <img class="h-8 w-8 rounded-full object-cover"
+                                                                src="{{ $a->getFirstMediaUrl('avatar') }}"
+                                                                alt="{{ $a->name }}">
+                                                        @else
+                                                            <div
+                                                                class="h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center {{ $assistantUserId == $a->id ? 'ring-2 ring-indigo-300 dark:ring-indigo-500' : '' }}">
+                                                                <span
+                                                                    class="text-xs font-medium {{ $assistantUserId == $a->id ? 'text-white' : 'text-gray-700 dark:text-gray-300' }}">{{ strtoupper(substr($a->name, 0, 1)) }}</span>
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                    <div class="flex-1">
+                                                        <div
+                                                            class="text-sm font-medium {{ $assistantUserId == $a->id ? 'text-white' : 'text-gray-900 dark:text-white' }}">
+                                                            {{ $a->name }}</div>
+                                                        <div
+                                                            class="text-xs {{ $assistantUserId == $a->id ? 'text-indigo-100' : 'text-gray-500 dark:text-gray-400' }}">
+                                                            {{ $a->email }} • {{ $a->riscoin_id }}</div>
+                                                    </div>
+                                                    <div>
+                                                        @if ($assistantUserId == $a->id)
+                                                            <svg class="h-5 w-5 text-green-600" fill="none"
+                                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="2" d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        @endif
+                                                    </div>
+                                                </button>
+                                            @endforeach
+                                        </div>
+
+                                        @if (session()->has('message'))
+                                            <div
+                                                class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+                                                {{ session('message') }}
+                                            </div>
+                                        @endif
+
+                                        @if (session()->has('error'))
+                                            <div
+                                                class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                                                {{ session('error') }}
+                                            </div>
+                                        @endif
+
+                                        <div class="mt-4">
+                                            <label
+                                                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Apply
+                                                Reward Message to Sir Martin</label>
+                                            <textarea readonly rows="6" class="w-full p-3 border rounded-md bg-gray-50 dark:bg-gray-700 text-sm"
+                                                id="assistantSample">{{ $this->assistantSampleText }}</textarea>
+                                            <div class="mt-2 flex justify-end">
+                                                <button type="button"
+                                                    onclick="(async function(){const t=document.getElementById('assistantSample').value; try{if(navigator.clipboard && navigator.clipboard.writeText){await navigator.clipboard.writeText(t);} else {const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();} alert('Copied to clipboard');}catch(e){try{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();alert('Copied to clipboard');}catch(err){alert('Copy failed');}}})()"
+                                                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Copy</button>
+                                            </div>
+                                        </div>
+
+                                    </div>
+
+                                    <!-- Action Buttons -->
+                                    <div
+                                        class="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
+                                        <button type="button" wire:click="closeAssistantModal"
+                                            class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                            Cancel
+                                        </button>
+                                        <button type="submit" wire:click="addAssistantUser"
+                                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                            Save Assistant
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-</div>
