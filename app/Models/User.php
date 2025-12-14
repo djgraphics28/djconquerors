@@ -17,6 +17,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -296,5 +297,15 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     public function getLastLoginTimestampAttribute()
     {
         return $this->last_login_at ?? $this->updated_at;
+    }
+
+    /**
+     * Get the assistant that owns the User
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function assistant(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assistant_id', 'id');
     }
 }
