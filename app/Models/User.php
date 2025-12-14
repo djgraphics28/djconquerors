@@ -12,6 +12,7 @@ use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -26,6 +27,7 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     use LogsActivity;
     use InteractsWithMedia;
     use HasApiTokens;
+    use SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -50,6 +52,7 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         'gender',
         'occupation',
         'support_team',
+        'assistant_id',
     ];
 
     /**

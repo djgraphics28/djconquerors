@@ -45,9 +45,12 @@
     <link href="/pwa/icons/android/android-launchericon-48-48.png" sizes="48x48" rel="icon" type="image/png">
     <link href="/pwa/icons/android/android-launchericon-72-72.png" sizes="72x72" rel="icon" type="image/png">
     <link href="/pwa/icons/android/android-launchericon-96-96.png" sizes="96x96" rel="icon" type="image/png">
-    <link href="/pwa/icons/android/android-launchericon-144-144.png" sizes="144x144" rel="icon" type="image/png">
-    <link href="/pwa/icons/android/android-launchericon-192-192.png" sizes="192x192" rel="icon" type="image/png">
-    <link href="/pwa/icons/android/android-launchericon-512-512.png" sizes="512x512" rel="icon" type="image/png">
+    <link href="/pwa/icons/android/android-launchericon-144-144.png" sizes="144x144" rel="icon"
+        type="image/png">
+    <link href="/pwa/icons/android/android-launchericon-192-192.png" sizes="192x192" rel="icon"
+        type="image/png">
+    <link href="/pwa/icons/android/android-launchericon-512-512.png" sizes="512x512" rel="icon"
+        type="image/png">
 </head>
 
 <body class="min-h-screen bg-white dark:bg-zinc-800">
@@ -64,6 +67,68 @@
                 wire:navigate>
                 {{ __('Dashboard') }}
             </flux:navbar.item>
+            @can('genealogy.view')
+                <flux:navlist.item icon="users" :href="route('genealogy')" :current="request()->routeIs('genealogy')"
+                    wire:navigate>{{ __('Genealogy') }}</flux:navlist.item>
+            @endcan
+            @can('my-team.access')
+                <flux:navlist.item icon="users" :href="route('my-team')" :current="request()->routeIs('my-team')"
+                    wire:navigate>{{ __('My Team') }}</flux:navlist.item>
+            @endcan
+            @can('my-withdrawals.view')
+                <flux:navlist.item icon="credit-card" :href="route('my-withdrawals')"
+                    :current="request()->routeIs('my-withdrawals')" wire:navigate>{{ __('My Withdrawals') }}
+                </flux:navlist.item>
+            @endcan
+            @can('appointments.book')
+                <flux:navlist.item icon="calendar" :href="route('appointments.book')"
+                    :current="request()->routeIs('book-appointment')" wire:navigate>{{ __('Book An Appointment') }}
+                </flux:navlist.item>
+            @endcan
+            @can('appointments.view')
+                <flux:navlist.item icon="calendar" :href="route('appointments.index')"
+                    :current="request()->routeIs('appointments')" wire:navigate>{{ __('Manage Appointments') }}
+                </flux:navlist.item>
+            @endcan
+            {{-- @can('tutorials.view')
+                <flux:navlist.item icon="play-circle" :href="route('tutorials.index')"
+                    :current="request()->routeIs('tutorials.index')" wire:navigate>{{ __('Tutorials Management') }}
+                </flux:navlist.item>
+            @endcan
+            @can('tutorials.access')
+                <flux:navlist.item icon="video-camera" :href="route('tutorials.access')"
+                    :current="request()->routeIs('tutorials.access')" wire:navigate>{{ __('Tutorials') }}
+                </flux:navlist.item>
+            @endcan
+            @can('guide.view')
+                <flux:navlist.item icon="book-open" :href="route('guide.index')"
+                    :current="request()->routeIs('guide.index')" wire:navigate>{{ __('Guide Management') }}
+                </flux:navlist.item>
+            @endcan
+            @can('guide.access')
+                <flux:navlist.item icon="book-open" :href="route('guide.access')"
+                    :current="request()->routeIs('guide.access')" wire:navigate>{{ __('Guide') }}
+                </flux:navlist.item>
+            @endcan
+            @can('users.view')
+                <flux:navlist.item icon="user-circle" :href="route('users.index')"
+                    :current="request()->routeIs('users.index')" wire:navigate>{{ __('Users') }}</flux:navlist.item>
+            @endcan
+            @can('roles.view')
+                <flux:navlist.item icon="shield-check" :href="route('roles.index')"
+                    :current="request()->routeIs('roles.index')" wire:navigate>{{ __('Roles & Permissions') }}
+                </flux:navlist.item>
+            @endcan
+            @can('activity-logs.view')
+                <flux:navlist.item icon="clipboard" :href="route('activity-logs')"
+                    :current="request()->routeIs('activity-logs')" wire:navigate>{{ __('Activity Logs') }}
+                </flux:navlist.item>
+            @endcan
+            @can('email-receivers.view')
+                <flux:navlist.item icon="envelope" :href="route('email-receivers')"
+                    :current="request()->routeIs('email-receivers')" wire:navigate>{{ __('Email Receivers') }}
+                </flux:navlist.item>
+            @endcan --}}
         </flux:navbar>
 
         <flux:spacer />
@@ -132,7 +197,8 @@
         class="lg:hidden border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
         <flux:sidebar.toggle class="lg:hidden" icon="x-mark" />
 
-        <a href="{{ route('dashboard') }}" class="ms-1 flex items-center space-x-2 rtl:space-x-reverse" wire:navigate>
+        <a href="{{ route('dashboard') }}" class="ms-1 flex items-center space-x-2 rtl:space-x-reverse"
+            wire:navigate>
             <x-app-logo />
         </a>
 

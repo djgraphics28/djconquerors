@@ -47,6 +47,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('settings/appearance', 'settings.appearance')->name('appearance.edit');
     Volt::route('settings/share-link', 'settings.share-link')->name('share-link');
 
+    Volt::route('managers', 'managers.index')->name('managers.index');
+
+    // Compound Interest Calculator
+    Volt::route('compound-calculator', 'compound-interest-calculator')->name('compound-calculator');
+
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(
             when(
