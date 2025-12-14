@@ -53,13 +53,101 @@ new class extends Component {
 
     public function getVideoEmbedUrl($url)
     {
-        $videoId = $this->getVideoId($url);
-        if (str_contains($url, 'youtube')) {
-            return "https://www.youtube.com/embed/{$videoId}";
-        } elseif (str_contains($url, 'vimeo')) {
-            return "https://player.vimeo.com/video/{$videoId}";
+        // Auto-detect video type from URL
+        if (str_contains($url, 'drive.google.com')) {
+            // For Google Drive, we'll use a direct approach
+            return $this->getDirectDriveVideoUrl($url);
+        } else {
+            // YouTube/Vimeo
+            $videoId = $this->getVideoId($url);
+            if (str_contains($url, 'youtube')) {
+                return $videoId ? "https://www.youtube.com/embed/{$videoId}?rel=0" : null;
+            } elseif (str_contains($url, 'vimeo')) {
+                return $videoId ? "https://player.vimeo.com/video/{$videoId}" : null;
+            }
         }
         return null;
+    }
+
+    private function getDirectDriveVideoUrl($url)
+    {
+        // Extract file ID from Google Drive URL
+        $fileId = $this->extractDriveFileId($url);
+
+        if ($fileId) {
+            // Use the direct preview URL for Google Drive
+            return "https://drive.google.com/file/d/{$fileId}/preview";
+        }
+
+        return $url;
+    }
+
+    private function extractDriveFileId($url)
+    {
+        // Handle different Google Drive URL formats
+        if (str_contains($url, '/file/d/')) {
+            // Format: https://drive.google.com/file/d/FILE_ID/view
+            preg_match('/\/file\/d\/([a-zA-Z0-9_-]+)/', $url, $matches);
+            return $matches[1] ?? null;
+        } elseif (str_contains($url, 'id=')) {
+            // Format: https://drive.google.com/open?id=FILE_ID
+            preg_match('/[?&]id=([a-zA-Z0-9_-]+)/', $url, $matches);
+            return $matches[1] ?? null;
+        } elseif (str_contains($url, '/uc?')) {
+            // Format: https://drive.google.com/uc?id=FILE_ID
+            preg_match('/[?&]id=([a-zA-Z0-9_-]+)/', $url, $matches);
+            return $matches[1] ?? null;
+        }
+
+        return null;
+    }
+
+    // Check if it's a direct video file
+    public function isDirectVideoUrl($url)
+    {
+        $directVideoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.wmv'];
+
+        foreach ($directVideoExtensions as $extension) {
+            if (str_contains($url, $extension)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Get video type for display
+    public function getVideoType($url)
+    {
+        if (str_contains($url, 'youtube.com') || str_contains($url, 'youtu.be')) {
+            return 'youtube';
+        } elseif (str_contains($url, 'drive.google.com')) {
+            return 'drive';
+        } elseif (str_contains($url, 'vimeo.com')) {
+            return 'vimeo';
+        } elseif ($this->isDirectVideoUrl($url)) {
+            return 'direct';
+        }
+        return 'other';
+    }
+
+    // Get video type badge color
+    public function getVideoTypeBadge($url)
+    {
+        $type = $this->getVideoType($url);
+
+        switch ($type) {
+            case 'youtube':
+                return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+            case 'drive':
+                return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+            case 'vimeo':
+                return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+            case 'direct':
+                return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+            default:
+                return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+        }
     }
 }; ?>
 
@@ -72,8 +160,10 @@ new class extends Component {
                 <li>
                     <a href="{{ route('tutorials.access') }}"
                         class="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
                         Video Tutorials
                     </a>
@@ -88,14 +178,74 @@ new class extends Component {
                     @if ($selectedTutorial)
                         <!-- Video Player -->
                         <div class="bg-black rounded-lg overflow-hidden mb-4">
-                            @if ($selectedTutorial->video_url && $this->getVideoEmbedUrl($selectedTutorial->video_url))
-                                <div class="relative pb-[56.25%] h-0"> <!-- 16:9 aspect ratio -->
-                                    <iframe src="{{ $this->getVideoEmbedUrl($selectedTutorial->video_url) }}?autoplay=1"
-                                        class="absolute top-0 left-0 w-full h-full" frameborder="0"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                        allowfullscreen>
-                                    </iframe>
-                                </div>
+                            @if ($selectedTutorial->video_url)
+                                @if ($this->getVideoType($selectedTutorial->video_url) === 'drive')
+                                    <!-- Google Drive with better error handling -->
+                                    <div class="relative pb-[56.25%] h-0">
+                                        <iframe src="{{ $this->getVideoEmbedUrl($selectedTutorial->video_url) }}"
+                                            class="absolute top-0 left-0 w-full h-full" frameborder="0"
+                                            allow="autoplay; fullscreen" allowfullscreen
+                                            onerror="this.style.display='none'; document.getElementById('drive-fallback-{{ $selectedTutorial->id }}').style.display='block';">
+                                        </iframe>
+                                        <div id="drive-fallback-{{ $selectedTutorial->id }}"
+                                            class="absolute top-0 left-0 w-full h-full bg-gray-800 hidden flex items-center justify-center text-center p-6">
+                                            <div>
+                                                <svg class="mx-auto h-16 w-16 mb-3 text-gray-400" fill="none"
+                                                    viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="1.5"
+                                                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                </svg>
+                                                <h3 class="text-lg font-medium text-white mb-2">Google Drive Video</h3>
+                                                <p class="text-sm text-gray-300 mb-4">
+                                                    If the video doesn't load, please check:
+                                                </p>
+                                                <ul
+                                                    class="text-xs text-gray-400 text-left max-w-md mx-auto mb-4 space-y-1">
+                                                    <li>• The file is shared with "Anyone with the link can view"</li>
+                                                    <li>• You're signed into Google account</li>
+                                                    <li>• The file is a supported video format</li>
+                                                </ul>
+                                                <a href="{{ $selectedTutorial->video_url }}" target="_blank"
+                                                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                    </svg>
+                                                    Open in Google Drive
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @elseif ($this->getVideoEmbedUrl($selectedTutorial->video_url))
+                                    <!-- YouTube, Vimeo, or other embeddable URLs -->
+                                    <div class="relative pb-[56.25%] h-0">
+                                        <iframe src="{{ $this->getVideoEmbedUrl($selectedTutorial->video_url) }}"
+                                            class="absolute top-0 left-0 w-full h-full" frameborder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowfullscreen>
+                                        </iframe>
+                                    </div>
+                                @else
+                                    <!-- Direct video file or unsupported URL -->
+                                    <div
+                                        class="flex items-center justify-center h-96 text-gray-400 dark:text-gray-500 bg-gray-800">
+                                        <div class="text-center">
+                                            <svg class="mx-auto h-16 w-16 mb-3" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            <p class="text-lg">Video format not supported</p>
+                                            <a href="{{ $selectedTutorial->video_url }}" target="_blank"
+                                                class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mt-2">
+                                                Open Video Link
+                                            </a>
+                                        </div>
+                                    </div>
+                                @endif
                             @else
                                 <div
                                     class="flex items-center justify-center h-96 text-gray-400 dark:text-gray-500 bg-gray-800">
@@ -113,7 +263,13 @@ new class extends Component {
 
                         <!-- Video Info -->
                         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-6">
-                            <h2 class="text-xl font-bold mb-2 dark:text-white">{{ $selectedTutorial->title }}</h2>
+                            <div class="flex items-start justify-between mb-2">
+                                <h2 class="text-xl font-bold dark:text-white">{{ $selectedTutorial->title }}</h2>
+                                <span
+                                    class="px-2 py-1 text-xs font-medium rounded-full {{ $this->getVideoTypeBadge($selectedTutorial->video_url) }}">
+                                    {{ ucfirst($this->getVideoType($selectedTutorial->video_url)) }}
+                                </span>
+                            </div>
                             <div class="flex items-center justify-between mb-4">
                                 <div class="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
                                     <span><i class="fas fa-eye mr-1"></i> 1.2K views</span>
@@ -136,7 +292,8 @@ new class extends Component {
 
                             @if ($selectedTutorial->description)
                                 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                                    <p class="text-gray-700 dark:text-gray-300">{{ $selectedTutorial->description }}</p>
+                                    <p class="text-gray-700 dark:text-gray-300">{{ $selectedTutorial->description }}
+                                    </p>
                                 </div>
                             @endif
                         </div>
@@ -164,8 +321,8 @@ new class extends Component {
                                 placeholder="Search tutorials..."
                                 class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400">
                             <div class="absolute right-3 top-2.5">
-                                <svg class="h-5 w-5 text-gray-400 dark:text-gray-300" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor">
+                                <svg class="h-5 w-5 text-gray-400 dark:text-gray-300" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
@@ -187,22 +344,37 @@ new class extends Component {
                                         class="flex p-3 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors {{ $selectedTutorial && $selectedTutorial->id === $tutorial->id ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}">
                                         @if ($tutorial->thumbnail_url)
                                             <div class="flex-shrink-0 mr-3 relative">
-                                                <img src="{{ $tutorial->thumbnail_url }}" alt="{{ $tutorial->title }}"
+                                                <img src="{{ $tutorial->thumbnail_url }}"
+                                                    alt="{{ $tutorial->title }}"
                                                     class="w-40 h-24 object-cover rounded" loading="lazy">
                                                 <div
                                                     class="absolute bottom-1 right-1 bg-black bg-opacity-80 text-white text-xs px-1 rounded">
                                                     10:30
                                                 </div>
+                                                <!-- Video Type Badge -->
+                                                <div class="absolute top-1 left-1">
+                                                    <span
+                                                        class="px-1 py-0.5 text-xs font-medium rounded {{ $this->getVideoTypeBadge($tutorial->video_url) }}">
+                                                        {{ ucfirst($this->getVideoType($tutorial->video_url)) }}
+                                                    </span>
+                                                </div>
                                             </div>
                                         @else
                                             <div
-                                                class="flex-shrink-0 w-40 h-24 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center mr-3">
+                                                class="flex-shrink-0 w-40 h-24 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center mr-3 relative">
                                                 <svg class="h-8 w-8 text-gray-400 dark:text-gray-500" fill="none"
                                                     viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round"
                                                         stroke-width="2"
                                                         d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                                 </svg>
+                                                <!-- Video Type Badge -->
+                                                <div class="absolute top-1 left-1">
+                                                    <span
+                                                        class="px-1 py-0.5 text-xs font-medium rounded {{ $this->getVideoTypeBadge($tutorial->video_url) }}">
+                                                        {{ ucfirst($this->getVideoType($tutorial->video_url)) }}
+                                                    </span>
+                                                </div>
                                             </div>
                                         @endif
                                         <div class="flex-1 min-w-0">
@@ -242,3 +414,4 @@ new class extends Component {
             </div>
         </div>
     </div>
+</div>

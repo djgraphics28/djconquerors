@@ -5,14 +5,17 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Spatie\Image\Enums\Fit;
+use Laravel\Sanctum\HasApiTokens;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -23,6 +26,8 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles;
     use LogsActivity;
     use InteractsWithMedia;
+    use HasApiTokens;
+    use SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -42,6 +47,12 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         'phone_number',
         'is_birthday_mention',
         'is_monthly_milestone_mention',
+        'last_login_at',
+        'last_login_ip',
+        'gender',
+        'occupation',
+        'support_team',
+        'assistant_id',
     ];
 
     /**
@@ -67,6 +78,7 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
             'date_joined' => 'date',
             'birth_date' => 'date',
             'invested_amount' => 'decimal:2',
+            'last_login_at' => 'datetime',
         ];
     }
 
@@ -201,5 +213,88 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     public function superior()
     {
         return $this->belongsTo(User::class, 'inviters_code', 'riscoin_id');
+    }
+
+    /**
+     * Relationship with appointments
+     */
+    public function appointments()
+    {
+        return $this->hasMany(Appointment::class);
+    }
+
+    /**
+     * Check if user has appointment at specific time
+     */
+    public function hasAppointmentAt($dateTime)
+    {
+        return $this->appointments()
+                   ->where('start_time', '<=', $dateTime)
+                   ->where('end_time', '>=', $dateTime)
+                   ->whereIn('status', ['pending', 'confirmed'])
+                   ->exists();
+    }
+
+    /**
+     * Relationship with EmailReceiver
+     */
+    public function emailReceiver(): HasOne
+    {
+        return $this->hasOne(EmailReceiver::class);
+    }
+
+    /**
+     * Check if user is an email receiver
+     */
+    public function isEmailReceiver(): bool
+    {
+        return $this->emailReceiver()->where('is_active', true)->exists();
+    }
+
+    /**
+     * Get email receiver settings
+     */
+    public function getEmailReceiverSettings()
+    {
+        return $this->emailReceiver()->where('is_active', true)->first();
+    }
+
+    /**
+     * Scope for users who are email receivers
+     */
+    public function scopeEmailReceivers($query)
+    {
+        return $query->whereHas('emailReceiver', function ($q) {
+            $q->where('is_active', true);
+        });
+    }
+
+    /**
+     * Scope for users who receive appointment notifications
+     */
+    public function scopeAppointmentNotificationReceivers($query)
+    {
+        return $query->whereHas('emailReceiver', function ($q) {
+            $q->where('is_active', true)
+              ->where('receive_appointment_notifications', true);
+        });
+    }
+
+    /**
+     * Get the last login with fallback to updated_at
+     */
+    public function getLastLoginAttribute()
+    {
+        $loginTime = $this->last_login_at ?? $this->updated_at;
+
+        return $loginTime ? $loginTime->diffForHumans() : 'Never logged in';
+    }
+
+    /**
+     * Get the actual last login timestamp (for internal use)
+     */
+    public function getLastLoginTimestampAttribute()
+    {
+        return $this->last_login_at ?? $this->updated_at;
     }
 }

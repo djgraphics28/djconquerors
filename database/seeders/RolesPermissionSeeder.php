@@ -20,6 +20,8 @@ class RolesPermissionSeeder extends Seeder
         $adminPermissions = [
             //Dashboard
             'dashboard.view',
+            'dashboard.viewSpecialOccasions',
+            'dashboard.copyMessageToMartin',
 
             //Users
             'users.view',
@@ -29,6 +31,7 @@ class RolesPermissionSeeder extends Seeder
             'users.disable-enable',
             'users.cop-welcome-message',
             'users.verify-email',
+            'users.promote',
 
             //Roles
             'roles.view',
@@ -61,6 +64,38 @@ class RolesPermissionSeeder extends Seeder
             'my-team.access',
             'my-team.view',
             'my-team.edit',
+
+            //Apointments
+            'appointments.book',
+            'appointments.view',
+            'appointments.create',
+            'appointments.edit',
+            'appointments.delete',
+
+            //Email Receivers
+            'email-receivers.view',
+            'email-receivers.create',
+            'email-receivers.edit',
+            'email-receivers.delete',
+
+            //Guide Management
+            'guide.view',
+            'guide.create',
+            'guide.edit',
+            'guide.delete',
+
+            //Guide Access
+            'guide.access',
+
+            //Managesrs
+            'managers.view',
+            'managers.create',
+            'managers.edit',
+            'managers.delete',
+
+            // Compound Interest Calculator
+            'calculator.view',
+            'calculator.access',
         ];
 
         foreach ($adminPermissions as $permission) {
@@ -81,7 +116,13 @@ class RolesPermissionSeeder extends Seeder
             'genealogy.view',
             'tutorials.access',
             'my-team.access',
-            'my-team.view'
+            'my-team.view',
+            'appointments.book',
+            // 'guide.access',
+
+            // Compound Interest Calculator
+            'calculator.view',
+            'calculator.access',
         ]);
 
         $adminUser = User::where('email', 'admin@djconquerors.com')->first();

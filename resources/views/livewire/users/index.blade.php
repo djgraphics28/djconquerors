@@ -2,6 +2,7 @@
 
 use Livewire\Volt\Component;
 use App\Models\User;
+use App\Models\Manager;
 use Spatie\Permission\Models\Role;
 use Spatie\Activitylog\Models\Activity;
 use Livewire\WithPagination;
@@ -14,6 +15,7 @@ new class extends Component {
     public $user;
     public $name;
     public $email;
+    public $phone_number;
     public $riscoin_id;
     public $password;
     public $inviters_code;
@@ -116,6 +118,7 @@ new class extends Component {
         $userData = [
             'name' => $this->name,
             'email' => $this->email,
+            'phone_number' => $this->phone_number,
             'riscoin_id' => $this->riscoin_id,
             'password' => bcrypt($this->password),
             'inviters_code' => $this->inviters_code,
@@ -164,11 +167,12 @@ new class extends Component {
         $this->user = $user;
         $this->name = $user->name;
         $this->email = $user->email;
+        $this->phone_number = $user->phone_number;
         $this->riscoin_id = $user->riscoin_id;
         $this->inviters_code = $user->inviters_code;
         $this->invested_amount = $user->invested_amount;
-        $this->birth_date = $user->birth_date;
-        $this->date_joined = $user->date_joined;
+        $this->birth_date = $user->birth_date ? $user->birth_date->format('Y-m-d') : null;
+        $this->date_joined = $user->date_joined ? $user->date_joined->format('Y-m-d') :
         $this->is_active = $user->is_active;
         $this->selectedRoles = $user->roles->pluck('name')->toArray();
         $this->avatarToRemove = false;
@@ -182,9 +186,12 @@ new class extends Component {
         $updateData = [
             'name' => $this->name,
             'email' => $this->email,
+            'phone_number' => $this->phone_number,
             'riscoin_id' => $this->riscoin_id,
             'inviters_code' => $this->inviters_code,
             'invested_amount' => $this->invested_amount ?? 0,
+            'date_joined' => $this->date_joined,
+            'birth_date' => $this->birth_date,
             'is_active' => $this->is_active,
         ];
 
@@ -263,6 +270,33 @@ new class extends Component {
         session()->flash('message', 'User deleted successfully.');
     }
 
+    // Restore a soft-deleted user
+    public function restore($userId)
+    {
+        $user = User::withTrashed()->find($userId);
+
+        if (!$user) {
+            session()->flash('error', 'User not found.');
+            return;
+        }
+
+        // Prevent restoring the currently authenticated user
+        if ($user->id === auth()->id()) {
+            session()->flash('error', 'You cannot restore your own account.');
+            return;
+        }
+
+        $user->restore();
+
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($user)
+            ->withProperties(['restored_user' => $user->toArray()])
+            ->log('restored user: ' . $user->name);
+
+        session()->flash('message', 'User restored successfully.');
+    }
+
     public function resetForm()
     {
         $this->reset(['name', 'email', 'riscoin_id', 'password', 'inviters_code', 'invested_amount', 'is_active', 'userId', 'user', 'selectedRoles', 'avatar', 'avatarToRemove']);
@@ -330,6 +364,9 @@ new class extends Component {
             })
             ->when($this->statusFilter === 'inactive', function ($query) {
                 $query->where('is_active', false);
+            })
+            ->when($this->statusFilter === 'deleted', function ($query) {
+                $query->onlyTrashed();
             })
             ->when($this->inviterFilter, function ($query) {
                 $query->where('inviters_code', $this->inviterFilter);
@@ -432,6 +469,23 @@ Amount invested: $" .
 
         session()->flash('message', 'Email verified successfully.');
     }
+
+    // Promote a user to level 1 manager (creates or updates managers_table record)
+    public function promoteToLevelOne($userId)
+    {
+        $user = User::find($userId);
+        if (!$user) {
+            session()->flash('error', 'User not found.');
+            return;
+        }
+
+        $manager = Manager::updateOrCreate(
+            ['user_id' => $user->id],
+            ['level' => 1]
+        );
+
+        session()->flash('message', 'User promoted to Level 1 manager.');
+    }
 }; ?>
 
 <div class="max-w-10xl mx-auto">
@@ -502,6 +556,7 @@ Amount invested: $" .
                                 <option value="">All Status</option>
                                 <option value="active">Active</option>
                                 <option value="inactive">Inactive</option>
+                                <option value="deleted">Deleted</option>
                             </flux:select>
                         </div>
 
@@ -613,6 +668,9 @@ Amount invested: $" .
                                     <td
                                         class="md:sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
                                         {{ $user->name }}
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            <small>Last Logged In: {{ $user->last_login }}</small>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->email }}
@@ -665,10 +723,14 @@ Amount invested: $" .
                                         {{ $user->inviter ? $user->inviter->name . ' (' . $user->inviter->riscoin_id . ')' : 'N/A' }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <span
-                                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                            {{ $user->is_active ? 'Active' : 'Inactive' }}
-                                        </span>
+                                        @if(method_exists($user, 'trashed') && $user->trashed())
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Trashed</span>
+                                        @else
+                                            <span
+                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                                {{ $user->is_active ? 'Active' : 'Inactive' }}
+                                            </span>
+                                        @endif
                                     </td>
                                     <td
                                         class="md:sticky md:right-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
@@ -683,6 +745,13 @@ Amount invested: $" .
                                                         <path stroke-linecap="round" stroke-linejoin="round"
                                                             stroke-width="2"
                                                             d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                                    </svg>
+                                                </flux:button>
+                                            @endcan
+                                            @can('users.promote')
+                                                <flux:button wire:click="promoteToLevelOne({{ $user->id }})" variant="ghost" size="sm" class="bg-indigo-600 text-white hover:bg-indigo-700" title="Promote to Level 1">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                                                     </svg>
                                                 </flux:button>
                                             @endcan
@@ -724,18 +793,26 @@ Amount invested: $" .
                                                 </flux:button>
                                             @endcan
                                             @can('users.delete')
-                                                <flux:button wire:click="delete({{ $user->id }})" variant="ghost"
-                                                    size="sm"
-                                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                                    onclick="return confirm('Are you sure you want to delete this user?')"
-                                                    data-test="delete-user-{{ $user->id }}" title="Delete">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                        viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </flux:button>
+                                                @if(method_exists($user, 'trashed') && $user->trashed())
+                                                    <flux:button wire:click="restore({{ $user->id }})" variant="ghost" size="sm" class="text-green-600 hover:text-green-900" onclick="return confirm('Are you sure you want to restore this user?')" data-test="restore-user-{{ $user->id }}" title="Restore">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h4l3-6 4 12 3-6h4" />
+                                                        </svg>
+                                                    </flux:button>
+                                                @else
+                                                    <flux:button wire:click="delete({{ $user->id }})" variant="ghost"
+                                                        size="sm"
+                                                        class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                                        onclick="return confirm('Are you sure you want to delete this user?')"
+                                                        data-test="delete-user-{{ $user->id }}" title="Delete">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                            viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2"
+                                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </flux:button>
+                                                @endif
                                             @endcan
                                         </div>
                                     </td>
@@ -854,6 +931,11 @@ Amount invested: $" .
                                                 <flux:input wire:model="email" :label="__('Email')" type="email"
                                                     required :placeholder="__('Enter email address')"
                                                     data-test="email-input" />
+
+                                                <!-- Phone Number -->
+                                                <flux:input wire:model="phone_number" :label="__('Phone Number')"
+                                                    type="text" :placeholder="__('Enter phone number')"
+                                                    data-test="phone-input" />
 
                                                 <!-- Riscoin ID -->
                                                 <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')"
@@ -1002,6 +1084,9 @@ Amount invested: $" .
                                                             </h3>
                                                             <p class="text-sm text-gray-500 dark:text-gray-400">
                                                                 {{ $selectedUser->email }}
+                                                            </p>
+                                                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                                {{ $selectedUser->phone_number }}
                                                             </p>
                                                         </div>
                                                     </div>

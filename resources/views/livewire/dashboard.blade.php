@@ -216,7 +216,6 @@ new class extends Component {
         return "{$selectedMessage}\n\n🎊 Celebrating {$member['months_with_team']} month" . ($member['months_with_team'] > 1 ? 's' : '') . " with {$name}!\nJoined: {$joinDate}";
     }
 }; ?>
-
 <div>
     <!-- Breadcrumb Navigation -->
     <nav class="flex mb-6" aria-label="Breadcrumb">
@@ -236,35 +235,34 @@ new class extends Component {
         </ol>
     </nav>
 
-    <!-- Page Header -->
+    {{-- first reply to martin --}}
     <div class="mb-6">
-        <h1 class="text-2xl font-bold dark:text-white">
-            @if ($riscoinId)
-                Team Statistics: {{ $currentNode->name }} ({{ $currentNode->riscoin_id }})
-            @else
-                My Team Statistics
-            @endif
-        </h1>
-        <p class="text-gray-600 dark:text-gray-400 mt-2">Real-time team performance metrics</p>
+        <livewire:widget.first-reply-to-martin :currentNode="$currentNode" />
+    </div>
+
+    {{-- share link widget --}}
+    <div class="mb-6">
+        <livewire:widget.share-link />
     </div>
 
     <!-- Statistics Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <!-- Team Withdrawals Card -->
+
+        <!-- Direct Members Card -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
-                <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900 mr-4">
-                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor"
+                <div class="p-3 rounded-full bg-purple-100 dark:bg-purple-900 mr-4">
+                    <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1">
+                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z">
                         </path>
                     </svg>
                 </div>
                 <div>
-                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Total Team Withdrawals</h3>
-                    <p class="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-2">
-                        ${{ number_format($totalTeamWithdrawals, 2) }}</p>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Direct Members</h3>
+                    <p class="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-2">
+                        {{ number_format($totalDirectMembers) }}</p>
                 </div>
             </div>
         </div>
@@ -288,25 +286,6 @@ new class extends Component {
             </div>
         </div>
 
-        <!-- Direct Members Card -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-purple-100 dark:bg-purple-900 mr-4">
-                    <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor"
-                        viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z">
-                        </path>
-                    </svg>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Direct Members</h3>
-                    <p class="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-2">
-                        {{ number_format($totalDirectMembers) }}</p>
-                </div>
-            </div>
-        </div>
-
         <!-- Team Investments Card -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
@@ -325,251 +304,455 @@ new class extends Component {
                 </div>
             </div>
         </div>
+
+        <!-- Team Withdrawals Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900 mr-4">
+                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1">
+                        </path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Total Team Withdrawals</h3>
+                    <p class="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-2">
+                        ${{ number_format($totalTeamWithdrawals, 2) }}</p>
+                </div>
+            </div>
+        </div>
     </div>
+
+
 
     <!-- New Cards for Special Occasions -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <!-- Birthday Celebrators Card -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-pink-100 dark:bg-pink-900 mr-4">
-                        <svg class="w-6 h-6 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Birthday Celebrators</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">This month</p>
-                    </div>
-                    <div
-                        class="ml-auto bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400 px-3 py-1 rounded-full text-sm font-semibold">
-                        {{ count($birthdayCelebrators) }}
+    @can('dashboard.viewSpecialOccasions')
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Birthday Celebrators Card -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-pink-100 dark:bg-pink-900 mr-4">
+                                <svg class="w-6 h-6 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Birthday Celebrators
+                                </h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">This month</p>
+                            </div>
+                        </div>
+                        <div
+                            class="bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400 px-3 py-1 rounded-full text-sm font-semibold">
+                            {{ count($birthdayCelebrators) }}
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="p-6">
-                @if (count($birthdayCelebrators) > 0)
-                    <div class="space-y-3">
-                        @foreach ($birthdayCelebrators as $celebrator)
-                            @php
-                                $isBirthdayToday =
-                                    \Carbon\Carbon::parse($celebrator['birth_date'])->format('m-d') ===
-                                    now()->format('m-d');
-                            @endphp
-                            <div x-data="{
-                                copied: false,
-                                async copyToClipboard() {
-                                    if (!{{ $celebrator['is_birthday_mention'] }}) return;
-                                    try {
-                                        // Call the Livewire method to get the message
-                                        const message = await $wire.getRandomBirthdayMessage('{{ $celebrator['name'] }}');
+                <div class="p-6">
+                    @if (count($birthdayCelebrators) > 0)
+                        <div class="space-y-3">
+                            @foreach ($birthdayCelebrators as $celebrator)
+                                @php
+                                    $isBirthdayToday =
+                                        \Carbon\Carbon::parse($celebrator['birth_date'])->format('m-d') ===
+                                        now()->format('m-d');
+                                @endphp
+                                <div x-data="{
+                                    copied: false,
+                                    showTextArea: false,
+                                    messageText: '',
+                                    async copyToClipboard() {
+                                        if (!{{ $celebrator['is_birthday_mention'] }}) return;
 
-                                        // Use the modern Clipboard API
-                                        await navigator.clipboard.writeText(message);
+                                        try {
+                                            // Get the message from Livewire
+                                            this.messageText = await $wire.getRandomBirthdayMessage('{{ $celebrator['name'] }}');
 
-                                        // Show feedback
+                                            // Try modern clipboard API first
+                                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                try {
+                                                    await navigator.clipboard.writeText(this.messageText);
+                                                    this.showSuccess();
+                                                    return;
+                                                } catch (clipboardError) {
+                                                    console.log('Clipboard API failed, trying fallback...');
+                                                }
+                                            }
+
+                                            // Fallback for iOS and other browsers
+                                            this.showTextArea = true;
+                                            await this.$nextTick();
+
+                                            const textArea = this.$refs.textArea{{ $loop->index }};
+                                            textArea.focus();
+                                            textArea.select();
+
+                                            // For iOS
+                                            textArea.setSelectionRange(0, 99999);
+
+                                            try {
+                                                const successful = document.execCommand('copy');
+                                                if (successful) {
+                                                    this.showSuccess();
+                                                } else {
+                                                    this.showManualCopy();
+                                                }
+                                            } catch (execError) {
+                                                this.showManualCopy();
+                                            }
+
+                                            // Hide textarea after a delay
+                                            setTimeout(() => {
+                                                this.showTextArea = false;
+                                            }, 1500);
+
+                                        } catch (err) {
+                                            console.error('Copy failed:', err);
+                                            this.showManualCopy();
+                                        }
+                                    },
+                                    showSuccess() {
                                         this.copied = true;
                                         setTimeout(() => {
                                             this.copied = false;
                                         }, 2000);
-                                    } catch (err) {
-                                        // Fallback for older browsers
-                                        console.error('Failed to copy: ', err);
-                                        const textArea = document.createElement('textarea');
-                                        textArea.value = await $wire.getRandomBirthdayMessage('{{ $celebrator['name'] }}');
-                                        document.body.appendChild(textArea);
+                                    },
+                                    showManualCopy() {
+                                        // Show the textarea for manual copy
+                                        this.showTextArea = true;
+                                        setTimeout(() => {
+                                            this.showTextArea = false;
+                                        }, 5000);
+                                    },
+                                    manualCopy() {
+                                        const textArea = this.$refs.textArea{{ $loop->index }};
+                                        textArea.focus();
                                         textArea.select();
-                                        document.execCommand('copy');
-                                        document.body.removeChild(textArea);
-
-                                        this.copied = true;
-                                        setTimeout(() => {
-                                            this.copied = false;
-                                        }, 2000);
+                                        textArea.setSelectionRange(0, 99999);
                                     }
-                                }
-                            }" @click="copyToClipboard()"
-                                class="flex items-center p-3 {{ $isBirthdayToday ? 'bg-pink-50 dark:bg-pink-900/20 border-2 border-pink-200 dark:border-pink-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg {{ $celebrator['is_birthday_mention'] ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600' : 'cursor-not-allowed opacity-75' }} transition duration-200 relative">
-                                <img class="w-10 h-10 rounded-full mr-3" src="{{ $celebrator['avatar'] }}"
-                                    alt="{{ $celebrator['name'] }}">
-                                <div class="flex-1">
-                                    <h4 class="font-medium text-gray-900 dark:text-white flex items-center">
-                                        {{ $celebrator['name'] }}
-                                        @if ($isBirthdayToday)
-                                            <span class="ml-2 inline-flex">
-                                                🎈🎂✨
-                                            </span>
-                                        @endif
-                                    </h4>
-                                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                                        Birthday: {{ $celebrator['birth_date'] }} •
-                                        ID: {{ $celebrator['riscoin_id'] }}
-                                        @if ($isBirthdayToday)
-                                            <span class="ml-2 text-pink-600 dark:text-pink-400 font-medium">Birthday
-                                                Today! 🎉</span>
-                                        @endif
-                                    </p>
-                                </div>
-                                <!-- Copy feedback -->
-                                <div x-show="copied" x-transition
-                                    class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg">
-                                    <span class="text-white font-semibold">Copied to clipboard! 📋</span>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <div class="text-center py-8">
-                        <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z">
-                            </path>
-                        </svg>
-                        <p class="mt-2 text-gray-500 dark:text-gray-400">No birthdays this month</p>
-                    </div>
-                @endif
-            </div>
-        </div>
+                                }"
+                                    class="group flex items-center p-3 {{ $isBirthdayToday ? 'bg-pink-50 dark:bg-pink-900/20 border-2 border-pink-200 dark:border-pink-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg transition duration-200 relative">
+                                    <img class="w-10 h-10 rounded-full mr-3" src="{{ $celebrator['avatar'] }}"
+                                        alt="{{ $celebrator['name'] }}">
+                                    <div class="flex-1 min-w-0">
+                                        <h4 class="font-medium text-gray-900 dark:text-white flex items-center truncate">
+                                            {{ $celebrator['name'] }}
+                                            @if ($isBirthdayToday)
+                                                <span class="ml-2 inline-flex">🎈🎂✨</span>
+                                            @endif
+                                        </h4>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                            Birthday: {{ $celebrator['birth_date'] }} •
+                                            ID: {{ $celebrator['riscoin_id'] }}
+                                            @if ($isBirthdayToday)
+                                                <span class="ml-2 text-pink-600 dark:text-pink-400 font-medium">Birthday
+                                                    Today! 🎉</span>
+                                            @endif
+                                        </p>
+                                    </div>
 
-        <!-- Membership Anniversaries Card -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900 mr-4">
-                        <svg class="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none"
-                            stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
-                            </path>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Membership</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Monthly milestones</p>
-                    </div>
-                    <div
-                        class="ml-auto bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full text-sm font-semibold">
-                        {{ count($membershipAnniversaries) }}
-                    </div>
+                                    @if ($celebrator['is_birthday_mention'])
+                                        <button @click="copyToClipboard()" :disabled="copied || showTextArea"
+                                            class="ml-3 p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title="Copy birthday message">
+                                            <svg x-show="!copied && !showTextArea" class="w-5 h-5" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            <svg x-show="copied" class="w-5 h-5 text-green-500" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            <svg x-show="showTextArea" class="w-5 h-5 text-yellow-500 animate-pulse"
+                                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </button>
+                                    @else
+                                        <div class="ml-3 p-2 text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                                            title="Copy disabled">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                    @endif
+
+                                    <!-- Hidden textarea for manual copy -->
+                                    <div x-show="showTextArea" x-transition class="absolute inset-0 z-20">
+                                        <div
+                                            class="absolute inset-0 bg-yellow-100 dark:bg-yellow-900/30 border-2 border-yellow-400 rounded-lg p-2">
+                                            <p class="text-xs text-yellow-800 dark:text-yellow-200 mb-1 font-medium">
+                                                Select and copy the text below:
+                                            </p>
+                                            <textarea x-ref="textArea{{ $loop->index }}" x-model="messageText"
+                                                class="w-full h-20 text-xs bg-white dark:bg-gray-800 border border-yellow-300 dark:border-yellow-600 rounded p-2 resize-none"
+                                                @click="manualCopy()" readonly></textarea>
+                                            <button @click="showTextArea = false"
+                                                class="mt-1 px-2 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition-colors">
+                                                Close
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Copy feedback -->
+                                    <div x-show="copied" x-transition
+                                        class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg z-10">
+                                        <span class="text-white font-semibold flex items-center">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            Copied! 📋
+                                        </span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="text-center py-8">
+                            <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z">
+                                </path>
+                            </svg>
+                            <p class="mt-2 text-gray-500 dark:text-gray-400">No birthdays this month</p>
+                        </div>
+                    @endif
                 </div>
             </div>
-            <div class="p-6">
-                @if (count($membershipAnniversaries) > 0)
-                    <div class="space-y-3">
-                        @foreach ($membershipAnniversaries as $member)
-                            @php
-                                $isTodayJoined =
-                                    \Carbon\Carbon::parse($member['date_joined'])->format('Y-m-d') ===
-                                    now()->format('Y-m-d');
-                            @endphp
-                            <div x-data="{
-                                copied: false,
-                                async copyToClipboard() {
-                                    if (!{{ $member['is_monthly_milestone_mention'] }}) return;
-                                    try {
-                                        // Prepare the member data for Livewire method
-                                        const memberData = {
-                                            name: '{{ $member['name'] }}',
-                                            join_date: '{{ $member['join_date'] }}',
-                                            months_with_team: '{{ $member['months_with_team'] }}',
-                                            avatar: '{{ $member['avatar'] }}',
-                                            riscoin_id: '{{ $member['riscoin_id'] }}',
-                                            invested_amount: '{{ $member['invested_amount'] }}',
-                                            date_joined: '{{ $member['date_joined'] }}',
-                                            is_today_joined: {{ $isTodayJoined ? 'true' : 'false' }}
-                                        };
 
-                                        // Call the Livewire method to get the message
-                                        const message = await $wire.getMembershipAnniversaryMessage(memberData);
-
-                                        // Use the modern Clipboard API
-                                        await navigator.clipboard.writeText(message);
-
-                                        // Show feedback
-                                        this.copied = true;
-                                        setTimeout(() => {
-                                            this.copied = false;
-                                        }, 2000);
-                                    } catch (err) {
-                                        // Fallback for older browsers
-                                        console.error('Failed to copy: ', err);
-
-                                        // Prepare member data for fallback
-                                        const memberData = {
-                                            name: '{{ $member['name'] }}',
-                                            join_date: '{{ $member['join_date'] }}',
-                                            months_with_team: '{{ $member['months_with_team'] }}',
-                                            avatar: '{{ $member['avatar'] }}',
-                                            riscoin_id: '{{ $member['riscoin_id'] }}',
-                                            invested_amount: '{{ $member['invested_amount'] }}',
-                                            date_joined: '{{ $member['date_joined'] }}',
-                                            is_today_joined: {{ $isTodayJoined ? 'true' : 'false' }}
-                                        };
-
-                                        const textArea = document.createElement('textarea');
-                                        textArea.value = await $wire.getMembershipAnniversaryMessage(memberData);
-                                        document.body.appendChild(textArea);
-                                        textArea.select();
-                                        document.execCommand('copy');
-                                        document.body.removeChild(textArea);
-
-                                        this.copied = true;
-                                        setTimeout(() => {
-                                            this.copied = false;
-                                        }, 2000);
-                                    }
-                                }
-                            }" @click="copyToClipboard()"
-                                class="flex items-center p-3 {{ $isTodayJoined ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg {{ $member['is_monthly_milestone_mention'] ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600' : 'cursor-not-allowed opacity-75' }} transition duration-200 relative">
-                                <img class="w-10 h-10 rounded-full mr-3" src="{{ $member['avatar'] }}"
-                                    alt="{{ $member['name'] }}">
-                                <div class="flex-1">
-                                    <h4 class="font-medium text-gray-900 dark:text-white flex items-center">
-                                        {{ $member['name'] }}
-                                        @if ($isTodayJoined)
-                                            <span class="ml-2 inline-flex">
-                                                🎊🎉✨
-                                            </span>
-                                        @endif
-                                    </h4>
-                                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                                        Joined: {{ $member['join_date'] }} •
-                                        {{ $member['months_with_team'] }}
-                                        month{{ $member['months_with_team'] > 1 ? 's' : '' }} with team
-                                        @if ($isTodayJoined)
-                                            <span class="ml-2 text-indigo-600 dark:text-indigo-400 font-medium">Joined
-                                                Today! 🎉</span>
-                                        @endif
-                                    </p>
-                                </div>
-                                <!-- Copy feedback -->
-                                <div x-show="copied" x-transition
-                                    class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg">
-                                    <span class="text-white font-semibold">Copied to clipboard! 📋</span>
-                                </div>
+            <!-- Membership Anniversaries Card -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900 mr-4">
+                                <svg class="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                                    </path>
+                                </svg>
                             </div>
-                        @endforeach
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Membership</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Monthly milestones</p>
+                            </div>
+                        </div>
+                        <div
+                            class="bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full text-sm font-semibold">
+                            {{ count($membershipAnniversaries) }}
+                        </div>
                     </div>
-                @else
-                    <div class="text-center py-8">
-                        <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z">
-                            </path>
-                        </svg>
-                        <p class="mt-2 text-gray-500 dark:text-gray-400">No anniversaries today</p>
-                    </div>
-                @endif
+                </div>
+                <div class="p-6">
+                    @if (count($membershipAnniversaries) > 0)
+                        <div class="space-y-3">
+                            @foreach ($membershipAnniversaries as $member)
+                                @php
+                                    $isTodayJoined =
+                                        \Carbon\Carbon::parse($member['date_joined'])->format('Y-m-d') ===
+                                        now()->format('Y-m-d');
+                                @endphp
+                                <div x-data="{
+                                    copied: false,
+                                    showTextArea: false,
+                                    messageText: '',
+                                    async copyToClipboard() {
+                                        if (!{{ $member['is_monthly_milestone_mention'] }}) return;
+
+                                        try {
+                                            const memberData = {
+                                                name: '{{ $member['name'] }}',
+                                                join_date: '{{ $member['join_date'] }}',
+                                                months_with_team: '{{ $member['months_with_team'] }}',
+                                                avatar: '{{ $member['avatar'] }}',
+                                                riscoin_id: '{{ $member['riscoin_id'] }}',
+                                                invested_amount: '{{ $member['invested_amount'] }}',
+                                                date_joined: '{{ $member['date_joined'] }}',
+                                                is_today_joined: {{ $isTodayJoined ? 'true' : 'false' }}
+                                            };
+
+                                            // Get the message from Livewire
+                                            this.messageText = await $wire.getMembershipAnniversaryMessage(memberData);
+
+                                            // Try modern clipboard API first
+                                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                try {
+                                                    await navigator.clipboard.writeText(this.messageText);
+                                                    this.showSuccess();
+                                                    return;
+                                                } catch (clipboardError) {
+                                                    console.log('Clipboard API failed, trying fallback...');
+                                                }
+                                            }
+
+                                            // Fallback for iOS and other browsers
+                                            this.showTextArea = true;
+                                            await this.$nextTick();
+
+                                            const textArea = this.$refs.textArea{{ $loop->index }};
+                                            textArea.focus();
+                                            textArea.select();
+
+                                            // For iOS
+                                            textArea.setSelectionRange(0, 99999);
+
+                                            try {
+                                                const successful = document.execCommand('copy');
+                                                if (successful) {
+                                                    this.showSuccess();
+                                                } else {
+                                                    this.showManualCopy();
+                                                }
+                                            } catch (execError) {
+                                                this.showManualCopy();
+                                            }
+
+                                            // Hide textarea after a delay
+                                            setTimeout(() => {
+                                                this.showTextArea = false;
+                                            }, 1500);
+
+                                        } catch (err) {
+                                            console.error('Copy failed:', err);
+                                            this.showManualCopy();
+                                        }
+                                    },
+                                    showSuccess() {
+                                        this.copied = true;
+                                        setTimeout(() => {
+                                            this.copied = false;
+                                        }, 2000);
+                                    },
+                                    showManualCopy() {
+                                        // Show the textarea for manual copy
+                                        this.showTextArea = true;
+                                        setTimeout(() => {
+                                            this.showTextArea = false;
+                                        }, 5000);
+                                    },
+                                    manualCopy() {
+                                        const textArea = this.$refs.textArea{{ $loop->index }};
+                                        textArea.focus();
+                                        textArea.select();
+                                        textArea.setSelectionRange(0, 99999);
+                                    }
+                                }"
+                                    class="group flex items-center p-3 {{ $isTodayJoined ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg transition duration-200 relative">
+                                    <img class="w-10 h-10 rounded-full mr-3" src="{{ $member['avatar'] }}"
+                                        alt="{{ $member['name'] }}">
+                                    <div class="flex-1 min-w-0">
+                                        <h4 class="font-medium text-gray-900 dark:text-white flex items-center truncate">
+                                            {{ $member['name'] }}
+                                            @if ($isTodayJoined)
+                                                <span class="ml-2 inline-flex">🎊🎉✨</span>
+                                            @endif
+                                        </h4>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                            Joined: {{ $member['join_date'] }} •
+                                            {{ $member['months_with_team'] }}
+                                            month{{ $member['months_with_team'] > 1 ? 's' : '' }} with team
+                                            @if ($isTodayJoined)
+                                                <span class="ml-2 text-indigo-600 dark:text-indigo-400 font-medium">Joined
+                                                    Today! 🎉</span>
+                                            @endif
+                                        </p>
+                                    </div>
+
+                                    @if ($member['is_monthly_milestone_mention'])
+                                        <button @click="copyToClipboard()" :disabled="copied || showTextArea"
+                                            class="ml-3 p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title="Copy anniversary message">
+                                            <svg x-show="!copied && !showTextArea" class="w-5 h-5" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            <svg x-show="copied" class="w-5 h-5 text-green-500" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            <svg x-show="showTextArea" class="w-5 h-5 text-yellow-500 animate-pulse"
+                                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </button>
+                                    @else
+                                        <div class="ml-3 p-2 text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                                            title="Copy disabled">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                    @endif
+
+                                    <!-- Hidden textarea for manual copy -->
+                                    <div x-show="showTextArea" x-transition class="absolute inset-0 z-20">
+                                        <div
+                                            class="absolute inset-0 bg-yellow-100 dark:bg-yellow-900/30 border-2 border-yellow-400 rounded-lg p-2">
+                                            <p class="text-xs text-yellow-800 dark:text-yellow-200 mb-1 font-medium">
+                                                Select and copy the text below:
+                                            </p>
+                                            <textarea x-ref="textArea{{ $loop->index }}" x-model="messageText"
+                                                class="w-full h-20 text-xs bg-white dark:bg-gray-800 border border-yellow-300 dark:border-yellow-600 rounded p-2 resize-none"
+                                                @click="manualCopy()" readonly></textarea>
+                                            <button @click="showTextArea = false"
+                                                class="mt-1 px-2 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition-colors">
+                                                Close
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Copy feedback -->
+                                    <div x-show="copied" x-transition
+                                        class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg z-10">
+                                        <span class="text-white font-semibold flex items-center">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            Copied! 📋
+                                        </span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="text-center py-8">
+                            <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z">
+                                </path>
+                            </svg>
+                            <p class="mt-2 text-gray-500 dark:text-gray-400">No anniversaries today</p>
+                        </div>
+                    @endif
+                </div>
             </div>
         </div>
-    </div>
+    @endcan
 
     <!-- Additional Information -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
