@@ -308,4 +308,15 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     {
         return $this->belongsTo(User::class, 'assistant_id', 'id');
     }
+
+    /**
+     * Get the managerLevel associated with the User
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne
+     */
+    public function managerLevel(): HasOne
+    {
+        // include user_id so the relation can be properly hydrated when selecting specific columns
+        return $this->hasOne(Manager::class, 'user_id', 'id')->select('user_id', 'level');
+    }
 }
