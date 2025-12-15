@@ -486,6 +486,22 @@ new class extends Component {
         $this->assistantUserId = $assistantId;
     }
 
+    // Deselect currently selected assistant
+    public function deselectAssistant()
+    {
+        $this->assistantUserId = null;
+        $target = User::find($this->assistantTargetUserId);
+        if (!$target) {
+            session()->flash('error', 'Target user not found.');
+            return;
+        }
+
+        $target->assistant_id = null;
+        $target->save();
+
+        session()->flash('message', 'Assistant removed successfully.');
+    }
+
     // Add/assign assistant to the target user
     public function addAssistantUser()
     {
@@ -542,7 +558,7 @@ new class extends Component {
 
         $now = now()->toIsoString();
 
-        return "Hi Sir Martin\nHere is my application reward request from my investor, {$this->assistantTargetUser?->name}\n\nInviter's Riscoin Account : {$inviterId}\n\nDepositor's Riscoin Account : {$depositorId}\n\nAssistant's Riscoin : {$assistantId}\n\n";
+        return "Hi Sir Martin\nHere is my application reward request from my investor, {$this->assistantTargetUser?->name}\n\nInviter's Riscoin Account : {$inviterId}\n\nDepositor's Riscoin Account : {$depositorId}\n\nAssister's Riscoin Account: {$assistantId}\n\n";
     }
 
     // Reset filters
@@ -1638,6 +1654,10 @@ new class extends Component {
                                         <button type="button" wire:click="closeAssistantModal"
                                             class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                                             Cancel
+                                        </button>
+                                        <button type="button" wire:click="deselectAssistant"
+                                            class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">
+                                            Remove Assistant
                                         </button>
                                         <button type="submit" wire:click="addAssistantUser"
                                             class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
