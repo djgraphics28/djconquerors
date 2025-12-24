@@ -35,6 +35,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Volt::route('guide-access', 'guide.access')->name('guide.access');
     Volt::route('guide-access/{class}', 'guide.show')->name('guide.show');
+    Volt::route('guide-options', 'guide.option-lists')->name('guide.options');
 
     Volt::route('activity-logs', 'activity-logs')->name('activity-logs');
 
@@ -51,6 +52,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Compound Interest Calculator
     Volt::route('compound-calculator', 'compound-interest-calculator')->name('compound-calculator');
+
+    // Export endpoint for compound calculator
+    Route::match(['GET','POST'], 'compound-calculator/export', [\App\Http\Controllers\CompoundCalculatorExportController::class, 'export'])->name('compound-calculator.export');
 
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(
