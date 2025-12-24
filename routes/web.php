@@ -66,6 +66,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ),
         )
         ->name('two-factor.show');
+
+        Route::get('clear-cache', function() {
+            Artisan::call('optimize:clear');
+            return "Cache Cleared!";
+        });
 });
 
 require __DIR__.'/auth.php';
