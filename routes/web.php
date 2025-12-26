@@ -56,6 +56,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Export endpoint for compound calculator
     Route::match(['GET','POST'], 'compound-calculator/export', [\App\Http\Controllers\CompoundCalculatorExportController::class, 'export'])->name('compound-calculator.export');
 
+    Volt::route('/manage-opalite','opalite.manage')->name('opalite.manage');
+    Volt::route('/opalite-winners','opalite.index')->name('opalite.index');
+
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(
             when(

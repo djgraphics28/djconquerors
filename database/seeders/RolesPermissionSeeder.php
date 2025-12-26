@@ -96,6 +96,9 @@ class RolesPermissionSeeder extends Seeder
             // Compound Interest Calculator
             'calculator.view',
             'calculator.access',
+
+            'opalite.view',
+            'opalite.manage',
         ];
 
         foreach ($adminPermissions as $permission) {
@@ -123,6 +126,7 @@ class RolesPermissionSeeder extends Seeder
             // Compound Interest Calculator
             'calculator.view',
             'calculator.access',
+
         ]);
 
         $adminUser = User::where('email', 'admin@djconquerors.com')->first();
