@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
+use App\Models\Manager;
 
 new #[Layout('components.layouts.auth')] class extends Component {
     public string $name = '';
@@ -64,12 +65,31 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
         event(new Registered(($user = User::create($validated))));
 
+        //promote inviter to manager if eligible
+        $this->promoteToManager($user->inviters_code);
+
         //add role to user
         $user->assignRole('user');
 
         Auth::login($user);
 
         $this->redirectIntended(route('dashboard', absolute: false), navigate: true);
+    }
+
+    public function promoteToManager($code): void
+    {
+        $user = User::where('riscoin_id', strtoupper($code))->first();
+        if ($user && $user->invites()->count() >= 3) {
+            //check if already a manager
+            if (!$user->managerLevel) {
+
+                // dd( 'Promoting user ID ' . $user->id . ' to manager level 1.');
+                Manager::create([
+                    'user_id' => $user->id,
+                    'level' => 1,
+                ]);
+            }
+        }
     }
 }; ?>
 

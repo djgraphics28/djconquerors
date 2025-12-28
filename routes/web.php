@@ -1,8 +1,9 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Laravel\Fortify\Features;
 use Livewire\Volt\Volt;
+use Laravel\Fortify\Features;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Artisan;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -74,6 +75,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Artisan::call('optimize:clear');
             return "Cache Cleared!";
         });
+});
+
+
+Route::get('/run-queue', function () {
+    Artisan::call('queue:work --once');
+    return 'Queue triggered';
+});
+
+Route::get('/migrate', function () {
+    Artisan::call('migrate');
+    return 'Migration triggered';
+});
+
+Route::get('/clear-cache', function () {
+    Artisan::call('optimize:clear');
+    return 'Cache cleared';
 });
 
 require __DIR__.'/auth.php';

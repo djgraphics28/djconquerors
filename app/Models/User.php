@@ -15,6 +15,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Jobs\SendVerificationEmail;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -196,6 +197,11 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         $days = $diff->d;
 
         return number_format($months) . " months and " . number_format($days) . " days";
+    }
+
+    public function sendEmailVerificationNotification()
+    {
+        SendVerificationEmail::dispatch($this);
     }
 
     public function registerMediaConversions(?Media $media = null): void
