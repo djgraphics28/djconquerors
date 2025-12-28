@@ -325,6 +325,12 @@ new class extends Component {
         </div>
     </div>
 
+    @can('dashboard.viewNewInvestorsAnalytics')
+        <!-- New Investors Analytics Widget -->
+        <div class="mb-6">
+            <livewire:widget.new-investors-analytics :filter="'today'" />
+        </div>
+    @endcan
 
 
     <!-- New Cards for Special Occasions -->

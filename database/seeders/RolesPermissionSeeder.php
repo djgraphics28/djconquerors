@@ -22,6 +22,7 @@ class RolesPermissionSeeder extends Seeder
             'dashboard.view',
             'dashboard.viewSpecialOccasions',
             'dashboard.copyMessageToMartin',
+            'dashboard.viewNewInvestorsAnalytics',
 
             //Users
             'users.view',
