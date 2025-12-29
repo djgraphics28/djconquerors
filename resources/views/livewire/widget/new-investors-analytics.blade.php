@@ -125,7 +125,7 @@ new class extends Component {
             ->selectRaw('inviters_code, COUNT(*) as invites_count')
             ->groupBy('inviters_code')
             ->orderByDesc('invites_count')
-            ->limit(5)
+            // ->limit(5)
             ->get();
 
         return $topInviters->map(function ($row) {
