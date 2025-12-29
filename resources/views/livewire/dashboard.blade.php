@@ -16,6 +16,8 @@ new class extends Component {
     public $riscoinId;
     public $birthdayCelebrators = [];
     public $membershipAnniversaries = [];
+    public $showFirstReplyToMartin = false;
+    public $showLatestInvitesWidget = false;
 
     public function mount($riscoinId = null)
     {
@@ -37,6 +39,32 @@ new class extends Component {
                 },
             ]);
         }
+
+        //if auth user is just first week investor and has no invites, show first reply to martin
+        if (Auth::user()->id === $this->currentNode->id) {
+            $user = User::whereHas('invites', function ($query) {
+                $query->where('created_at', '>=', now()->subWeek());
+            })->first();
+
+            if ($user) {
+                $oneWeekAfterInvestment = Carbon::parse($user->created_at)->addWeek();
+                if (Carbon::now()->lessThanOrEqualTo($oneWeekAfterInvestment) && $this->currentNode->invites->isEmpty()) {
+                    $this->showFirstReplyToMartin = true;
+                }
+            } else {
+                // User is not a first week investor
+            }
+
+            $latestInvitesCount = $this->currentNode
+                ->invites()
+                ->where('created_at', '>=', now()->subWeek())
+                ->count();
+            if ($latestInvitesCount > 0) {
+                $this->showLatestInvitesWidget = true;
+            }
+        }
+
+        $this->latestInvites = $latestInvites ?? collect();
 
         $this->riscoinId = $riscoinId;
         $this->calculateStatistics();
@@ -235,10 +263,19 @@ new class extends Component {
         </ol>
     </nav>
 
-    {{-- first reply to martin --}}
-    <div class="mb-6">
-        <livewire:widget.first-reply-to-martin :currentNode="$currentNode" />
-    </div>
+    @if ($this->showFirstReplyToMartin)
+        {{-- first reply to martin --}}
+        <div class="mb-6">
+            <livewire:widget.first-reply-to-martin :currentNode="$currentNode" />
+        </div>
+    @endif
+
+    @if ($this->showLatestInvitesWidget)
+        {{-- latest invites widget --}}
+        <div class="mb-6">
+            <livewire:widget.latest-invites :currentNode="$currentNode" />
+        </div>
+    @endif
 
     {{-- share link widget --}}
     <div class="mb-6">
