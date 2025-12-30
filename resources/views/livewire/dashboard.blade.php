@@ -42,18 +42,20 @@ new class extends Component {
 
         //if auth user is just first week investor and has no invites, show first reply to martin
         if (Auth::user()->id === $this->currentNode->id) {
+            $firstInvestor = User::where('id', Auth::user()->id)
+                ->where('date_joined', '>=', now()->subWeek())
+                ->whereDoesntHave('invites')
+                ->first();
+
+            if ($firstInvestor) {
+                $this->showFirstReplyToMartin = true;
+            }
+
             $user = User::whereHas('invites', function ($query) {
                 $query->where('created_at', '>=', now()->subWeek());
             })->first();
 
-            if ($user) {
-                $oneWeekAfterInvestment = Carbon::parse($user->created_at)->addWeek();
-                if (Carbon::now()->lessThanOrEqualTo($oneWeekAfterInvestment) && $this->currentNode->invites->isEmpty()) {
-                    $this->showFirstReplyToMartin = true;
-                }
-            } else {
-                // User is not a first week investor
-            }
+
 
             $latestInvitesCount = $this->currentNode
                 ->invites()
@@ -263,7 +265,7 @@ new class extends Component {
         </ol>
     </nav>
 
-    @if ($this->showFirstReplyToMartin)
+    @if ($this->showFirstReplyToMartin === true)
         {{-- first reply to martin --}}
         <div class="mb-6">
             <livewire:widget.first-reply-to-martin :currentNode="$currentNode" />
