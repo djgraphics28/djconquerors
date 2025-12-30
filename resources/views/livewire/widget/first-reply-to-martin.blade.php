@@ -11,11 +11,13 @@ new class extends Component {
     public function mount($currentNode): void
     {
         $this->currentNode = $currentNode;
+
+        // dd($this->currentNode);
     }
 }; ?>
 
 <div>
-    @can('dashboard.copyMessageToMartin')
+    {{-- @can('dashboard.copyMessageToMartin') --}}
         <!-- Copy Support Form to Clipboard -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
             <div x-data="{
@@ -144,5 +146,5 @@ Languages Spoken: English, Filipino
 Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
             </div>
         </div>
-    @endcan
+    {{-- @endcan --}}
 </div>
