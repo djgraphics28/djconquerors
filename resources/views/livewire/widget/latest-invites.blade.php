@@ -145,7 +145,7 @@ new class extends Component {
                         @else
                             <div
                                 class="h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
-                                <span class="text-base font-semibold text-white">{{ substr($invite->name, 0, 2) }}</span>
+                                <span class="text-base font-semibold text-white">{{ strtoupper(substr($invite->name, 0, 2)) }}</span>
                             </div>
                         @endif
                         <div>
@@ -160,7 +160,7 @@ new class extends Component {
                     </div>
                 </div>
 
-                <div class="mt-4 grid grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     <div>
                         <span class="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Riscoin
                             ID</span>
@@ -179,15 +179,20 @@ new class extends Component {
                     </div>
                 </div>
 
-                <div class="mt-4 flex space-x-4 rtl:space-x-reverse">
+                <div class="mt-4 flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0 rtl:space-x-reverse">
                     <flux:button wire:click="addAssistant({{ $invite->id }})"
                         class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium">
                         Enter Assistant
                     </flux:button>
                     <flux:button
                         class="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors duration-200 text-sm font-medium"
-                        onclick="(function(){const inviter='{{ addslashes(auth()->user()->riscoin_id ?? 'N/A') }}';const depositor='{{ addslashes($invite->riscoin_id ?? 'N/A') }}';const investor='{{ addslashes($invite->name) }}';const assister='{{ addslashes($invite->assistant?->riscoin_id ?? 'N/A') }}';const msg=`Hi Sir Martin\nHere is my application reward request from my investor, ${investor}\n\nInviter's Riscoin Account : ${inviter}\n\nDepositor's Riscoin Account : ${depositor}\n\nAssister's Riscoin Account: ${assister}\n\n`; try{if(navigator.clipboard && navigator.clipboard.writeText){navigator.clipboard.writeText(msg);} else {const ta=document.createElement('textarea');ta.value=msg;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();} alert('Copied to clipboard');}catch(e){alert('Copy failed');}})()">
-                        Copy Application Reward Message
+                        onclick="(function(){const inviter='{{ addslashes(auth()->user()->riscoin_id ?? 'N/A') }}';const depositor='{{ addslashes($invite->riscoin_id ?? 'N/A') }}';const investor='{{ addslashes($invite->name) }}';const assister='{{ addslashes($invite->assistant?->riscoin_id ?? 'N/A') }}';const msg=`Hi Sir Martin\nHere is my application reward request from my investor, ${investor}\n\nInviter's Riscoin Account : ${inviter}\n\nDepositor's Riscoin Account : ${depositor}\n\nAssister's Riscoin Account: ${assister}\n\n`; try{if(navigator.clipboard && navigator.clipboard.writeText){navigator.clipboard.writeText(msg);} else {const ta=document.createElement('textarea');ta.value=msg;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();} showToast('Application reward message copied');}catch(e){showToast('Copy failed', 'error');}})()">
+                        <span class="inline-flex items-center space-x-2"><svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg><span>Copy Application Reward Message</span></span>
+                    </flux:button>
+
+                    <flux:button type="button" class="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
+                        onclick="copyWelcomeMessage({{ json_encode(['name' => $invite->name, 'joined' => $invite->date_joined->format('M j, Y'), 'amount' => number_format($invite->invested_amount,2)]) }})">
+                        <span class="inline-flex items-center space-x-2"><svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>Copy Welcome Message</span></span>
                     </flux:button>
                 </div>
             </div>
@@ -196,6 +201,33 @@ new class extends Component {
                 <p class="text-gray-500 dark:text-gray-400">No recent invites found.</p>
             </div>
         @endforelse
+
+    <script>
+        function showToast(message, type = 'success'){
+            const color = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 left-1/2 transform -translate-x-1/2 ${color} text-white px-4 py-2 rounded-lg shadow-lg z-50`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+        }
+    </script>
+
+    <script>
+        function copyWelcomeMessage(payload){
+            const { name, joined, amount } = payload;
+            const message = `🌟 Welcome to DJ Conquerors!\nWe're thrilled to have you join our community of dedicated investors. Together we'll achieve great things!\nWith gratitude,\nDJ Conquerors Team\n\n🎊 Welcome ${name}!\nJoined: ${joined}\nAmount invested: $${amount} USDT`;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(message).then(() => showToast('Welcome message copied'), () => showToast('Copy failed', 'error'));
+                return;
+            }
+
+            try{
+                const ta = document.createElement('textarea'); ta.value = message; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); showToast('Welcome message copied');
+            }catch(e){ showToast('Copy failed', 'error'); }
+        }
+    </script>
 
         <!-- Add Assistant User Modal - Right Side Panel -->
         <div x-data="{ open: @entangle('showAssistantModal') }" x-show="open" x-on:keydown.escape.window="open = false" class="fixed inset-0 z-50 overflow-hidden" style="display: none;">
@@ -256,7 +288,7 @@ new class extends Component {
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Apply Reward Message to Sir Martin</label>
                                         <textarea readonly rows="6" class="w-full p-3 border rounded-md bg-gray-50 dark:bg-gray-700 text-sm" id="assistantSample">{{ $this->assistantSampleText }}</textarea>
                                         <div class="mt-2 flex justify-end">
-                                            <button type="button" onclick="(async function(){const t=document.getElementById('assistantSample').value; try{if(navigator.clipboard && navigator.clipboard.writeText){await navigator.clipboard.writeText(t);} else {const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();} alert('Copied to clipboard');}catch(e){try{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();alert('Copied to clipboard');}catch(err){alert('Copy failed');}}})()" class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Copy</button>
+                                            <button type="button" onclick="(async function(){const t=document.getElementById('assistantSample').value; try{if(navigator.clipboard && navigator.clipboard.writeText){await navigator.clipboard.writeText(t);} else {const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();} showToast('Copied to clipboard');}catch(e){try{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();showToast('Copied to clipboard');}catch(err){showToast('Copy failed', 'error');}}})()" class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Copy</button>
                                         </div>
                                     </div>
 

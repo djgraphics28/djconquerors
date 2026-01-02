@@ -124,7 +124,7 @@ new class extends Component {
             'permissionGroup' => 'required|min:2',
         ]);
 
-        $permissionName = strtolower($this->permissionGroup) . '.' . strtolower($this->permissionName);
+        $permissionName = strtolower($this->permissionGroup) . '.' . $this->permissionName;
 
         Permission::create(['name' => $permissionName]);
 
