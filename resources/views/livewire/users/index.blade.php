@@ -172,8 +172,7 @@ new class extends Component {
         $this->inviters_code = $user->inviters_code;
         $this->invested_amount = $user->invested_amount;
         $this->birth_date = $user->birth_date ? $user->birth_date->format('Y-m-d') : null;
-        $this->date_joined = $user->date_joined ? $user->date_joined->format('Y-m-d') :
-        $this->is_active = $user->is_active;
+        $this->date_joined = $user->date_joined ? $user->date_joined->format('Y-m-d') : ($this->is_active = $user->is_active);
         $this->selectedRoles = $user->roles->pluck('name')->toArray();
         $this->avatarToRemove = false;
         $this->showModal = true;
@@ -479,10 +478,7 @@ Amount invested: $" .
             return;
         }
 
-        $manager = Manager::updateOrCreate(
-            ['user_id' => $user->id],
-            ['level' => 1]
-        );
+        $manager = Manager::updateOrCreate(['user_id' => $user->id], ['level' => 1]);
 
         session()->flash('message', 'User promoted to Level 1 manager.');
     }
@@ -612,16 +608,13 @@ Amount invested: $" .
                                     Name</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Inviter</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Email</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Is Verified?</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Age</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Roles</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Riscoin ID</th>
@@ -636,10 +629,13 @@ Amount invested: $" .
                                     Tenure</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Inviter</th>
+                                    Roles</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Status</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Is Verified?</th>
                                 <th scope="col"
                                     class="md:sticky md:right-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Actions</th>
@@ -650,7 +646,7 @@ Amount invested: $" .
                                 <tr>
                                     <td
                                         class="sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
-                                        <div class="flex-shrink-0 h-10 w-10">
+                                        <a href="{{ route('genealogy.show', $user->riscoin_id) }}">
                                             @if ($user->getFirstMediaUrl('avatar'))
                                                 <img class="h-10 w-10 rounded-full object-cover"
                                                     src="{{ $user->getFirstMediaUrl('avatar') }}"
@@ -663,649 +659,640 @@ Amount invested: $" .
                                                     </span>
                                                 </div>
                                             @endif
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="md:sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
-                                        {{ $user->name }}
-                                        <div class="text-sm text-gray-500 dark:text-gray-400">
-                                            <small>Last Logged In: {{ $user->last_login }}</small>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->email }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        @if ($user->email_verified_at)
-                                            <span
-                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                Verified
-                                            </span>
-                                        @else
-                                            <span
-                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                                Not Verified
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->age }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex flex-wrap gap-1">
-                                            @foreach ($user->roles as $role)
-                                                <span
-                                                    class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
-                                                    {{ $role->name }}
-                                                </span>
-                                            @endforeach
-                                            @if ($user->roles->isEmpty())
-                                                <span
-                                                    class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
-                                                    No roles
-                                                </span>
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->riscoin_id ?? 'N/A' }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        ${{ number_format($user->invested_amount, 2) }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->date_joined ? \Carbon\Carbon::parse($user->date_joined)->format('M j, Y') : 'N/A' }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->months_and_days_since_joined }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->inviter ? $user->inviter->name . ' (' . $user->inviter->riscoin_id . ')' : 'N/A' }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        @if(method_exists($user, 'trashed') && $user->trashed())
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Trashed</span>
-                                        @else
-                                            <span
-                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                                {{ $user->is_active ? 'Active' : 'Inactive' }}
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td
-                                        class="md:sticky md:right-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
-                                        <div class="flex space-x-2">
-                                            @can('users.copy-welcome-message')
-                                                <flux:button wire:click="copyWelcomeMessage({{ $user->id }})"
-                                                    variant="ghost" size="sm"
-                                                    data-test="copy-welcome-message-{{ $user->id }}"
-                                                    title="Copy Welcome Message">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                        viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                                                    </svg>
-                                                </flux:button>
-                                            @endcan
-                                            @can('users.promote')
-                                                <flux:button wire:click="promoteToLevelOne({{ $user->id }})" variant="ghost" size="sm" class="bg-indigo-600 text-white hover:bg-indigo-700" title="Promote to Level 1">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                                                    </svg>
-                                                </flux:button>
-                                            @endcan
-                                            @can('users.verify-email')
-                                                <flux:button wire:click="verifyEmail({{ $user->id }})"
-                                                    variant="ghost" size="sm"
-                                                    data-test="verify-email-{{ $user->id }}" title="Verify Email">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                        viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
-                                                </flux:button>
-                                                @endcan @can('users.view')
-                                                <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost"
-                                                    size="sm" data-test="view-user-{{ $user->id }}"
-                                                    title="View Info">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                        viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                </flux:button>
-                                            @endcan
-                                            @can('users.edit')
-                                                <flux:button wire:click="edit({{ $user->id }})" variant="ghost"
-                                                    size="sm" data-test="edit-user-{{ $user->id }}"
-                                                    title="Edit">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                        viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                    </svg>
-                                                </flux:button>
-                                            @endcan
-                                            @can('users.delete')
-                                                @if(method_exists($user, 'trashed') && $user->trashed())
-                                                    <flux:button wire:click="restore({{ $user->id }})" variant="ghost" size="sm" class="text-green-600 hover:text-green-900" onclick="return confirm('Are you sure you want to restore this user?')" data-test="restore-user-{{ $user->id }}" title="Restore">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h4l3-6 4 12 3-6h4" />
-                                                        </svg>
-                                                    </flux:button>
-                                                @else
-                                                    <flux:button wire:click="delete({{ $user->id }})" variant="ghost"
-                                                        size="sm"
-                                                        class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                                        onclick="return confirm('Are you sure you want to delete this user?')"
-                                                        data-test="delete-user-{{ $user->id }}" title="Delete">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                            viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                                stroke-width="2"
-                                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </flux:button>
-                                                @endif
-                                            @endcan
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="13" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-                                        No users found matching your criteria.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div> <!-- Pagination -->
-                <div class="mt-6">
-                    {{ $this->users->links() }}
+                </div>
+                </a>
+                </td>
+                <td
+                    class="md:sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
+                    {{ $user->name }}
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        <small>Riscoin ID: <span onclick="copyToClipboard('{{ $user->riscoin_id }}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->riscoin_id ?? 'N/A' }}</span></small>
+                    </div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        <small>Last Logged In: {{ $user->last_login }}</small>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                    {{ $user->inviter->name }}
+                    <div class="text-sm text-gray-400">
+                        <small>Riscoin ID: <span onclick="copyToClipboard('{{ $user->inviter->riscoin_id }}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->inviter->riscoin_id ?? 'N/A' }}</span></small>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                    <span onclick="copyToClipboard('{{ $user->email }}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->email }}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                    {{ $user->age }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                    {{ $user->riscoin_id ?? 'N/A' }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                    ${{ number_format($user->invested_amount, 2) }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                    {{ $user->date_joined ? \Carbon\Carbon::parse($user->date_joined)->format('M j, Y') : 'N/A' }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                    {{ $user->months_and_days_since_joined }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex flex-wrap gap-1">
+                        @foreach ($user->roles as $role)
+                            <span
+                                class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
+                                {{ $role->name }}
+                            </span>
+                        @endforeach
+                        @if ($user->roles->isEmpty())
+                            <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                No roles
+                            </span>
+                        @endif
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    @if (method_exists($user, 'trashed') && $user->trashed())
+                        <span
+                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Trashed</span>
+                    @else
+                        <span
+                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                            {{ $user->is_active ? 'Active' : 'Inactive' }}
+                        </span>
+                    @endif
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    @if ($user->email_verified_at)
+                        <span
+                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            Verified
+                        </span>
+                    @else
+                        <span
+                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                            Not Verified
+                        </span>
+                    @endif
+                </td>
+                <td class="md:sticky md:right-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
+                    <div class="flex space-x-2">
+                        @can('users.copy-welcome-message')
+                            <flux:button wire:click="copyWelcomeMessage({{ $user->id }})" variant="ghost"
+                                size="sm" data-test="copy-welcome-message-{{ $user->id }}"
+                                title="Copy Welcome Message">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                </svg>
+                            </flux:button>
+                        @endcan
+                        @can('users.promote')
+                            <flux:button wire:click="promoteToLevelOne({{ $user->id }})" variant="ghost"
+                                size="sm" class="bg-indigo-600 text-white hover:bg-indigo-700"
+                                title="Promote to Level 1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 4v16m8-8H4" />
+                                </svg>
+                            </flux:button>
+                        @endcan
+                        @can('users.verify-email')
+                            <flux:button wire:click="verifyEmail({{ $user->id }})" variant="ghost" size="sm"
+                                data-test="verify-email-{{ $user->id }}" title="Verify Email">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </flux:button>
+                            @endcan @can('users.view')
+                            <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost" size="sm"
+                                data-test="view-user-{{ $user->id }}" title="View Info">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </flux:button>
+                        @endcan
+                        @can('users.edit')
+                            <flux:button wire:click="edit({{ $user->id }})" variant="ghost" size="sm"
+                                data-test="edit-user-{{ $user->id }}" title="Edit">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                            </flux:button>
+                        @endcan
+                        @can('users.delete')
+                            @if (method_exists($user, 'trashed') && $user->trashed())
+                                <flux:button wire:click="restore({{ $user->id }})" variant="ghost" size="sm"
+                                    class="text-green-600 hover:text-green-900"
+                                    onclick="return confirm('Are you sure you want to restore this user?')"
+                                    data-test="restore-user-{{ $user->id }}" title="Restore">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M3 10h4l3-6 4 12 3-6h4" />
+                                    </svg>
+                                </flux:button>
+                            @else
+                                <flux:button wire:click="delete({{ $user->id }})" variant="ghost" size="sm"
+                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                                    onclick="return confirm('Are you sure you want to delete this user?')"
+                                    data-test="delete-user-{{ $user->id }}" title="Delete">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </flux:button>
+                            @endif
+                        @endcan
+                    </div>
+                </td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="13" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                        No users found matching your criteria.
+                    </td>
+                </tr>
+                @endforelse
+                </tbody>
+                </table>
+            </div> <!-- Pagination -->
+            <div class="mt-6">
+                {{ $this->users->links() }}
+            </div>
+
+            <!-- Create/Edit User Modal - Right Side Panel -->
+            <div x-data="{ open: @entangle('showModal') }" x-show="open" x-on:keydown.escape.window="open = false"
+                class="fixed inset-0 z-50 overflow-hidden" style="display: none;">
+                <!-- Overlay -->
+                <div x-show="open" x-transition:enter="ease-in-out duration-500"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in-out duration-500" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    class="absolute inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 transition-opacity"
+                    x-on:click="open = false">
                 </div>
 
-                <!-- Create/Edit User Modal - Right Side Panel -->
-                <div x-data="{ open: @entangle('showModal') }" x-show="open" x-on:keydown.escape.window="open = false"
-                    class="fixed inset-0 z-50 overflow-hidden" style="display: none;">
-                    <!-- Overlay -->
-                    <div x-show="open" x-transition:enter="ease-in-out duration-500"
-                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                        x-transition:leave="ease-in-out duration-500" x-transition:leave-start="opacity-100"
-                        x-transition:leave-end="opacity-0"
-                        class="absolute inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 transition-opacity"
-                        x-on:click="open = false">
-                    </div>
+                <!-- Modal Panel -->
+                <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
+                    <div x-show="open"
+                        x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
+                        x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+                        x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700"
+                        x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+                        class="w-screen max-w-2xl">
+                        <div class="h-full flex flex-col bg-white dark:bg-gray-800 shadow-xl">
+                            <!-- Header -->
+                            <div
+                                class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                                    {{ $editMode ? 'Edit User' : 'New User' }}
+                                </h2>
+                                <button wire:click="closeModal"
+                                    class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
 
-                    <!-- Modal Panel -->
-                    <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
-                        <div x-show="open"
-                            x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
-                            x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
-                            x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700"
-                            x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
-                            class="w-screen max-w-2xl">
-                            <div class="h-full flex flex-col bg-white dark:bg-gray-800 shadow-xl">
-                                <!-- Header -->
-                                <div
-                                    class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                                        {{ $editMode ? 'Edit User' : 'New User' }}
-                                    </h2>
-                                    <button wire:click="closeModal"
-                                        class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-                                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24"
-                                            stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
-
-                                <!-- Content -->
-                                <div class="flex-1 overflow-y-auto">
-                                    <div class="px-6 py-4">
-                                        <form wire:submit.prevent="{{ $editMode ? 'update' : 'create' }}"
-                                            class="space-y-6">
-                                            <!-- Avatar Upload -->
-                                            <div class="flex items-center space-x-6">
-                                                <div class="flex-shrink-0">
-                                                    @if ($editMode && $user && $user->getFirstMediaUrl('avatar') && !$avatarToRemove)
-                                                        <img class="h-20 w-20 rounded-full object-cover"
-                                                            src="{{ $user->getFirstMediaUrl('avatar') }}"
-                                                            alt="Current avatar">
-                                                    @elseif($avatar)
-                                                        <img class="h-20 w-20 rounded-full object-cover"
-                                                            src="{{ $avatar->temporaryUrl() }}" alt="New avatar">
-                                                    @else
-                                                        <div
-                                                            class="h-20 w-20 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                                                            <span
-                                                                class="text-gray-600 dark:text-gray-300 font-medium text-xl">
-                                                                {{ $name ? strtoupper(substr($name, 0, 1)) : 'U' }}
-                                                            </span>
-                                                        </div>
+                            <!-- Content -->
+                            <div class="flex-1 overflow-y-auto">
+                                <div class="px-6 py-4">
+                                    <form wire:submit.prevent="{{ $editMode ? 'update' : 'create' }}"
+                                        class="space-y-6">
+                                        <!-- Avatar Upload -->
+                                        <div class="flex items-center space-x-6">
+                                            <div class="flex-shrink-0">
+                                                @if ($editMode && $user && $user->getFirstMediaUrl('avatar') && !$avatarToRemove)
+                                                    <img class="h-20 w-20 rounded-full object-cover"
+                                                        src="{{ $user->getFirstMediaUrl('avatar') }}"
+                                                        alt="Current avatar">
+                                                @elseif($avatar)
+                                                    <img class="h-20 w-20 rounded-full object-cover"
+                                                        src="{{ $avatar->temporaryUrl() }}" alt="New avatar">
+                                                @else
+                                                    <div
+                                                        class="h-20 w-20 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                                                        <span
+                                                            class="text-gray-600 dark:text-gray-300 font-medium text-xl">
+                                                            {{ $name ? strtoupper(substr($name, 0, 1)) : 'U' }}
+                                                        </span>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            <div class="flex-1">
+                                                <label
+                                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                    Profile Avatar
+                                                </label>
+                                                <div class="flex space-x-3">
+                                                    <div>
+                                                        <input type="file" wire:model="avatar" accept="image/*"
+                                                            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                                        @error('avatar')
+                                                            <p class="mt-1 text-sm text-red-600">{{ $message }}
+                                                            </p>
+                                                        @enderror
+                                                    </div>
+                                                    @if ($editMode && (($user && $user->getFirstMediaUrl('avatar')) || $avatar))
+                                                        <flux:button type="button" wire:click="removeAvatar"
+                                                            variant="ghost" size="sm" class="text-red-600">
+                                                            Remove Avatar
+                                                        </flux:button>
                                                     @endif
                                                 </div>
-                                                <div class="flex-1">
-                                                    <label
-                                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                        Profile Avatar
-                                                    </label>
-                                                    <div class="flex space-x-3">
-                                                        <div>
-                                                            <input type="file" wire:model="avatar"
-                                                                accept="image/*"
-                                                                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                                            @error('avatar')
-                                                                <p class="mt-1 text-sm text-red-600">{{ $message }}
-                                                                </p>
-                                                            @enderror
-                                                        </div>
-                                                        @if ($editMode && (($user && $user->getFirstMediaUrl('avatar')) || $avatar))
-                                                            <flux:button type="button" wire:click="removeAvatar"
-                                                                variant="ghost" size="sm" class="text-red-600">
-                                                                Remove Avatar
-                                                            </flux:button>
-                                                        @endif
-                                                    </div>
-                                                    <p class="mt-1 text-xs text-gray-500">
-                                                        Upload a profile picture. Max 2MB. JPG, PNG, GIF.
-                                                    </p>
+                                                <p class="mt-1 text-xs text-gray-500">
+                                                    Upload a profile picture. Max 2MB. JPG, PNG, GIF.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 gap-6">
+                                            <!-- Name -->
+                                            <flux:input wire:model="name" :label="__('Name')" type="text"
+                                                required :placeholder="__('Enter full name')" data-test="name-input" />
+
+                                            <!-- Email -->
+                                            <flux:input wire:model="email" :label="__('Email')" type="email"
+                                                required :placeholder="__('Enter email address')"
+                                                data-test="email-input" />
+
+                                            <!-- Phone Number -->
+                                            <flux:input wire:model="phone_number" :label="__('Phone Number')"
+                                                type="text" :placeholder="__('Enter phone number')"
+                                                data-test="phone-input" />
+
+                                            <!-- Riscoin ID -->
+                                            <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')"
+                                                type="text" :placeholder="__('Enter Riscoin ID')"
+                                                data-test="riscoin-id-input" />
+
+                                            <!-- Password -->
+                                            <flux:input wire:model="password" :label="__('Password')" type="password"
+                                                :required="!$editMode" :placeholder="__('Enter password')"
+                                                data-test="password-input" />
+
+                                            <!-- Inviter's Code -->
+                                            <flux:input wire:model="inviters_code" :label="__('Inviter\'s Code')"
+                                                type="text" :placeholder="__('Enter inviter\'s code')"
+                                                data-test="inviters-code-input" />
+
+                                            <!-- Invested Amount -->
+                                            <flux:input wire:model="invested_amount" :label="__('Invested Amount')"
+                                                type="number" step="0.01" :placeholder="__('0.00')"
+                                                prefix="$" data-test="invested-amount-input" />
+
+                                            <!-- Birth Date -->
+                                            <flux:input wire:model="birth_date" :label="__('Birth Date')"
+                                                type="date" :placeholder="__('Select birth date')"
+                                                data-test="birth-date-input" />
+
+                                            <!-- Date Joined -->
+                                            <flux:input wire:model="date_joined" :label="__('Date Joined')"
+                                                type="date" :placeholder="__('Select date joined')"
+                                                data-test="date-joined-input" />
+
+                                            <!-- Roles -->
+                                            <div>
+                                                <label
+                                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Roles</label>
+                                                <div class="space-y-2">
+                                                    @foreach ($roles as $role)
+                                                        <label class="flex items-center">
+                                                            <input type="checkbox" wire:model="selectedRoles"
+                                                                value="{{ $role->name }}"
+                                                                class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                                            <span
+                                                                class="ml-2 text-sm text-gray-700 dark:text-gray-300 capitalize">{{ $role->name }}</span>
+                                                        </label>
+                                                    @endforeach
+                                                    @if ($roles->isEmpty())
+                                                        <p class="text-sm text-gray-500">No roles available. Create
+                                                            roles first.</p>
+                                                    @endif
                                                 </div>
                                             </div>
 
-                                            <div class="grid grid-cols-1 gap-6">
-                                                <!-- Name -->
-                                                <flux:input wire:model="name" :label="__('Name')" type="text"
-                                                    required :placeholder="__('Enter full name')"
-                                                    data-test="name-input" />
-
-                                                <!-- Email -->
-                                                <flux:input wire:model="email" :label="__('Email')" type="email"
-                                                    required :placeholder="__('Enter email address')"
-                                                    data-test="email-input" />
-
-                                                <!-- Phone Number -->
-                                                <flux:input wire:model="phone_number" :label="__('Phone Number')"
-                                                    type="text" :placeholder="__('Enter phone number')"
-                                                    data-test="phone-input" />
-
-                                                <!-- Riscoin ID -->
-                                                <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')"
-                                                    type="text" :placeholder="__('Enter Riscoin ID')"
-                                                    data-test="riscoin-id-input" />
-
-                                                <!-- Password -->
-                                                <flux:input wire:model="password" :label="__('Password')"
-                                                    type="password" :required="!$editMode"
-                                                    :placeholder="__('Enter password')" data-test="password-input" />
-
-                                                <!-- Inviter's Code -->
-                                                <flux:input wire:model="inviters_code" :label="__('Inviter\'s Code')"
-                                                    type="text" :placeholder="__('Enter inviter\'s code')"
-                                                    data-test="inviters-code-input" />
-
-                                                <!-- Invested Amount -->
-                                                <flux:input wire:model="invested_amount"
-                                                    :label="__('Invested Amount')" type="number" step="0.01"
-                                                    :placeholder="__('0.00')" prefix="$"
-                                                    data-test="invested-amount-input" />
-
-                                                <!-- Birth Date -->
-                                                <flux:input wire:model="birth_date" :label="__('Birth Date')"
-                                                    type="date" :placeholder="__('Select birth date')"
-                                                    data-test="birth-date-input" />
-
-                                                <!-- Date Joined -->
-                                                <flux:input wire:model="date_joined" :label="__('Date Joined')"
-                                                    type="date" :placeholder="__('Select date joined')"
-                                                    data-test="date-joined-input" />
-
-                                                <!-- Roles -->
-                                                <div>
-                                                    <label
-                                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Roles</label>
-                                                    <div class="space-y-2">
-                                                        @foreach ($roles as $role)
-                                                            <label class="flex items-center">
-                                                                <input type="checkbox" wire:model="selectedRoles"
-                                                                    value="{{ $role->name }}"
-                                                                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                                                <span
-                                                                    class="ml-2 text-sm text-gray-700 dark:text-gray-300 capitalize">{{ $role->name }}</span>
-                                                            </label>
-                                                        @endforeach
-                                                        @if ($roles->isEmpty())
-                                                            <p class="text-sm text-gray-500">No roles available. Create
-                                                                roles first.</p>
-                                                        @endif
-                                                    </div>
-                                                </div>
-
-                                                <!-- Active Status -->
-                                                <div class="flex items-center">
-                                                    <flux:checkbox wire:model="is_active" :label="__('Active User')"
-                                                        data-test="is-active-checkbox" />
-                                                </div>
+                                            <!-- Active Status -->
+                                            <div class="flex items-center">
+                                                <flux:checkbox wire:model="is_active" :label="__('Active User')"
+                                                    data-test="is-active-checkbox" />
                                             </div>
+                                        </div>
 
-                                            <!-- Action Buttons -->
-                                            <div
-                                                class="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-                                                <flux:button type="button" wire:click="closeModal"
-                                                    data-test="cancel-user-button">
-                                                    Cancel
-                                                </flux:button>
-                                                <flux:button type="submit" variant="primary"
-                                                    data-test="submit-user-button">
-                                                    {{ $editMode ? 'Update' : 'Create' }} User
-                                                </flux:button>
-                                            </div>
-                                        </form>
-                                    </div>
+                                        <!-- Action Buttons -->
+                                        <div
+                                            class="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+                                            <flux:button type="button" wire:click="closeModal"
+                                                data-test="cancel-user-button">
+                                                Cancel
+                                            </flux:button>
+                                            <flux:button type="submit" variant="primary"
+                                                data-test="submit-user-button">
+                                                {{ $editMode ? 'Update' : 'Create' }} User
+                                            </flux:button>
+                                        </div>
+                                    </form>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- View User Info Modal - Right Side Panel -->
-                <div x-data="{ open: @entangle('showViewModal') }" x-show="open" x-on:keydown.escape.window="open = false"
-                    class="fixed inset-0 z-50 overflow-hidden" style="display: none;">
-                    <!-- Overlay -->
-                    <div x-show="open" x-transition:enter="ease-in-out duration-500"
-                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                        x-transition:leave="ease-in-out duration-500" x-transition:leave-start="opacity-100"
-                        x-transition:leave-end="opacity-0"
-                        class="absolute inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 transition-opacity"
-                        x-on:click="open = false">
-                    </div>
+            <!-- View User Info Modal - Right Side Panel -->
+            <div x-data="{ open: @entangle('showViewModal') }" x-show="open" x-on:keydown.escape.window="open = false"
+                class="fixed inset-0 z-50 overflow-hidden" style="display: none;">
+                <!-- Overlay -->
+                <div x-show="open" x-transition:enter="ease-in-out duration-500"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in-out duration-500" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    class="absolute inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 transition-opacity"
+                    x-on:click="open = false">
+                </div>
 
-                    <!-- Modal Panel -->
-                    <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
-                        <div x-show="open"
-                            x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
-                            x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
-                            x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700"
-                            x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
-                            class="w-screen max-w-4xl">
-                            <div class="h-full flex flex-col bg-white dark:bg-gray-800 shadow-xl">
-                                <!-- Header -->
-                                <div
-                                    class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                                        User Information & Activity Logs
-                                    </h2>
-                                    <button wire:click="closeViewModal"
-                                        class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-                                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24"
-                                            stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
+                <!-- Modal Panel -->
+                <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
+                    <div x-show="open"
+                        x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
+                        x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+                        x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700"
+                        x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+                        class="w-screen max-w-4xl">
+                        <div class="h-full flex flex-col bg-white dark:bg-gray-800 shadow-xl">
+                            <!-- Header -->
+                            <div
+                                class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                                    User Information & Activity Logs
+                                </h2>
+                                <button wire:click="closeViewModal"
+                                    class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
 
-                                <!-- Content -->
-                                <div class="flex-1 overflow-y-auto">
-                                    <div class="px-6 py-4">
-                                        @if ($selectedUser)
-                                            <div class="space-y-6">
-                                                <!-- User Information -->
-                                                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                                                    <div class="flex items-center space-x-4 mb-4">
-                                                        <!-- Avatar in View Modal -->
-                                                        <div class="flex-shrink-0">
-                                                            @if ($selectedUser->getFirstMediaUrl('avatar'))
-                                                                <img class="h-16 w-16 rounded-full object-cover"
-                                                                    src="{{ $selectedUser->getFirstMediaUrl('avatar') }}"
-                                                                    alt="{{ $selectedUser->name }} avatar">
-                                                            @else
-                                                                <div
-                                                                    class="h-16 w-16 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                                                                    <span
-                                                                        class="text-gray-600 dark:text-gray-300 font-medium text-lg">
-                                                                        {{ strtoupper(substr($selectedUser->name, 0, 1)) }}
-                                                                    </span>
-                                                                </div>
-                                                            @endif
-                                                        </div>
-                                                        <div>
-                                                            <h3
-                                                                class="text-lg font-medium text-gray-900 dark:text-white">
-                                                                {{ $selectedUser->name }}
-                                                            </h3>
-                                                            <p class="text-sm text-gray-500 dark:text-gray-400">
-                                                                {{ $selectedUser->email }}
-                                                            </p>
-                                                            <p class="text-sm text-gray-500 dark:text-gray-400">
-                                                                {{ $selectedUser->phone_number }}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                        <div>
-                                                            <label
-                                                                class="text-sm font-medium text-gray-500 dark:text-gray-400">Riscoin
-                                                                ID</label>
-                                                            <p class="text-sm text-gray-900 dark:text-white">
-                                                                {{ $selectedUser->riscoin_id ?? 'N/A' }}</p>
-                                                        </div>
-                                                        <div>
-                                                            <label
-                                                                class="text-sm font-medium text-gray-500 dark:text-gray-400">Invested
-                                                                Amount</label>
-                                                            <p class="text-sm text-gray-900 dark:text-white">
-                                                                ${{ number_format($selectedUser->invested_amount, 2) }}
-                                                            </p>
-                                                        </div>
-                                                        <div>
-                                                            <label
-                                                                class="text-sm font-medium text-gray-500 dark:text-gray-400">Date
-                                                                Joined</label>
-                                                            <p class="text-sm text-gray-900 dark:text-white">
-                                                                {{ $selectedUser->date_joined->format('M j, Y') }}
-                                                            </p>
-                                                        </div>
-                                                        <div>
-                                                            <label
-                                                                class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                                                                Inviter</label>
-                                                            <p class="text-sm text-gray-900 dark:text-white">
-                                                                {{ $selectedUser->inviter->name }}
-                                                            </p>
-
-                                                            <small>{{ $selectedUser->inviters_code }}</small>
-                                                        </div>
-                                                        <div>
-                                                            <label
-                                                                class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</label>
-                                                            <p class="text-sm">
+                            <!-- Content -->
+                            <div class="flex-1 overflow-y-auto">
+                                <div class="px-6 py-4">
+                                    @if ($selectedUser)
+                                        <div class="space-y-6">
+                                            <!-- User Information -->
+                                            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                                <div class="flex items-center space-x-4 mb-4">
+                                                    <!-- Avatar in View Modal -->
+                                                    <div class="flex-shrink-0">
+                                                        @if ($selectedUser->getFirstMediaUrl('avatar'))
+                                                            <img class="h-16 w-16 rounded-full object-cover"
+                                                                src="{{ $selectedUser->getFirstMediaUrl('avatar') }}"
+                                                                alt="{{ $selectedUser->name }} avatar">
+                                                        @else
+                                                            <div
+                                                                class="h-16 w-16 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
                                                                 <span
-                                                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $selectedUser->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                                                    {{ $selectedUser->is_active ? 'Active' : 'Inactive' }}
+                                                                    class="text-gray-600 dark:text-gray-300 font-medium text-lg">
+                                                                    {{ strtoupper(substr($selectedUser->name, 0, 1)) }}
                                                                 </span>
-                                                            </p>
-                                                        </div>
-                                                        <div>
-                                                            <label
-                                                                class="text-sm font-medium text-gray-500 dark:text-gray-400">Roles</label>
-                                                            <div class="flex flex-wrap gap-1 mt-1">
-                                                                @foreach ($selectedUser->roles as $role)
-                                                                    <span
-                                                                        class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
-                                                                        {{ $role->name }}
-                                                                    </span>
-                                                                @endforeach
-                                                                @if ($selectedUser->roles->isEmpty())
-                                                                    <span
-                                                                        class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
-                                                                        No roles
-                                                                    </span>
-                                                                @endif
                                                             </div>
-                                                        </div>
+                                                        @endif
+                                                    </div>
+                                                    <div>
+                                                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                                                            {{ $selectedUser->name }}
+                                                        </h3>
+                                                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                            {{ $selectedUser->email }}
+                                                        </p>
+                                                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                            {{ $selectedUser->phone_number }}
+                                                        </p>
                                                     </div>
                                                 </div>
 
-                                                <!-- Withdrawals -->
-                                                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                                                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                                                        Withdrawal History
-                                                    </h3>
-                                                    <div class="overflow-x-auto">
-                                                        <table
-                                                            class="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-                                                            <thead class="bg-gray-100 dark:bg-gray-600">
+                                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    <div>
+                                                        <label
+                                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">Riscoin
+                                                            ID</label>
+                                                        <p class="text-sm text-gray-900 dark:text-white">
+                                                            {{ $selectedUser->riscoin_id ?? 'N/A' }}</p>
+                                                    </div>
+                                                    <div>
+                                                        <label
+                                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">Invested
+                                                            Amount</label>
+                                                        <p class="text-sm text-gray-900 dark:text-white">
+                                                            ${{ number_format($selectedUser->invested_amount, 2) }}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <label
+                                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">Date
+                                                            Joined</label>
+                                                        <p class="text-sm text-gray-900 dark:text-white">
+                                                            {{ $selectedUser->date_joined->format('M j, Y') }}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <label
+                                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                                            Inviter</label>
+                                                        <p class="text-sm text-gray-900 dark:text-white">
+                                                            {{ $selectedUser->inviter->name }}
+                                                        </p>
+
+                                                        <small>{{ $selectedUser->inviters_code }}</small>
+                                                    </div>
+                                                    <div>
+                                                        <label
+                                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</label>
+                                                        <p class="text-sm">
+                                                            <span
+                                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $selectedUser->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                                                {{ $selectedUser->is_active ? 'Active' : 'Inactive' }}
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <label
+                                                            class="text-sm font-medium text-gray-500 dark:text-gray-400">Roles</label>
+                                                        <div class="flex flex-wrap gap-1 mt-1">
+                                                            @foreach ($selectedUser->roles as $role)
+                                                                <span
+                                                                    class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
+                                                                    {{ $role->name }}
+                                                                </span>
+                                                            @endforeach
+                                                            @if ($selectedUser->roles->isEmpty())
+                                                                <span
+                                                                    class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                                                    No roles
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Withdrawals -->
+                                            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                                                    Withdrawal History
+                                                </h3>
+                                                <div class="overflow-x-auto">
+                                                    <table
+                                                        class="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                                                        <thead class="bg-gray-100 dark:bg-gray-600">
+                                                            <tr>
+                                                                <th
+                                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                                    Date</th>
+                                                                <th
+                                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                                    Amount</th>
+                                                                <th
+                                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                                    Status</th>
+                                                                <th
+                                                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                                                    Transaction ID</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody
+                                                            class="bg-white divide-y divide-gray-200 dark:bg-gray-700 dark:divide-gray-600">
+                                                            @forelse ($selectedUser->withdrawals ?? [] as $withdrawal)
                                                                 <tr>
-                                                                    <th
-                                                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                                        Date</th>
-                                                                    <th
-                                                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                                        Amount</th>
-                                                                    <th
-                                                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                                        Status</th>
-                                                                    <th
-                                                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                                                        Transaction ID</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody
-                                                                class="bg-white divide-y divide-gray-200 dark:bg-gray-700 dark:divide-gray-600">
-                                                                @forelse ($selectedUser->withdrawals ?? [] as $withdrawal)
-                                                                    <tr>
-                                                                        <td
-                                                                            class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                                                            {{ $withdrawal->created_at->format('M j, Y H:i') }}
-                                                                        </td>
-                                                                        <td
-                                                                            class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                                                            ${{ number_format($withdrawal->amount, 2) }}
-                                                                        </td>
-                                                                        <td class="px-6 py-4 whitespace-nowrap">
-                                                                            <span
-                                                                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                                                    <td
+                                                                        class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                                        {{ $withdrawal->created_at->format('M j, Y H:i') }}
+                                                                    </td>
+                                                                    <td
+                                                                        class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                                                        ${{ number_format($withdrawal->amount, 2) }}
+                                                                    </td>
+                                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                                        <span
+                                                                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                                                                 @if ($withdrawal->status === 'completed') bg-green-100 text-green-800
                                                                 @elseif($withdrawal->status === 'pending') bg-yellow-100 text-yellow-800
                                                                 @else bg-red-100 text-red-800 @endif">
-                                                                                {{ ucfirst($withdrawal->status) }}
-                                                                            </span>
-                                                                        </td>
-                                                                        <td
-                                                                            class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                                            {{ $withdrawal->transaction_id ?? 'N/A' }}
-                                                                        </td>
-                                                                    </tr>
-                                                                @empty
-                                                                    <tr>
-                                                                        <td colspan="4"
-                                                                            class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                                                                            No withdrawal history found
-                                                                        </td>
-                                                                    </tr>
-                                                                @endforelse
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
+                                                                            {{ ucfirst($withdrawal->status) }}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td
+                                                                        class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                                        {{ $withdrawal->transaction_id ?? 'N/A' }}
+                                                                    </td>
+                                                                </tr>
+                                                            @empty
+                                                                <tr>
+                                                                    <td colspan="4"
+                                                                        class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                                                                        No withdrawal history found
+                                                                    </td>
+                                                                </tr>
+                                                            @endforelse
+                                                        </tbody>
+                                                    </table>
                                                 </div>
+                                            </div>
 
-                                                <!-- Activity Logs -->
-                                                <div>
-                                                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                                                        Recent Activity Logs
-                                                    </h3>
+                                            <!-- Activity Logs -->
+                                            <div>
+                                                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                                                    Recent Activity Logs
+                                                </h3>
 
-                                                    @if ($activityLogs->count() > 0)
-                                                        <div class="space-y-3 max-h-96 overflow-y-auto">
-                                                            @foreach ($activityLogs as $log)
-                                                                <div
-                                                                    class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                                                                    <div class="flex justify-between items-start">
-                                                                        <div class="flex-1">
-                                                                            <p
-                                                                                class="text-sm font-medium text-gray-900 dark:text-white">
-                                                                                {{ $this->formatActivityDescription($log) }}
-                                                                            </p>
-                                                                            <p
-                                                                                class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                                                By:
-                                                                                {{ $log->causer->name ?? 'System' }} •
-                                                                                {{ $log->created_at->format('M j, Y g:i A') }}
-                                                                                •
-                                                                                Model:
-                                                                                {{ class_basename($log->subject_type) }}
-                                                                            </p>
+                                                @if ($activityLogs->count() > 0)
+                                                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                                                        @foreach ($activityLogs as $log)
+                                                            <div
+                                                                class="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                                                                <div class="flex justify-between items-start">
+                                                                    <div class="flex-1">
+                                                                        <p
+                                                                            class="text-sm font-medium text-gray-900 dark:text-white">
+                                                                            {{ $this->formatActivityDescription($log) }}
+                                                                        </p>
+                                                                        <p
+                                                                            class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                                            By:
+                                                                            {{ $log->causer->name ?? 'System' }} •
+                                                                            {{ $log->created_at->format('M j, Y g:i A') }}
+                                                                            •
+                                                                            Model:
+                                                                            {{ class_basename($log->subject_type) }}
+                                                                        </p>
 
-                                                                            @if ($log->description === 'updated')
-                                                                                @php $changedFields = $this->getChangedFields($log); @endphp
-                                                                                @if (count($changedFields) > 0)
-                                                                                    <div class="mt-2 text-xs">
-                                                                                        <p
-                                                                                            class="font-medium text-gray-700 dark:text-gray-300">
-                                                                                            Changes:</p>
-                                                                                        <ul class="mt-1 space-y-1">
-                                                                                            @foreach ($changedFields as $field => $changes)
-                                                                                                <li
-                                                                                                    class="text-gray-600 dark:text-gray-400">
-                                                                                                    <span
-                                                                                                        class="font-medium">{{ ucfirst(str_replace('_', ' ', $field)) }}:</span>
-                                                                                                    <span
-                                                                                                        class="line-through text-red-500">{{ $changes['from'] ?? 'Empty' }}</span>
-                                                                                                    →
-                                                                                                    <span
-                                                                                                        class="text-green-500">{{ $changes['to'] ?? 'Empty' }}</span>
-                                                                                                </li>
-                                                                                            @endforeach
-                                                                                        </ul>
-                                                                                    </div>
-                                                                                @endif
+                                                                        @if ($log->description === 'updated')
+                                                                            @php $changedFields = $this->getChangedFields($log); @endphp
+                                                                            @if (count($changedFields) > 0)
+                                                                                <div class="mt-2 text-xs">
+                                                                                    <p
+                                                                                        class="font-medium text-gray-700 dark:text-gray-300">
+                                                                                        Changes:</p>
+                                                                                    <ul class="mt-1 space-y-1">
+                                                                                        @foreach ($changedFields as $field => $changes)
+                                                                                            <li
+                                                                                                class="text-gray-600 dark:text-gray-400">
+                                                                                                <span
+                                                                                                    class="font-medium">{{ ucfirst(str_replace('_', ' ', $field)) }}:</span>
+                                                                                                <span
+                                                                                                    class="line-through text-red-500">{{ $changes['from'] ?? 'Empty' }}</span>
+                                                                                                →
+                                                                                                <span
+                                                                                                    class="text-green-500">{{ $changes['to'] ?? 'Empty' }}</span>
+                                                                                            </li>
+                                                                                        @endforeach
+                                                                                    </ul>
+                                                                                </div>
                                                                             @endif
-                                                                        </div>
+                                                                        @endif
                                                                     </div>
                                                                 </div>
-                                                            @endforeach
-                                                        </div>
-                                                    @else
-                                                        <div class="text-center py-8">
-                                                            <div class="text-gray-400 dark:text-gray-500 mb-4">
-                                                                <svg class="mx-auto h-12 w-12" fill="none"
-                                                                    viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path stroke-linecap="round"
-                                                                        stroke-linejoin="round" stroke-width="1.5"
-                                                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                                </svg>
                                                             </div>
-                                                            <h3
-                                                                class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                                                                No activity
-                                                                logs found</h3>
-                                                            <p class="text-gray-500 dark:text-gray-400">This user
-                                                                hasn't performed any
-                                                                activities yet.</p>
+                                                        @endforeach
+                                                    </div>
+                                                @else
+                                                    <div class="text-center py-8">
+                                                        <div class="text-gray-400 dark:text-gray-500 mb-4">
+                                                            <svg class="mx-auto h-12 w-12" fill="none"
+                                                                viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="1.5"
+                                                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                            </svg>
                                                         </div>
-                                                    @endif
-                                                </div>
+                                                        <h3
+                                                            class="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                                                            No activity
+                                                            logs found</h3>
+                                                        <p class="text-gray-500 dark:text-gray-400">This user
+                                                            hasn't performed any
+                                                            activities yet.</p>
+                                                    </div>
+                                                @endif
                                             </div>
+                                        </div>
 
-                                            <!-- Close Button -->
-                                            <div
-                                                class="flex justify-end pt-6 border-t border-gray-200 dark:border-gray-700">
-                                                <flux:button type="button" wire:click="closeViewModal">
-                                                    Close
-                                                </flux:button>
-                                            </div>
-                                        @endif
-                                    </div>
+                                        <!-- Close Button -->
+                                        <div
+                                            class="flex justify-end pt-6 border-t border-gray-200 dark:border-gray-700">
+                                            <flux:button type="button" wire:click="closeViewModal">
+                                                Close
+                                            </flux:button>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -1314,43 +1301,137 @@ Amount invested: $" .
             </div>
         </div>
     </div>
-    <script>
-        document.addEventListener('livewire:initialized', () => {
-            Livewire.on('copyToClipboard', async (event) => {
-                try {
-                    await navigator.clipboard.writeText(event.message);
-                    if (window.showToast) {
-                        window.showToast('Welcome message copied to clipboard!', 'success');
-                    } else {
-                        // Fallback for older browsers
-                        const textArea = document.createElement('textarea');
-                        textArea.value = event.message;
-                        document.body.appendChild(textArea);
-                        textArea.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(textArea);
-                        alert('Welcome message copied to clipboard!');
-                    }
-                } catch (err) {
-                    console.error('Failed to copy:', err);
-                    // Fallback copy method
+</div>
+<script>
+    (function(){
+        if (window.showToast) return;
+        const containerId = 'global-toast-container';
+        function ensureContainer(){
+            let c = document.getElementById(containerId);
+            if(!c){
+                c = document.createElement('div');
+                c.id = containerId;
+                c.style = 'position:fixed;top:1rem;right:1rem;display:flex;flex-direction:column;gap:0.5rem;z-index:99999;pointer-events:none';
+                document.body.appendChild(c);
+            }
+            return c;
+        }
+        window.showToast = function(message, type = 'success', duration = 3000){
+            const c = ensureContainer();
+            const toast = document.createElement('div');
+            toast.className = 'global-toast';
+            toast.style = 'pointer-events:auto;min-width:200px;max-width:360px;background:rgba(0,0,0,0.85);color:#fff;padding:12px 14px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;align-items:center;gap:10px;opacity:0;transform:translateX(12px);transition:opacity .18s ease,transform .18s ease';
+            const icon = document.createElement('div');
+            icon.innerHTML = type === 'success' ? '✓' : (type === 'error' ? '⚠' : 'ℹ');
+            icon.style = 'font-weight:700;font-size:14px';
+            const msg = document.createElement('div');
+            msg.style = 'flex:1;font-size:13px;line-height:1.2';
+            msg.textContent = message;
+            const close = document.createElement('button');
+            close.innerHTML = '✕';
+            close.style = 'background:none;border:none;color:inherit;font-size:12px;cursor:pointer';
+            close.onclick = () => { if (toast.parentNode) toast.parentNode.removeChild(toast); };
+            toast.appendChild(icon);
+            toast.appendChild(msg);
+            toast.appendChild(close);
+            c.appendChild(toast);
+            requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateX(0)'; });
+            let removed = false;
+            const timer = setTimeout(() => {
+                if (removed) return;
+                removed = true;
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(12px)';
+                setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 180);
+            }, duration);
+            toast.addEventListener('mouseenter', () => clearTimeout(timer));
+            toast.addEventListener('mouseleave', () => setTimeout(() => {
+                if (!removed) {
+                    removed = true;
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateX(12px)';
+                    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 180);
+                }
+            }, 500));
+        };
+    })();
+
+    document.addEventListener('livewire:initialized', () => {
+        Livewire.on('copyToClipboard', async (event) => {
+            try {
+                await navigator.clipboard.writeText(event.message);
+                if (window.showToast) {
+                    window.showToast('Welcome message copied to clipboard!', 'success');
+                } else {
+                    // Fallback for older browsers
                     const textArea = document.createElement('textarea');
                     textArea.value = event.message;
                     document.body.appendChild(textArea);
                     textArea.select();
-                    try {
-                        document.execCommand('copy');
-                        if (window.showToast) {
-                            window.showToast('Welcome message copied to clipboard!', 'success');
-                        } else {
-                            alert('Welcome message copied to clipboard!');
-                        }
-                    } catch (err) {
-                        alert('Failed to copy to clipboard. Please try again.');
-                    }
+                    document.execCommand('copy');
                     document.body.removeChild(textArea);
+                    alert('Welcome message copied to clipboard!');
                 }
-            });
+            } catch (err) {
+                console.error('Failed to copy:', err);
+                // Fallback copy method
+                const textArea = document.createElement('textarea');
+                textArea.value = event.message;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    if (window.showToast) {
+                        window.showToast('Welcome message copied to clipboard!', 'success');
+                    } else {
+                        alert('Welcome message copied to clipboard!');
+                    }
+                } catch (err) {
+                    alert('Failed to copy to clipboard. Please try again.');
+                }
+                document.body.removeChild(textArea);
+            }
         });
-    </script>
+    });
+
+    function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            // For modern browsers
+            navigator.clipboard.writeText(text).then(() => {
+                if (window.showToast) {
+                    window.showToast('Copied to clipboard!', 'success');
+                } else {
+                    alert('Copied to clipboard!');
+                }
+            }).catch(() => {
+                fallbackCopyToClipboard(text);
+            });
+        } else {
+            // Fallback for older browsers
+            fallbackCopyToClipboard(text);
+        }
+    }
+
+    function fallbackCopyToClipboard(text) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+
+        try {
+            document.execCommand('copy');
+            if (window.showToast) {
+                window.showToast('Copied to clipboard!', 'success');
+            } else {
+                alert('Copied to clipboard!');
+            }
+        } catch (err) {
+            alert('Failed to copy text to clipboard');
+        }
+
+        document.body.removeChild(textArea);
+    }
+</script>
 </div>

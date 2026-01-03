@@ -859,20 +859,23 @@ new class extends Component {
                                     <td
                                         class="sticky left-0 z-10 px-6 py-4 whitespace-nowrap
                                         {{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
-                                        <div class="flex-shrink-0 h-10 w-10 {{ $teamLevel > 1 ? 'ml-4' : '' }}">
-                                            @if ($user->getFirstMediaUrl('avatar'))
-                                                <img class="h-10 w-10 rounded-full object-cover"
-                                                    src="{{ $user->getFirstMediaUrl('avatar') }}"
-                                                    alt="{{ $user->name }} avatar">
-                                            @else
-                                                <div
-                                                    class="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                                                    <span class="text-gray-600 dark:text-gray-300 font-medium text-sm">
-                                                        {{ strtoupper(substr($user->name, 0, 1)) }}
-                                                    </span>
-                                                </div>
-                                            @endif
-                                        </div>
+                                        <a href="{{ route('genealogy.show', $user->riscoin_id) }}">
+                                            <div class="flex-shrink-0 h-10 w-10 {{ $teamLevel > 1 ? 'ml-4' : '' }}">
+                                                @if ($user->getFirstMediaUrl('avatar'))
+                                                    <img class="h-10 w-10 rounded-full object-cover"
+                                                        src="{{ $user->getFirstMediaUrl('avatar') }}"
+                                                        alt="{{ $user->name }} avatar">
+                                                @else
+                                                    <div
+                                                        class="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                                                        <span
+                                                            class="text-gray-600 dark:text-gray-300 font-medium text-sm">
+                                                            {{ strtoupper(substr($user->name, 0, 1)) }}
+                                                        </span>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </a>
                                     </td>
                                     <td
                                         class="md:sticky left-0 z-10 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white
