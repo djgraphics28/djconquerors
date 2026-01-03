@@ -785,6 +785,22 @@ Amount invested: $" .
                                 </svg>
                             </flux:button>
                         @endcan
+
+                        @can('users.impersonate')
+                            <flux:button onclick="window.open('{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('impersonate.login', now()->addMinutes(5), ['user' => $user->id]) }}', '_blank')" variant="ghost" size="sm" class="bg-yellow-500 text-white hover:bg-yellow-600" title="Impersonate User">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </flux:button>
+                        @endcan
+
+                        @can('users.impersonate')
+                            <flux:button onclick="downloadIncognitoHelper('{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('impersonate.login', now()->addMinutes(5), ['user' => $user->id]) }}','{{ $user->riscoin_id ?? $user->id }}')" variant="ghost" size="sm" class="bg-yellow-600 text-white hover:bg-yellow-700" title="Download Incognito Helper">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            </flux:button>
+                        @endcan
+
                         @can('users.delete')
                             @if (method_exists($user, 'trashed') && $user->trashed())
                                 <flux:button wire:click="restore({{ $user->id }})" variant="ghost" size="sm"
@@ -1432,6 +1448,37 @@ Amount invested: $" .
         }
 
         document.body.removeChild(textArea);
+    }
+
+    // Generate and download helper scripts to open impersonation URL in Incognito
+    function downloadFile(filename, content){
+        const blob = new Blob([content], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+    }
+
+    function downloadIncognitoHelper(url, id){
+        try{
+            const timestamp = new Date().toISOString().replace(/[:.]/g,'-');
+            // macOS helper (uses open)
+            const mac = `#!/bin/bash\n# macOS: Open Google Chrome in incognito with the impersonation URL\nopen -a "Google Chrome" --args --incognito "${url}"\n`;
+            const linux = `#!/bin/bash\n# Linux: Open Google Chrome in incognito with the impersonation URL\ngoogle-chrome --incognito "${url}" || google-chrome-stable --incognito "${url}" || chromium-browser --incognito "${url}"\n`;
+            const win = `# PowerShell script to open Chrome in incognito with the impersonation URL\nStart-Process "chrome" -ArgumentList '--incognito','"${url}"'\n`;
+
+            downloadFile(`impersonate-${id}-mac-${timestamp}.sh`, mac);
+            downloadFile(`impersonate-${id}-linux-${timestamp}.sh`, linux);
+            downloadFile(`impersonate-${id}-windows-${timestamp}.ps1`, win);
+
+            if(window.showToast) window.showToast('Incognito helper scripts downloaded', 'success'); else alert('Downloaded helper scripts');
+        }catch(e){
+            console.error(e);
+            if(window.showToast) window.showToast('Failed to create helper files', 'error'); else alert('Failed to create helper files');
+        }
     }
 </script>
 </div>
