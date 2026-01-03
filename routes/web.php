@@ -4,6 +4,7 @@ use Livewire\Volt\Volt;
 use Laravel\Fortify\Features;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
+use App\Http\Controllers\ImpersonationController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -24,6 +25,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('appointments', 'appointments.index')->name('appointments.index');
 
     Volt::route('users', 'users.index')->name('users.index');
+
+    // Impersonation: generate a temporary signed URL that logs in as the specified user when opened
+    Route::get('impersonate/login/{user}', [ImpersonationController::class, 'loginAs'])->name('impersonate.login')->middleware('signed');
+    // Endpoint to stop impersonation (requires auth)
+    Route::post('impersonate/stop', [ImpersonationController::class, 'stop'])->name('impersonate.stop')->middleware('auth');
 
     Volt::route('roles', 'roles.index')->name('roles.index');
 

@@ -34,6 +34,7 @@ class RolesPermissionSeeder extends Seeder
             'users.cop-welcome-message',
             'users.verify-email',
             'users.promote',
+            'users.impersonate',
 
             //Roles
             'roles.view',
