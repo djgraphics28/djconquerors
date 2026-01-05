@@ -13,7 +13,9 @@ new class extends Component {
     public $assistantUserId = null;
     public $assistantTargetUserId = null;
     public $assistantTargetUser = null;
-    public $assistants = [];
+    public $assistants;
+    public $assistantsPage = 1;
+    public $assistantsPerPage = 10;
 
     public function mount()
     {
@@ -24,6 +26,9 @@ new class extends Component {
             ->latest()
             ->take(5)
             ->get();
+
+        // initialize assistants collection for lazy loading
+        $this->assistants = collect();
     }
 
     public function loadAssistants()
@@ -34,7 +39,30 @@ new class extends Component {
         if ($this->assistantTargetUserId) {
             $query->where('id', '!=', $this->assistantTargetUserId);
         }
-        $this->assistants = $query->get();
+
+        // If user is searching, return a limited search result (no pagination)
+        if (trim($this->assistantSearch) !== '') {
+            $search = trim($this->assistantSearch);
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('riscoin_id', 'like', "%{$search}%");
+            });
+
+            $this->assistants = $query->limit(50)->get();
+            $this->assistantsPage = 1;
+            return;
+        }
+
+        // Load by pages to avoid loading everything at once
+        $offset = ($this->assistantsPage - 1) * $this->assistantsPerPage;
+        $results = $query->skip($offset)->take($this->assistantsPerPage)->get();
+
+        if ($this->assistantsPage === 1) {
+            $this->assistants = $results;
+        } else {
+            $this->assistants = $this->assistants->concat($results);
+        }
     }
 
     public function addAssistant($userId)
@@ -43,7 +71,12 @@ new class extends Component {
         $this->assistantTargetUser = User::find($userId);
         $this->assistantUserId = $this->assistantTargetUser->assistant_id ?? null;
         $this->assistantSearch = '';
+
+        // reset pagination and load first page
+        $this->assistantsPage = 1;
+        $this->assistants = collect();
         $this->loadAssistants();
+
         $this->showAssistantModal = true;
     }
 
@@ -111,6 +144,15 @@ new class extends Component {
             return Str::contains(strtolower($u->name ?? ''), $search) || Str::contains(strtolower($u->email ?? ''), $search) || Str::contains(strtolower($u->riscoin_id ?? ''), $search);
         });
     }
+
+    // Called when assistantSearch is updated from frontend
+    public function updatedAssistantSearch()
+    {
+        $this->assistantsPage = 1;
+        $this->loadAssistants();
+    }
+
+
 
     public function closeAssistantModal()
     {
@@ -325,6 +367,8 @@ new class extends Component {
                                         @endforeach
                                     </div>
 
+
+
                                     @if (session()->has('message'))
                                         <div
                                             class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
@@ -336,7 +380,7 @@ new class extends Component {
                                             {{ session('error') }}</div>
                                     @endif
 
-                                    <div class="mt-4">
+                                    {{-- <div class="mt-4">
                                         <label
                                             class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Apply
                                             Reward Message to Sir Martin</label>
@@ -347,7 +391,7 @@ new class extends Component {
                                                 onclick="(async function(){const t=document.getElementById('assistantSample').value; try{if(navigator.clipboard && navigator.clipboard.writeText){await navigator.clipboard.writeText(t);} else {const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();} showToast('Copied to clipboard');}catch(e){try{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();showToast('Copied to clipboard');}catch(err){showToast('Copy failed', 'error');}}})()"
                                                 class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Copy</button>
                                         </div>
-                                    </div>
+                                    </div> --}}
 
                                 </div>
 
