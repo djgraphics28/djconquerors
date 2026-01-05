@@ -28,7 +28,9 @@ new class extends Component {
 
     public function loadAssistants()
     {
-        $query = User::where('is_active', true)->where('id', '!=', auth()->id())->where('id', '!=', 1);
+        $query = User::where('is_active', true)
+            ->where('id', '!=', auth()->id())
+            ->where('id', '!=', 1);
         if ($this->assistantTargetUserId) {
             $query->where('id', '!=', $this->assistantTargetUserId);
         }
@@ -145,7 +147,8 @@ new class extends Component {
                         @else
                             <div
                                 class="h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
-                                <span class="text-base font-semibold text-white">{{ strtoupper(substr($invite->name, 0, 2)) }}</span>
+                                <span
+                                    class="text-base font-semibold text-white">{{ strtoupper(substr($invite->name, 0, 2)) }}</span>
                             </div>
                         @endif
                         <div>
@@ -175,25 +178,25 @@ new class extends Component {
                     <div>
                         <span class="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             Assister</span>
-                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $invite->assistant?->name ?? 'NOT YET ASSIGNED' }}</p>
+                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {{ $invite->assistant?->name ?? 'NOT YET ASSIGNED' }}</p>
                     </div>
                 </div>
 
                 <div class="mt-4 flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0 rtl:space-x-reverse">
-                    <flux:button wire:click="addAssistant({{ $invite->id }})"
+                    <button wire:click="addAssistant({{ $invite->id }})"
                         class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium">
                         Enter Assistant
-                    </flux:button>
-                    <flux:button
-                        class="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors duration-200 text-sm font-medium"
-                        onclick="(function(){const inviter='{{ addslashes(auth()->user()->riscoin_id ?? 'N/A') }}';const depositor='{{ addslashes($invite->riscoin_id ?? 'N/A') }}';const investor='{{ addslashes($invite->name) }}';const assister='{{ addslashes($invite->assistant?->riscoin_id ?? 'N/A') }}';const msg=`Hi Sir Martin\nHere is my application reward request from my investor, ${investor}\n\nInviter's Riscoin Account : ${inviter}\n\nDepositor's Riscoin Account : ${depositor}\n\nAssister's Riscoin Account: ${assister}\n\n`; try{if(navigator.clipboard && navigator.clipboard.writeText){navigator.clipboard.writeText(msg);} else {const ta=document.createElement('textarea');ta.value=msg;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();} showToast('Application reward message copied');}catch(e){showToast('Copy failed', 'error');}})()">
-                        <span class="inline-flex items-center space-x-2"><svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg><span>Copy Application Reward Message</span></span>
-                    </flux:button>
-
-                    <flux:button type="button" class="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
-                        onclick="copyWelcomeMessage({{ json_encode(['name' => $invite->name, 'joined' => $invite->date_joined->format('M j, Y'), 'amount' => number_format($invite->invested_amount,2)]) }})">
-                        <span class="inline-flex items-center space-x-2"><svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>Copy Welcome Message</span></span>
-                    </flux:button>
+                    </button>
+                    <button type="button"
+                        class="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
+                        onclick="copyWelcomeMessage({{ json_encode(['name' => $invite->name, 'joined' => $invite->date_joined->format('M j, Y'), 'amount' => number_format($invite->invested_amount, 2)]) }})">
+                        <span class="inline-flex items-center space-x-2"><svg class="w-4 h-4 text-white" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7" />
+                            </svg><span>Copy Welcome Message</span></span>
+                    </button>
                 </div>
             </div>
         @empty
@@ -202,74 +205,120 @@ new class extends Component {
             </div>
         @endforelse
 
-    <script>
-        function showToast(message, type = 'success'){
-            const color = type === 'success' ? 'bg-green-500' : 'bg-red-500';
-            const toast = document.createElement('div');
-            toast.className = `fixed bottom-4 left-1/2 transform -translate-x-1/2 ${color} text-white px-4 py-2 rounded-lg shadow-lg z-50`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 2500);
-        }
-    </script>
-
-    <script>
-        function copyWelcomeMessage(payload){
-            const { name, joined, amount } = payload;
-            const message = `🌟 Welcome to DJ Conquerors!\nWe're thrilled to have you join our community of dedicated investors. Together we'll achieve great things!\nWith gratitude,\nDJ Conquerors Team\n\n🎊 Welcome ${name}!\nJoined: ${joined}\nAmount invested: $${amount} USDT`;
-
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(message).then(() => showToast('Welcome message copied'), () => showToast('Copy failed', 'error'));
-                return;
+        <script>
+            function showToast(message, type = 'success') {
+                const color = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+                const toast = document.createElement('div');
+                toast.className =
+                    `fixed bottom-4 left-1/2 transform -translate-x-1/2 ${color} text-white px-4 py-2 rounded-lg shadow-lg z-50`;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2500);
             }
+        </script>
 
-            try{
-                const ta = document.createElement('textarea'); ta.value = message; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); showToast('Welcome message copied');
-            }catch(e){ showToast('Copy failed', 'error'); }
-        }
-    </script>
+        <script>
+            function copyWelcomeMessage(payload) {
+                const {
+                    name,
+                    joined,
+                    amount
+                } = payload;
+                const message =
+                    `🌟 Welcome to DJ Conquerors!\nWe're thrilled to have you join our community of dedicated investors. Together we'll achieve great things!\nWith gratitude,\nDJ Conquerors Team\n\n🎊 Welcome ${name}!\nJoined: ${joined}\nAmount invested: $${amount} USDT`;
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(message).then(() => showToast('Welcome message copied'), () => showToast(
+                        'Copy failed', 'error'));
+                    return;
+                }
+
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = message;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    ta.remove();
+                    showToast('Welcome message copied');
+                } catch (e) {
+                    showToast('Copy failed', 'error');
+                }
+            }
+        </script>
 
         <!-- Add Assistant User Modal - Right Side Panel -->
-        <div x-data="{ open: @entangle('showAssistantModal') }" x-show="open" x-on:keydown.escape.window="open = false" class="fixed inset-0 z-50 overflow-hidden" style="display: none;">
-            <div x-show="open" x-transition:enter="ease-in-out duration-500" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in-out duration-500" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="absolute inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 transition-opacity" x-on:click="open = false"></div>
+        <div x-data="{ open: @entangle('showAssistantModal') }" x-show="open" x-on:keydown.escape.window="open = false"
+            class="fixed inset-0 z-50 overflow-hidden" style="display: none;">
+            <div x-show="open" x-transition:enter="ease-in-out duration-500" x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100" x-transition:leave="ease-in-out duration-500"
+                x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                class="absolute inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 transition-opacity"
+                x-on:click="open = false"></div>
 
             <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
-                <div x-show="open" x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full" class="w-screen max-w-2xl">
+                <div x-show="open" x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
+                    x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+                    x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700"
+                    x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+                    class="w-screen max-w-2xl">
                     <div class="h-full flex flex-col bg-white dark:bg-gray-800 shadow-xl">
-                        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <div
+                            class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Add Assistant User</h2>
-                            <div class="text-sm text-gray-500">Target: {{ $this->assistantTargetUser ? $this->assistantTargetUser->name : 'None' }}</div>
-                            <button wire:click="closeAssistantModal" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
-                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            <div class="text-sm text-gray-500">Target:
+                                {{ $this->assistantTargetUser ? $this->assistantTargetUser->name : 'None' }}</div>
+                            <button wire:click="closeAssistantModal"
+                                class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </button>
                         </div>
 
                         <div class="flex-1 overflow-y-auto">
                             <div class="px-6 py-4">
                                 <div class="w-full">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ __('Search & Select Assistant') }}</label>
+                                    <label
+                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ __('Search & Select Assistant') }}</label>
 
-                                    <input type="text" wire:model.live="assistantSearch" placeholder="Search users by name, email or riscoin id" class="mt-1 block w-full pl-3 pr-3 py-2 text-base border-2 border-indigo-300 dark:border-indigo-600 dark:bg-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" />
+                                    <input type="text" wire:model.live="assistantSearch"
+                                        placeholder="Search users by name, email or riscoin id"
+                                        class="mt-1 block w-full pl-3 pr-3 py-2 text-base border-2 border-indigo-300 dark:border-indigo-600 dark:bg-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" />
 
                                     <div class="mt-3 grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
                                         @foreach ($this->filteredAssistants as $a)
-                                            <button type="button" wire:click="selectAssistant({{ $a->id }})" class="w-full flex items-center space-x-3 px-3 py-2 rounded-md text-left border border-transparent hover:bg-gray-50 dark:hover:bg-gray-700 {{ $assistantUserId == $a->id ? 'bg-indigo-700 dark:bg-indigo-700' : '' }}">
+                                            <button type="button" wire:click="selectAssistant({{ $a->id }})"
+                                                class="w-full flex items-center space-x-3 px-3 py-2 rounded-md text-left border border-transparent hover:bg-gray-50 dark:hover:bg-gray-700 {{ $assistantUserId == $a->id ? 'bg-indigo-700 dark:bg-indigo-700' : '' }}">
                                                 <div class="flex-shrink-0 h-8 w-8">
                                                     @if ($a->getFirstMediaUrl('avatar'))
-                                                        <img class="h-8 w-8 rounded-full object-cover" src="{{ $a->getFirstMediaUrl('avatar') }}" alt="{{ $a->name }}">
+                                                        <img class="h-8 w-8 rounded-full object-cover"
+                                                            src="{{ $a->getFirstMediaUrl('avatar') }}"
+                                                            alt="{{ $a->name }}">
                                                     @else
-                                                        <div class="h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center {{ $assistantUserId == $a->id ? 'ring-2 ring-indigo-300 dark:ring-indigo-500' : '' }}">
-                                                            <span class="text-xs font-medium {{ $assistantUserId == $a->id ? 'text-white' : 'text-gray-700 dark:text-gray-300' }}">{{ strtoupper(substr($a->name, 0, 1)) }}</span>
+                                                        <div
+                                                            class="h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center {{ $assistantUserId == $a->id ? 'ring-2 ring-indigo-300 dark:ring-indigo-500' : '' }}">
+                                                            <span
+                                                                class="text-xs font-medium {{ $assistantUserId == $a->id ? 'text-white' : 'text-gray-700 dark:text-gray-300' }}">{{ strtoupper(substr($a->name, 0, 1)) }}</span>
                                                         </div>
                                                     @endif
                                                 </div>
                                                 <div class="flex-1">
-                                                    <div class="text-sm font-medium {{ $assistantUserId == $a->id ? 'text-white' : 'text-gray-900 dark:text-white' }}">{{ $a->name }}</div>
-                                                    <div class="text-xs {{ $assistantUserId == $a->id ? 'text-indigo-100' : 'text-gray-500 dark:text-gray-400' }}">{{ $a->email }} 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 {{ $a->riscoin_id }}</div>
+                                                    <div
+                                                        class="text-sm font-medium {{ $assistantUserId == $a->id ? 'text-white' : 'text-gray-900 dark:text-white' }}">
+                                                        {{ $a->name }}</div>
+                                                    <div
+                                                        class="text-xs {{ $assistantUserId == $a->id ? 'text-indigo-100' : 'text-gray-500 dark:text-gray-400' }}">
+                                                        {{ $a->email }} {{ $a->riscoin_id }}</div>
                                                 </div>
                                                 <div>
                                                     @if ($assistantUserId == $a->id)
-                                                        <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                                        <svg class="h-5 w-5 text-green-600" fill="none"
+                                                            stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2" d="M5 13l4 4L19 7" />
+                                                        </svg>
                                                     @endif
                                                 </div>
                                             </button>
@@ -277,27 +326,41 @@ new class extends Component {
                                     </div>
 
                                     @if (session()->has('message'))
-                                        <div class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">{{ session('message') }}</div>
+                                        <div
+                                            class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+                                            {{ session('message') }}</div>
                                     @endif
 
                                     @if (session()->has('error'))
-                                        <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">{{ session('error') }}</div>
+                                        <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                                            {{ session('error') }}</div>
                                     @endif
 
                                     <div class="mt-4">
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Apply Reward Message to Sir Martin</label>
-                                        <textarea readonly rows="6" class="w-full p-3 border rounded-md bg-gray-50 dark:bg-gray-700 text-sm" id="assistantSample">{{ $this->assistantSampleText }}</textarea>
+                                        <label
+                                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Apply
+                                            Reward Message to Sir Martin</label>
+                                        <textarea readonly rows="6" class="w-full p-3 border rounded-md bg-gray-50 dark:bg-gray-700 text-sm"
+                                            id="assistantSample">{{ $this->assistantSampleText }}</textarea>
                                         <div class="mt-2 flex justify-end">
-                                            <button type="button" onclick="(async function(){const t=document.getElementById('assistantSample').value; try{if(navigator.clipboard && navigator.clipboard.writeText){await navigator.clipboard.writeText(t);} else {const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();} showToast('Copied to clipboard');}catch(e){try{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();showToast('Copied to clipboard');}catch(err){showToast('Copy failed', 'error');}}})()" class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Copy</button>
+                                            <button type="button"
+                                                onclick="(async function(){const t=document.getElementById('assistantSample').value; try{if(navigator.clipboard && navigator.clipboard.writeText){await navigator.clipboard.writeText(t);} else {const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();} showToast('Copied to clipboard');}catch(e){try{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();showToast('Copied to clipboard');}catch(err){showToast('Copy failed', 'error');}}})()"
+                                                class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Copy</button>
                                         </div>
                                     </div>
 
                                 </div>
 
-                                <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
-                                    <button type="button" wire:click="closeAssistantModal" class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Cancel</button>
-                                    <button type="button" wire:click="deselectAssistant" class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">Remove Assistant</button>
-                                    <button type="submit" wire:click="addAssistantUser" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Save Assistant</button>
+                                <div
+                                    class="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700 mt-6">
+                                    <button type="button" wire:click="closeAssistantModal"
+                                        class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Cancel</button>
+                                    <button type="button" wire:click="deselectAssistant"
+                                        class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">Remove
+                                        Assistant</button>
+                                    <button type="submit" wire:click="addAssistantUser"
+                                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Save
+                                        Assistant</button>
                                 </div>
                             </div>
                         </div>
