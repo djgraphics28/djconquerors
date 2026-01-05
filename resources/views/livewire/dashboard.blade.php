@@ -28,6 +28,7 @@ new class extends Component {
                     'invites' => function ($query) {
                         $query->withCount('invites');
                     },
+                    'assistant'
                 ])
                 ->firstOrFail();
         } else {
