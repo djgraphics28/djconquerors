@@ -36,7 +36,7 @@ new class extends Component {
 
         $this->name = $user->name;
         $this->email = $user->email;
-        $this->bonchat_id = $user->bonchat_id;
+        $this->bonchat_id = $user->bonchat_id ?? '';
         $this->riscoin_id = $user->riscoin_id;
         $this->inviters_code = $user->inviters_code;
         $this->invested_amount = $user->invested_amount;
