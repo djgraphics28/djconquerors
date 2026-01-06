@@ -12,7 +12,7 @@ new class extends Component {
 
     public string $name = '';
     public string $email = '';
-    public string $bonchat_id = '';
+    public $bonchat_id = '';
     public $riscoin_id = '';
     public $inviters_code = '';
     public $invested_amount = '';
