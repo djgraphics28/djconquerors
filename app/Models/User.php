@@ -39,6 +39,7 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     protected $fillable = [
         'name',
         'email',
+        'bonchat_id',
         'password',
         'riscoin_id',
         'inviters_code',
