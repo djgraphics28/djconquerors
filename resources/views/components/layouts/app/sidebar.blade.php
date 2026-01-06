@@ -65,7 +65,7 @@
                         wire:navigate>{{ __('Dashboard') }}</flux:navlist.item>
                 @endcan
                 @can('genealogy.view')
-                    <flux:navlist.item icon="users" :href="route('genealogy')" :current="request()->routeIs('genealogy')"
+                    <flux:navlist.item icon="users" :href="route('genealogy')" :current="request()->routeIs('genealogy*')"
                         wire:navigate>{{ __('Genealogy') }}</flux:navlist.item>
                 @endcan
                 @can('my-team.access')

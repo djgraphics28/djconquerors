@@ -882,27 +882,41 @@ new class extends Component {
                                         {{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
                                         {{ $user->name }}
                                         <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            <span>Riscoin ID: <span
+                                                    onclick="copyToClipboard('{{ $user->riscoin_id }}')"
+                                                    class="border-b border-radius font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->riscoin_id ?? 'N/A' }}</span></span>
+                                        </div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            <span>Bonchat ID: <span
+                                                    onclick="copyToClipboard('{{ $user->bonchat_id }}')"
+                                                    class="border-b border-radius font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->bonchat_id ?? 'N/A' }}</span></span>
+                                        </div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
                                             <small>Last Logged In: {{ $user->last_login }}</small>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        @if ($user->inviter)
-                                            <div>{{ $user->inviter->name }}</div>
-                                            <div><small>({{ $user->inviter->riscoin_id }})</small></div>
-                                        @else
-                                            N/A
-                                        @endif
+                                        {{ $user->inviter->name }}
+                                        <div class="text-sm text-gray-400">
+                                            <span>Riscoin ID: <span
+                                                    onclick="copyToClipboard('{{ $user->inviter->riscoin_id }}')"
+                                                    class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->inviter->riscoin_id ?? 'N/A' }}</span></span>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         @if ($user->assistant)
-                                            <div>{{ $user->assistant->name }}</div>
-                                            <div><small>({{ $user->assistant->riscoin_id }})</small></div>
+                                            {{ $user->assistant->name ?? 'N/A' }}
+                                            <div class="text-sm text-gray-400">
+                                                <span>Riscoin ID: <span
+                                                        onclick="copyToClipboard('{{ $user->assistant?->riscoin_id }}')"
+                                                        class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->assistant?->riscoin_id ?? 'N/A' }}</span></span>
+                                            </div>
                                         @else
-                                            N/A
+                                            <span class="text-gray-400">No Assistant</span>
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->email }}
+                                       <span onclick="copyToClipboard('{{ $user->email }}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->email }}</span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         ${{ number_format($user->invested_amount, 2) }}
@@ -1674,4 +1688,149 @@ new class extends Component {
                 </div>
             </div>
         </div>
+
+        <script>
+            (function() {
+                if (window.showToast) return;
+                const containerId = 'global-toast-container';
+
+                function ensureContainer() {
+                    let c = document.getElementById(containerId);
+                    if (!c) {
+                        c = document.createElement('div');
+                        c.id = containerId;
+                        c.style =
+                            'position:fixed;top:1rem;right:1rem;display:flex;flex-direction:column;gap:0.5rem;z-index:99999;pointer-events:none';
+                        document.body.appendChild(c);
+                    }
+                    return c;
+                }
+                window.showToast = function(message, type = 'success', duration = 3000) {
+                    const c = ensureContainer();
+                    const toast = document.createElement('div');
+                    toast.className = 'global-toast';
+                    toast.style =
+                        'pointer-events:auto;min-width:200px;max-width:360px;background:rgba(0,0,0,0.85);color:#fff;padding:12px 14px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;align-items:center;gap:10px;opacity:0;transform:translateX(12px);transition:opacity .18s ease,transform .18s ease';
+                    const icon = document.createElement('div');
+                    icon.innerHTML = type === 'success' ? '✓' : (type === 'error' ? '⚠' : 'ℹ');
+                    icon.style = 'font-weight:700;font-size:14px';
+                    const msg = document.createElement('div');
+                    msg.style = 'flex:1;font-size:13px;line-height:1.2';
+                    msg.textContent = message;
+                    const close = document.createElement('button');
+                    close.innerHTML = '✕';
+                    close.style = 'background:none;border:none;color:inherit;font-size:12px;cursor:pointer';
+                    close.onclick = () => {
+                        if (toast.parentNode) toast.parentNode.removeChild(toast);
+                    };
+                    toast.appendChild(icon);
+                    toast.appendChild(msg);
+                    toast.appendChild(close);
+                    c.appendChild(toast);
+                    requestAnimationFrame(() => {
+                        toast.style.opacity = '1';
+                        toast.style.transform = 'translateX(0)';
+                    });
+                    let removed = false;
+                    const timer = setTimeout(() => {
+                        if (removed) return;
+                        removed = true;
+                        toast.style.opacity = '0';
+                        toast.style.transform = 'translateX(12px)';
+                        setTimeout(() => {
+                            if (toast.parentNode) toast.parentNode.removeChild(toast);
+                        }, 180);
+                    }, duration);
+                    toast.addEventListener('mouseenter', () => clearTimeout(timer));
+                    toast.addEventListener('mouseleave', () => setTimeout(() => {
+                        if (!removed) {
+                            removed = true;
+                            toast.style.opacity = '0';
+                            toast.style.transform = 'translateX(12px)';
+                            setTimeout(() => {
+                                if (toast.parentNode) toast.parentNode.removeChild(toast);
+                            }, 180);
+                        }
+                    }, 500));
+                };
+            })();
+
+            document.addEventListener('livewire:initialized', () => {
+                Livewire.on('copyToClipboard', async (event) => {
+                    try {
+                        await navigator.clipboard.writeText(event.message);
+                        if (window.showToast) {
+                            window.showToast('Welcome message copied to clipboard!', 'success');
+                        } else {
+                            // Fallback for older browsers
+                            const textArea = document.createElement('textarea');
+                            textArea.value = event.message;
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                            alert('Welcome message copied to clipboard!');
+                        }
+                    } catch (err) {
+                        console.error('Failed to copy:', err);
+                        // Fallback copy method
+                        const textArea = document.createElement('textarea');
+                        textArea.value = event.message;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        try {
+                            document.execCommand('copy');
+                            if (window.showToast) {
+                                window.showToast('Welcome message copied to clipboard!', 'success');
+                            } else {
+                                alert('Welcome message copied to clipboard!');
+                            }
+                        } catch (err) {
+                            alert('Failed to copy to clipboard. Please try again.');
+                        }
+                        document.body.removeChild(textArea);
+                    }
+                });
+            });
+
+            function copyToClipboard(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    // For modern browsers
+                    navigator.clipboard.writeText(text).then(() => {
+                        if (window.showToast) {
+                            window.showToast('Copied to clipboard!', 'success');
+                        } else {
+                            alert('Copied to clipboard!');
+                        }
+                    }).catch(() => {
+                        fallbackCopyToClipboard(text);
+                    });
+                } else {
+                    // Fallback for older browsers
+                    fallbackCopyToClipboard(text);
+                }
+            }
+
+            function fallbackCopyToClipboard(text) {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.select();
+
+                try {
+                    document.execCommand('copy');
+                    if (window.showToast) {
+                        window.showToast('Copied to clipboard!', 'success');
+                    } else {
+                        alert('Copied to clipboard!');
+                    }
+                } catch (err) {
+                    alert('Failed to copy text to clipboard');
+                }
+
+                document.body.removeChild(textArea);
+            }
+        </script>
     </div>

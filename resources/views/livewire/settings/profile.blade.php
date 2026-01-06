@@ -12,6 +12,7 @@ new class extends Component {
 
     public string $name = '';
     public string $email = '';
+    public string $bonchat_id = '';
     public $riscoin_id = '';
     public $inviters_code = '';
     public $invested_amount = '';
@@ -35,6 +36,7 @@ new class extends Component {
 
         $this->name = $user->name;
         $this->email = $user->email;
+        $this->bonchat_id = $user->bonchat_id;
         $this->riscoin_id = $user->riscoin_id;
         $this->inviters_code = $user->inviters_code;
         $this->invested_amount = $user->invested_amount;
@@ -84,6 +86,7 @@ new class extends Component {
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class)->ignore($user->id)],
+            'bonchat_id' => ['nullable', 'string', 'max:255'],
             'phone_number' => ['required', 'string', 'max:20'],
             'birth_date' => ['required', 'date'],
             'date_joined' => ['required', 'date'],
@@ -311,6 +314,7 @@ new class extends Component {
                     </div>
                 @endif
             </div>
+            <flux:input wire:model="bonchat_id" :label="__('Bonchat ID')" type="text" :placeholder="__('Bonchat ID')" />
 
             <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')" type="text" disabled />
             <flux:input wire:model="inviters_code" :label="__('Inviters Code')" type="text" disabled />
