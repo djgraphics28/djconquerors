@@ -1,8 +1,10 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Laravel\Fortify\Features;
 use Livewire\Volt\Volt;
+use Laravel\Fortify\Features;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Artisan;
+use App\Http\Controllers\ImpersonationController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -24,6 +26,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Volt::route('users', 'users.index')->name('users.index');
 
+    // Impersonation: generate a temporary signed URL that logs in as the specified user when opened
+    Route::get('impersonate/login/{user}', [ImpersonationController::class, 'loginAs'])->name('impersonate.login')->middleware('signed');
+    // Endpoint to stop impersonation (requires auth)
+    Route::post('impersonate/stop', [ImpersonationController::class, 'stop'])->name('impersonate.stop')->middleware('auth');
+
     Volt::route('roles', 'roles.index')->name('roles.index');
 
     Volt::route('tutorials', 'tutorials.index')->name('tutorials.index');
@@ -35,6 +42,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Volt::route('guide-access', 'guide.access')->name('guide.access');
     Volt::route('guide-access/{class}', 'guide.show')->name('guide.show');
+    Volt::route('guide-options', 'guide.option-lists')->name('guide.options');
 
     Volt::route('activity-logs', 'activity-logs')->name('activity-logs');
 
@@ -52,6 +60,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Compound Interest Calculator
     Volt::route('compound-calculator', 'compound-interest-calculator')->name('compound-calculator');
 
+    // Export endpoint for compound calculator
+    Route::match(['GET','POST'], 'compound-calculator/export', [\App\Http\Controllers\CompoundCalculatorExportController::class, 'export'])->name('compound-calculator.export');
+
+    Volt::route('/manage-opalite','opalite.manage')->name('opalite.manage');
+    Volt::route('/opalite-winners','opalite.index')->name('opalite.index');
+
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(
             when(
@@ -62,6 +76,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ),
         )
         ->name('two-factor.show');
+
+        Route::get('clear-cache', function() {
+            Artisan::call('optimize:clear');
+            return "Cache Cleared!";
+        });
+});
+
+
+Route::get('/run-queue', function () {
+    Artisan::call('queue:work --once');
+    return 'Queue triggered';
+});
+
+Route::get('/migrate', function () {
+    Artisan::call('migrate');
+    return 'Migration triggered';
+});
+
+Route::get('/clear-cache', function () {
+    Artisan::call('optimize:clear');
+    return 'Cache cleared';
 });
 
 require __DIR__.'/auth.php';

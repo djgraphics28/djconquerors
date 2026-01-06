@@ -11,27 +11,28 @@ new class extends Component {
     public function mount($currentNode): void
     {
         $this->currentNode = $currentNode;
+
+        // dd($this->currentNode);
     }
 }; ?>
 
 <div>
-    @can('dashboard.copyMessageToMartin')
+    {{-- @can('dashboard.copyMessageToMartin') --}}
         <!-- Copy Support Form to Clipboard -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
             <div x-data="{
                 copied: false,
                 async copySupportForm() {
                     const message = `
-Support Team: {{ $currentNode->support_team ?? '' }}
-Inviter's Riscoin ID: {{ $currentNode->inviters_code ?? '' }}
-Riscoin Account ID: {{ $currentNode->riscoin_id ?? '' }}
+Your own Riscoin account ID: {{ $currentNode->riscoin_id ?? '' }}
 Deposit Amount: ${{ number_format($currentNode->invested_amount ?? 0, 2) }}
-Your Name: {{ $currentNode->name ?? '' }}
-Occupation: {{ $currentNode->occupation ?? 'Not specified' }}
-Gender: {{ $currentNode->gender ?? 'Not specified' }}
+My Name: {{ $currentNode->name ?? '' }}
+Language: English, Tagalog
 Nationality: Filipino
-Languages Spoken: English, Filipino
-Age: {{ $currentNode->age ?? 'Not specified' }}`;
+Age: {{ $currentNode->age ?? 'Not specified' }}
+Gender: {{ $currentNode->gender ?? 'Not specified' }}
+Inviter: {{ $currentNode->inviters_code ?? '' }}
+Assistant: {{ $currentNode->assistant?->riscoin_id ?? '' }}`;
 
                     await this.copyTextToClipboard(message);
                 },
@@ -132,17 +133,16 @@ Age: {{ $currentNode->age ?? 'Not specified' }}`;
             <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preview:</h4>
                 <pre class="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line">
-Support Team: {{ $currentNode->support_team ?? '' }}
-Inviter's Riscoin ID: {{ $currentNode->inviters_code ?? '' }}
-Riscoin Account ID: {{ $currentNode->riscoin_id ?? '' }}
+Your own Riscoin account ID: {{ $currentNode->riscoin_id ?? '' }}
 Deposit Amount: ${{ number_format($currentNode->invested_amount ?? 0, 2) }}
-Your Name: {{ $currentNode->name ?? '' }}
-Occupation: {{ $currentNode->occupation ?? 'Not specified' }}
-Gender: {{ $currentNode->gender ?? 'Not specified' }}
+My Name: {{ $currentNode->name ?? '' }}
+Language: English, Tagalog
 Nationality: Filipino
-Languages Spoken: English, Filipino
-Age: {{ $currentNode->age ?? 'Not specified' }}</pre>
+Age: {{ $currentNode->age ?? 'Not specified' }}
+Gender: {{ $currentNode->gender ?? 'Not specified' }}
+Inviter: {{ $currentNode->inviters_code ?? '' }}
+Assistant: {{ $currentNode->assistant?->riscoin_id ?? '' }}</pre>
             </div>
         </div>
-    @endcan
+    {{-- @endcan --}}
 </div>

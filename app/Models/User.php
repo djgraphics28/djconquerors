@@ -15,8 +15,10 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Jobs\SendVerificationEmail;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -197,6 +199,11 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         return number_format($months) . " months and " . number_format($days) . " days";
     }
 
+    public function sendEmailVerificationNotification()
+    {
+        SendVerificationEmail::dispatch($this);
+    }
+
     public function registerMediaConversions(?Media $media = null): void
     {
         $this
@@ -296,5 +303,32 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     public function getLastLoginTimestampAttribute()
     {
         return $this->last_login_at ?? $this->updated_at;
+    }
+
+    /**
+     * Get the assistant that owns the User
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function assistant(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assistant_id', 'id');
+    }
+
+    /**
+     * Get the managerLevel associated with the User
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne
+     */
+    public function managerLevel(): HasOne
+    {
+        // include user_id so the relation can be properly hydrated when selecting specific columns
+        return $this->hasOne(Manager::class, 'user_id', 'id')->select('user_id', 'level');
+    }
+
+    public function assistedUsers(): HasMany
+    {
+        return $this->hasMany(User::class, 'assistant_id', 'id');
+        // ->where('assistant_id', '!=', null);
     }
 }

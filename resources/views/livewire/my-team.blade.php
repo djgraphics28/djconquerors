@@ -486,6 +486,22 @@ new class extends Component {
         $this->assistantUserId = $assistantId;
     }
 
+    // Deselect currently selected assistant
+    public function deselectAssistant()
+    {
+        $this->assistantUserId = null;
+        $target = User::find($this->assistantTargetUserId);
+        if (!$target) {
+            session()->flash('error', 'Target user not found.');
+            return;
+        }
+
+        $target->assistant_id = null;
+        $target->save();
+
+        session()->flash('message', 'Assistant removed successfully.');
+    }
+
     // Add/assign assistant to the target user
     public function addAssistantUser()
     {
@@ -542,7 +558,7 @@ new class extends Component {
 
         $now = now()->toIsoString();
 
-        return "Depositors ID : {$depositorId}\n\nInviters ID : {$inviterId}\n\nAssistants ID : {$assistantId}\n\n";
+        return "Hi Sir Martin\nHere is my application reward request from my investor, {$this->assistantTargetUser?->name}\n\nInviter's Riscoin Account : {$inviterId}\n\nDepositor's Riscoin Account : {$depositorId}\n\nAssister's Riscoin Account: {$assistantId}\n\n";
     }
 
     // Reset filters
@@ -773,6 +789,9 @@ new class extends Component {
                                     Inviter</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Assistant</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Email</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -840,20 +859,23 @@ new class extends Component {
                                     <td
                                         class="sticky left-0 z-10 px-6 py-4 whitespace-nowrap
                                         {{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
-                                        <div class="flex-shrink-0 h-10 w-10 {{ $teamLevel > 1 ? 'ml-4' : '' }}">
-                                            @if ($user->getFirstMediaUrl('avatar'))
-                                                <img class="h-10 w-10 rounded-full object-cover"
-                                                    src="{{ $user->getFirstMediaUrl('avatar') }}"
-                                                    alt="{{ $user->name }} avatar">
-                                            @else
-                                                <div
-                                                    class="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                                                    <span class="text-gray-600 dark:text-gray-300 font-medium text-sm">
-                                                        {{ strtoupper(substr($user->name, 0, 1)) }}
-                                                    </span>
-                                                </div>
-                                            @endif
-                                        </div>
+                                        <a href="{{ route('genealogy.show', $user->riscoin_id) }}">
+                                            <div class="flex-shrink-0 h-10 w-10 {{ $teamLevel > 1 ? 'ml-4' : '' }}">
+                                                @if ($user->getFirstMediaUrl('avatar'))
+                                                    <img class="h-10 w-10 rounded-full object-cover"
+                                                        src="{{ $user->getFirstMediaUrl('avatar') }}"
+                                                        alt="{{ $user->name }} avatar">
+                                                @else
+                                                    <div
+                                                        class="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                                                        <span
+                                                            class="text-gray-600 dark:text-gray-300 font-medium text-sm">
+                                                            {{ strtoupper(substr($user->name, 0, 1)) }}
+                                                        </span>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </a>
                                     </td>
                                     <td
                                         class="md:sticky left-0 z-10 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white
@@ -862,8 +884,22 @@ new class extends Component {
                                         <div class="text-sm text-gray-500 dark:text-gray-400">
                                             <small>Last Logged In: {{ $user->last_login }}</small>
                                         </div>
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                        {{ $user->inviter ? $user->inviter->name . ' (' . $user->inviter->riscoin_id . ')' : 'N/A' }}
+                                        @if ($user->inviter)
+                                            <div>{{ $user->inviter->name }}</div>
+                                            <div><small>({{ $user->inviter->riscoin_id }})</small></div>
+                                        @else
+                                            N/A
+                                        @endif
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                        @if ($user->assistant)
+                                            <div>{{ $user->assistant->name }}</div>
+                                            <div><small>({{ $user->assistant->riscoin_id }})</small></div>
+                                        @else
+                                            N/A
+                                        @endif
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                                         {{ $user->email }}
@@ -1545,7 +1581,7 @@ new class extends Component {
 
                                         <input type="text" wire:model.live="assistantSearch"
                                             placeholder="Search users by name, email or riscoin id"
-                                            class="mt-1 block w-full pl-3 pr-3 py-2 text-base border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" />
+                                            class="mt-1 block w-full pl-3 pr-3 py-2 text-base border-2 border-indigo-300 dark:border-indigo-600 dark:bg-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" />
 
                                         <div class="mt-3 grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
                                             @foreach ($this->filteredAssistants as $a)
@@ -1621,6 +1657,10 @@ new class extends Component {
                                         <button type="button" wire:click="closeAssistantModal"
                                             class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                                             Cancel
+                                        </button>
+                                        <button type="button" wire:click="deselectAssistant"
+                                            class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">
+                                            Remove Assistant
                                         </button>
                                         <button type="submit" wire:click="addAssistantUser"
                                             class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
