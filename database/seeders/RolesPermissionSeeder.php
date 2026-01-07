@@ -48,6 +48,12 @@ class RolesPermissionSeeder extends Seeder
             'my-withdrawals.edit',
             'my-withdrawals.delete',
 
+            //Withdrawals
+            'withdrawals.view',
+            'withdrawals.create',
+            'withdrawals.edit',
+            'withdrawals.delete',
+
             //Genealogy
             'genealogy.view',
 
