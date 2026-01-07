@@ -20,6 +20,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('genealogy/{riscoinId}', 'genealogy.index')->name('genealogy.show');
     Volt::route('my-team','my-team')->name('my-team');
     Volt::route('my-withdrawals', 'my-withdrawals')->name('my-withdrawals');
+    Volt::route('withdrawals', 'withdrawals.index')->name('withdrawals.index');
+    // Volt::route('withdrawals/create', 'withdrawals.create')->name('withdrawals.create');
 
     Volt::route('book-appointment', 'appointments.create')->name('appointments.book');
     Volt::route('appointments', 'appointments.index')->name('appointments.index');

@@ -82,6 +82,11 @@
                         :current="request()->routeIs('my-withdrawals')" wire:navigate>{{ __('My Withdrawals') }}
                     </flux:navlist.item>
                 @endcan
+                @can('withdrawals.view')
+                    <flux:navlist.item icon="credit-card" :href="route('withdrawals.index')"
+                        :current="request()->routeIs('withdrawals.index')" wire:navigate>{{ __('Withdrawals') }}
+                    </flux:navlist.item>
+                @endcan
                 @can('appointments.book')
                     <flux:navlist.item icon="calendar" :href="route('appointments.book')"
                         :current="request()->routeIs('book-appointment')" wire:navigate>{{ __('Book An Appointment') }}
