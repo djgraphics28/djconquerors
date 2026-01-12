@@ -996,7 +996,7 @@ new class extends Component {
                                         class="md:sticky right-0 z-10 px-6 py-4 whitespace-nowrap
                                         {{ $teamLevel > 1 ? 'bg-gray-50 dark:bg-gray-700' : 'bg-white dark:bg-gray-800' }}">
                                         <div class="flex space-x-2">
-                                            @if (auth()->user()->riscoin_id === $user->inviters_code || auth()->user()->hasRole('admin'))
+                                            @if (auth()->user()->riscoin_id === $user->inviters_code || auth()->user()->hasRole('admin') || auth()->user()->hasPermissionTo('my-team.add-assister'))
                                                 <flux:button wire:click="addAssistant({{ $user->id }})"
                                                     variant="ghost" size="sm"
                                                     data-test="view-user-{{ $user->id }}"
