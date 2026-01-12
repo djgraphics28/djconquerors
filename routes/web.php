@@ -68,6 +68,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('/manage-opalite','opalite.manage')->name('opalite.manage');
     Volt::route('/opalite-winners','opalite.index')->name('opalite.index');
 
+    // Reply Templates - Using Livewire Volt
+    Volt::route('reply-template', 'reply-template.index')->name('reply-template.index')->middleware('can:reply-template.access');
+
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(
             when(
