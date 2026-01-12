@@ -117,6 +117,11 @@
                         :current="request()->routeIs('guide.access')" wire:navigate>{{ __('Guide') }}
                     </flux:navlist.item>
                 @endcan
+                @can('reply-template.access')
+                    <flux:navlist.item icon="chat-bubble-left-right" :href="route('reply-template.index')"
+                        :current="request()->routeIs('reply-template.index')" wire:navigate>{{ __('Reply Templates') }}
+                    </flux:navlist.item>
+                @endcan
                 @can('users.view')
                     <flux:navlist.item icon="user-circle" :href="route('users.index')"
                         :current="request()->routeIs('users.index')" wire:navigate>{{ __('Users') }}</flux:navlist.item>
