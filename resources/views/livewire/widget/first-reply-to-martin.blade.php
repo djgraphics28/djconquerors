@@ -82,7 +82,8 @@ new class extends Component {
             <div x-data="{
                 copied: false,
                 async copyTemplateMessage() {
-                    const message = @js($renderedTemplate);
+                    // Get the current rendered template from Livewire
+                    const message = $wire.renderedTemplate;
                     await this.copyTextToClipboard(message);
                 },
                 async copyTextToClipboard(text) {
