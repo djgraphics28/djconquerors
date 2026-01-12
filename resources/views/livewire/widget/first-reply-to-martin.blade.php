@@ -195,7 +195,7 @@ new class extends Component {
             @endif
         </div>
 
-        <!-- Original Static Form (Backup) -->
+        {{-- <!-- Original Static Form (Backup) -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
             <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Original Support Form</h3>
             <div x-data="{
@@ -305,6 +305,6 @@ Gender: {{ $currentNode->gender ?? 'Not specified' }}
 Inviter: {{ $currentNode->inviters_code ?? '' }}
 Assistant: {{ $currentNode->assistant?->riscoin_id ?? '' }}</pre>
             </div>
-        </div>
+        </div> --}}
     {{-- @endcan --}}
 </div>
