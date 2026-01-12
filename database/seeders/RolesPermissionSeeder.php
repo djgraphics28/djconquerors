@@ -73,6 +73,9 @@ class RolesPermissionSeeder extends Seeder
             'my-team.access',
             'my-team.view',
             'my-team.edit',
+            'my-team.delete',
+            'my-team.add-assister',
+
 
             //Apointments
             'appointments.book',
