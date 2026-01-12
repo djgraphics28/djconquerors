@@ -266,12 +266,12 @@ new class extends Component {
         </ol>
     </nav>
 
-    {{-- @if ($this->showFirstReplyToMartin === true) --}}
+    @if ($this->showFirstReplyToMartin === true)
         {{-- first reply to martin --}}
         <div class="mb-6">
             <livewire:widget.first-reply-to-martin :currentNode="$currentNode" />
         </div>
-    {{-- @endif --}}
+    @endif
 
     @if ($this->showLatestInvitesWidget)
         {{-- latest invites widget --}}
