@@ -23,11 +23,13 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $gender = '';
     public string $occupation = '';
     public string $support_group = '';
+    public string $bonchat_id = '';
 
     public function mount(): void
     {
         if (request()->has('ref')) {
             $this->inviters_code = request()->get('ref');
+            $this->support_group = User::where('riscoin_id', strtoupper($this->inviters_code))->value('support_group') ?? '';
         }
     }
 
@@ -49,6 +51,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
             'gender' => ['required', 'string', 'max:50'],
             'occupation' => ['required', 'string', 'max:100'],
             'support_group' => ['nullable', 'string', 'max:100'],
+            'bonchat_id' => ['required', 'string', 'max:255'],
             // 'gRecaptcha-response' => ['required', 'captcha'],
         ]);
 
@@ -113,6 +116,11 @@ new #[Layout('components.layouts.auth')] class extends Component {
         <!-- Riscoin ID -->
         <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')" type="text" required autocomplete="riscoin_id"
             :placeholder="__('Riscoin ID')" />
+
+        <!-- Bonchat ID -->
+        <flux:input wire:model="bonchat_id" :label="__('Bonchat ID')" type="text" required
+            autocomplete="bonchat_id" :placeholder="__('Bonchat ID')" />
+
         <!-- Inviters Code -->
         <flux:input wire:model="inviters_code" :label="__('Inviters Code')" type="text" required
             autocomplete="inviters_code" :placeholder="__('Inviters Code')" />

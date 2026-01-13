@@ -26,6 +26,7 @@ new class extends Component {
     public $isMonthlyMilestoneMention = true;
     public $gender = '';
     public $occupation = '';
+    public $support_group = '';
 
     /**
      * Mount the component.
@@ -46,6 +47,7 @@ new class extends Component {
         $this->isMonthlyMilestoneMention = $user->is_monthly_milestone_mention == 1 ? true : false;
         $this->gender = $user->gender;
         $this->occupation = $user->occupation;
+        $this->support_group = $user->support_group ?? '';
 
         // dd($user->getFirstMediaUrl('avatar'));
     }
@@ -96,6 +98,7 @@ new class extends Component {
             'avatar' => ['nullable', 'image', 'max:10240'],
             'gender' => ['required', 'string', 'max:50'],
             'occupation' => ['required', 'string', 'max:100'],
+            'support_group' => ['nullable', 'string', 'max:100'],
         ]);
 
         $validated['riscoin_id'] = strtoupper($validated['riscoin_id']);
@@ -318,6 +321,7 @@ new class extends Component {
 
             <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')" type="text" disabled />
             <flux:input wire:model="inviters_code" :label="__('Inviters Code')" type="text" disabled />
+            <flux:input wire:model="support_group" :label="__('Support Group (Bonchat Support Group)')" type="text" />
             <flux:input wire:model="invested_amount" :label="__('Invested Amount (USD)')" type="text" disabled />
             <flux:input wire:model="date_joined" :label="__('Date Joined')" type="date" disabled />
             <flux:input wire:model="birth_date" :label="__('Birth Date')" type="date" />
