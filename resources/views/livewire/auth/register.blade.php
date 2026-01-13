@@ -22,6 +22,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $phone_number = '';
     public string $gender = '';
     public string $occupation = '';
+    public string $support_group = '';
 
     public function mount(): void
     {
@@ -47,6 +48,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
             'phone_number' => ['nullable', 'string', 'max:20'],
             'gender' => ['required', 'string', 'max:50'],
             'occupation' => ['required', 'string', 'max:100'],
+            'support_group' => ['nullable', 'string', 'max:100'],
             // 'gRecaptcha-response' => ['required', 'captcha'],
         ]);
 
@@ -114,6 +116,11 @@ new #[Layout('components.layouts.auth')] class extends Component {
         <!-- Inviters Code -->
         <flux:input wire:model="inviters_code" :label="__('Inviters Code')" type="text" required
             autocomplete="inviters_code" :placeholder="__('Inviters Code')" />
+
+        <!-- Support Group -->
+        <flux:input wire:model="support_group" :label="__('Support Group (ask your inviter, bonchat support group)')" type="text" required
+            autocomplete="support_group" :placeholder="__('Support Group')" />
+
         <!-- Invested Amount -->
         <flux:input wire:model="invested_amount" :label="__('Invested Amount (USD)')" type="number" step="0.01"
             required autocomplete="invested_amount" :placeholder="__('Invested Amount')" prefix="$" />
