@@ -673,9 +673,9 @@ Amount invested: $" .
                     </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                    {{ $user->inviter->name }}
+                    {{ $user->inviter->name ?? 'N/A' }}
                     <div class="text-sm text-gray-400">
-                        <small>Riscoin ID: <span onclick="copyToClipboard('{{ $user->inviter->riscoin_id }}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->inviter->riscoin_id ?? 'N/A' }}</span></small>
+                        <small>Riscoin ID: <span onclick="copyToClipboard('{{ $user->inviter->riscoin_id ?? ''}}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->inviter->riscoin_id ?? 'N/A' }}</span></small>
                     </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
