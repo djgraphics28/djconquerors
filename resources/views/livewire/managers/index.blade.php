@@ -82,11 +82,37 @@ new class extends Component {
         messageText: '',
         messageType: '',
         draggedFromLevel: null,
+        showConfirmModal: false,
+        confirmData: null,
         showToast(type, text) {
             this.messageType = type;
             this.messageText = text;
             this.showMessage = true;
             setTimeout(() => this.showMessage = false, 3000);
+        },
+        showConfirm(managerId, currentLevel, targetLevel, userName) {
+            this.confirmData = {
+                managerId: managerId,
+                currentLevel: currentLevel,
+                targetLevel: targetLevel,
+                userName: userName
+            };
+            this.showConfirmModal = true;
+        },
+        confirmMove() {
+            if (this.confirmData) {
+                @this.reassignUser(
+                    parseInt(this.confirmData.managerId),
+                    this.confirmData.targetLevel,
+                    this.confirmData.currentLevel
+                );
+            }
+            this.showConfirmModal = false;
+            this.confirmData = null;
+        },
+        cancelMove() {
+            this.showConfirmModal = false;
+            this.confirmData = null;
         }
     }" x-init="
         $watch('showMessage', (value) => {
@@ -111,17 +137,16 @@ new class extends Component {
 
         <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
             @foreach ($this->levels as $level => $managers)
-                <div class="kanban-column bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700"
-                     data-level="{{ $level }}">
+                <div class="kanban-column bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 kanban-dropzone"
+                     data-level="{{ $level }}"
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)"
+                     ondrop="handleDrop(event, {{ $level }})">
                     <div class="flex items-center justify-between mb-2">
                         <h3 class="text-sm font-medium text-gray-700 dark:text-gray-200">Level {{ $level }}</h3>
                         <span class="text-xs text-gray-500">{{ $managers->count() }} </span>
                     </div>
-                    <div class="space-y-2 min-h-[120px] kanban-dropzone"
-                         data-level="{{ $level }}"
-                         ondragover="handleDragOver(event)"
-                         ondragleave="handleDragLeave(event)"
-                         ondrop="handleDrop(event, {{ $level }})">
+                    <div class="space-y-2 min-h-[120px]">
                         @forelse ($managers as $manager)
                             @php $user = $manager->user; @endphp
                             @if ($user)
@@ -146,7 +171,7 @@ new class extends Component {
                                     <div class="text-xs text-gray-500 dark:text-gray-300 truncate">{{ $user->riscoin_id ?? '—' }}</div>
                                 </div>
                                 <button type="button"
-                                        @click.stop="confirm('Are you sure you want to remove {{ $user->name }} from managers?') && $wire.deleteManager({{ $manager->id }})"
+                                        @click.stop="if(confirm('Are you sure you want to remove {{ addslashes($user->name) }} from managers?')) { $wire.deleteManager({{ $manager->id }}) }"
                                         class="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
                                         title="Remove manager">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -162,6 +187,67 @@ new class extends Component {
                 </div>
             @endforeach
         </div>
+
+        <!-- Confirmation Modal -->
+        <div x-show="showConfirmModal"
+             x-cloak
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 z-50 overflow-y-auto"
+             @keydown.escape.window="cancelMove()">
+            <!-- Backdrop -->
+            <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity" @click="cancelMove()"></div>
+
+            <!-- Modal -->
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div x-show="showConfirmModal"
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0 transform scale-95"
+                     x-transition:enter-end="opacity-100 transform scale-100"
+                     x-transition:leave="transition ease-in duration-200"
+                     x-transition:leave-start="opacity-100 transform scale-100"
+                     x-transition:leave-end="opacity-0 transform scale-95"
+                     class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
+                     @click.stop>
+                    <!-- Icon -->
+                    <div class="flex items-center justify-center w-12 h-12 mx-auto bg-blue-100 dark:bg-blue-900 rounded-full mb-4">
+                        <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                        </svg>
+                    </div>
+
+                    <!-- Content -->
+                    <div class="text-center">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                            Confirm Manager Reassignment
+                        </h3>
+                        <template x-if="confirmData">
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                                Move <span class="font-semibold text-gray-900 dark:text-white" x-text="confirmData.userName"></span>
+                                from <span class="font-semibold text-blue-600 dark:text-blue-400">Level <span x-text="confirmData.currentLevel"></span></span>
+                                to <span class="font-semibold text-green-600 dark:text-green-400">Level <span x-text="confirmData.targetLevel"></span></span>?
+                            </p>
+                        </template>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="flex gap-3 mt-6">
+                        <button @click="cancelMove()"
+                                class="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
+                            Cancel
+                        </button>
+                        <button @click="confirmMove()"
+                                class="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            Confirm Move
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -169,20 +255,36 @@ new class extends Component {
         let draggedFromLevel = null;
 
         function handleDragStart(event, currentLevel) {
-            draggedElement = event.target;
+            // Find the card element (might be dragging from child elements)
+            const card = event.target.closest('.kanban-card');
+            if (!card) {
+                console.error('Could not find kanban-card parent');
+                return;
+            }
+
+            draggedElement = card;
             draggedFromLevel = currentLevel;
 
-            // Store both manager ID and current level in data transfer
-            const managerId = event.target.getAttribute('data-manager-id');
+            // Get manager ID from the card's data attribute
+            const managerId = card.getAttribute('data-manager-id');
+            const userName = card.querySelector('.text-sm.font-medium')?.textContent || 'Unknown';
+
+            if (!managerId) {
+                console.error('No manager ID found on card');
+                return;
+            }
+
+            // Store manager ID, current level, and user name in data transfer
             event.dataTransfer.setData('text/plain', JSON.stringify({
                 managerId: managerId,
-                currentLevel: currentLevel
+                currentLevel: currentLevel,
+                userName: userName
             }));
 
-            event.target.classList.add('opacity-70', 'scale-95');
+            card.classList.add('opacity-70', 'scale-95');
 
             // Add a custom drag image
-            const dragImage = event.target.cloneNode(true);
+            const dragImage = card.cloneNode(true);
             dragImage.style.position = 'absolute';
             dragImage.style.top = '-1000px';
             document.body.appendChild(dragImage);
@@ -191,7 +293,11 @@ new class extends Component {
         }
 
         function handleDragEnd(event) {
-            event.target.classList.remove('opacity-70', 'scale-95');
+            // Find the card element
+            const card = event.target.closest('.kanban-card');
+            if (card) {
+                card.classList.remove('opacity-70', 'scale-95');
+            }
             draggedFromLevel = null;
 
             // Remove all dropzone highlights
