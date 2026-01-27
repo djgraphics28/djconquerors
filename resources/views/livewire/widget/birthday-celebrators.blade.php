@@ -55,6 +55,22 @@ new class extends Component {
         return $msgs[array_rand($msgs)];
     }
 
+    public function getBulkBirthdayMessage()
+    {
+        $todayMd = now()->format('m-d');
+        $todaysCelebrants = collect($this->birthdayCelebrators)->filter(fn($c) => ($c['birth_md'] ?? '') === $todayMd && ($c['is_birthday_mention'] ?? false))->values();
+
+        if ($todaysCelebrants->isEmpty()) {
+            return '';
+        }
+
+        // Get all names and join them with commas
+        $names = $todaysCelebrants->pluck('name')->toArray();
+        $namesList = implode(', ', $names);
+
+        return "🎉 Happy Birthday from DJ Conquerors! 🎉\n\nWishing all of today's celebrators an amazing day filled with joy, laughter, and success!\n\nHappy Birthday, {$namesList}!!\n\nCheers, DJ Conquerors Family\n\n---";
+    }
+
     private function getDefaultAvatar(): string{ return 'data:image/svg+xml;base64,' . base64_encode('<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>'); }
 };
 
@@ -73,14 +89,16 @@ new class extends Component {
                         <p class="text-sm text-gray-500 dark:text-gray-400">This month</p>
                     </div>
                 </div>
-                <div class="bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400 px-3 py-1 rounded-full text-sm font-semibold">{{ count($birthdayCelebrators) }}</div>
+                <div class="flex items-center space-x-2">
+                    <div class="bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400 px-3 py-1 rounded-full text-sm font-semibold">{{ count($birthdayCelebrators) }}</div>
                     @php
                         $todayMd = now()->format('m-d');
                         $todaysCelebrants = collect($birthdayCelebrators)->filter(fn($c)=>($c['birth_md'] ?? '') === $todayMd && ($c['is_birthday_mention'] ?? false))->values()->toArray();
                     @endphp
                     @if(count($todaysCelebrants) > 0)
-                        <button type="button" onclick="copyBirthdayToday()" class="ml-2 px-3 py-1 bg-pink-500 text-white text-sm rounded hover:bg-pink-600" title="Copy today's birthday greetings">Copy today's greetings</button>
+                        <button type="button" onclick="copyBirthdayBulk()" class="ml-2 px-3 py-1 bg-pink-500 text-white text-sm rounded hover:bg-pink-600 transition-colors" title="Copy today's birthday greetings">Copy today's greetings</button>
                     @endif
+                </div>
             </div>
         </div>
 
@@ -128,72 +146,65 @@ new class extends Component {
         function birthdayList() {
             return {
                 copiedAll: false,
-                
-                allMessage: '',
-                async copyAll() {
-                    try {
-                        const users = @json($todaysCelebrants ?? []);
-                        const parts = [];
-                        for (const u of users) {
-                            const msg = await $wire.getRandomBirthdayMessage(u.name);
-                            parts.push(`🎉 ${u.name} — ${msg}`);
-                        }
-                        this.allMessage = parts.join('\n\n');
-                        if (!this.allMessage) return;
-
-                        if (navigator.clipboard && navigator.clipboard.writeText) {
-                            await navigator.clipboard.writeText(this.allMessage);
-                            this.copiedAll = true;
-                            setTimeout(()=> this.copiedAll = false, 2000);
-                            return;
-                        }
-
-                        // fallback attempts silently — not showing textarea
-                        const ta = document.createElement('textarea'); ta.value = this.allMessage; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); } catch(e){} document.body.removeChild(ta);
-
-                    } catch (e) {
-                        console.error(e);
-                        // fallback attempt (silent)
-                    }
-                },
-                async copyTodayBulk() {
-                    // helper for non-alpine bulk
-                    const users = @json($todaysCelebrants ?? []);
-                    if (!users || users.length === 0) return;
-                    const parts = [];
-                    for (const u of users) {
-                        const msg = await $wire.getRandomBirthdayMessage(u.name);
-                        parts.push(`🎉 ${u.name} — ${msg}`);
-                    }
-                    const message = parts.join('\n\n');
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        await navigator.clipboard.writeText(message);
-                        const toast = document.createElement('div');
-                        toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
-                        toast.textContent = 'Birthday greetings copied!';
-                        document.body.appendChild(toast);
-                        setTimeout(() => toast.remove(), 2000);
-                        return true;
-                    }
-                    // fallback
-                    const ta = document.createElement('textarea');
-                    ta.value = message;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    try { document.execCommand('copy'); } catch(e) { console.warn(e); }
-                    document.body.removeChild(ta);
-                    const toast = document.createElement('div');
-                    toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
-                    toast.textContent = 'Birthday greetings copied!';
-                    document.body.appendChild(toast);
-                    setTimeout(() => toast.remove(), 2000);
-                    return true;
-                },
                 manualCopyAll() {
                     const ta = this.$refs.allTa;
                     if (!ta) return;
                     ta.focus(); ta.select(); try{ document.execCommand('copy'); }catch(e){}
                 }
+            }
+        }
+
+        // Client-side bulk copy using server-provided array (avoids race with Livewire)
+        async function copyBirthdayBulk() {
+            try {
+                const users = @json($todaysCelebrants ?? []);
+                if (!users || users.length === 0) return;
+
+                // Get the bulk message from Livewire server
+                const bulkMessage = await @this.getBulkBirthdayMessage();
+
+                if (!bulkMessage) return;
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(bulkMessage);
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                    toast.textContent = 'Birthday greetings copied to clipboard!';
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 2000);
+                    return true;
+                }
+
+                // Fallback method for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = bulkMessage;
+                ta.style.position = 'fixed';
+                ta.style.left = '-999999px';
+                ta.style.top = '-999999px';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        const toast = document.createElement('div');
+                        toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                        toast.textContent = 'Birthday greetings copied to clipboard!';
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 2000);
+                    }
+                } catch (err) {
+                    console.error('Fallback copy failed:', err);
+                    alert('Failed to copy. Please try again.');
+                } finally {
+                    document.body.removeChild(ta);
+                }
+
+                return true;
+            } catch (e) {
+                console.error('Copy error:', e);
+                alert('Failed to copy. Please try again.');
             }
         }
     </script>
