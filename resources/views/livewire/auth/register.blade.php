@@ -57,8 +57,16 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
         $validated['password'] = Hash::make($validated['password']);
 
-        $validated['riscoind_id'] = strtoupper($validated['riscoin_id']);
-        $validated['inviters_code'] = strtoupper($validated['inviters_code']);
+        $validated['riscoin_id'] = strtoupper(trim(str_replace(' ', '', $validated['riscoin_id'])));
+        $validated['inviters_code'] = strtoupper(trim(str_replace(' ', '', $validated['inviters_code'])));
+
+        //check if riscoin_id already exists
+        $checkRiscoinId = User::where('riscoin_id', $validated['riscoin_id'])->first();
+        if ($checkRiscoinId) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'riscoin_id' => 'This Riscoin ID is already registered. Please use a different Riscoin ID.',
+            ]);
+        }
 
         //check if inviters code exists
         $checkInvitersCode = User::where('riscoin_id', $validated['inviters_code'])->first();
