@@ -71,6 +71,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Reply Templates - Using Livewire Volt
     Volt::route('reply-template', 'reply-template.index')->name('reply-template.index')->middleware('can:reply-template.access');
 
+    // Teams Management
+    Volt::route('teams', 'teams.index')->name('teams.index')->middleware('can:teams.view');
+
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(
             when(
