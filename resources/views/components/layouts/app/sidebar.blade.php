@@ -122,6 +122,11 @@
                         :current="request()->routeIs('reply-template.index')" wire:navigate>{{ __('Reply Templates') }}
                     </flux:navlist.item>
                 @endcan
+                @can('teams.view')
+                    <flux:navlist.item icon="user-group" :href="route('teams.index')"
+                        :current="request()->routeIs('teams.index')" wire:navigate>{{ __('Teams') }}
+                    </flux:navlist.item>
+                @endcan
                 @can('users.view')
                     <flux:navlist.item icon="user-circle" :href="route('users.index')"
                         :current="request()->routeIs('users.index')" wire:navigate>{{ __('Users') }}</flux:navlist.item>

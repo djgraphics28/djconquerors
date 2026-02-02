@@ -111,6 +111,11 @@ class RolesPermissionSeeder extends Seeder
 
             'opalite.view',
             'opalite.manage',
+
+            'teams.view',
+            'teams.create',
+            'teams.edit',
+            'teams.delete',
         ];
 
         foreach ($adminPermissions as $permission) {

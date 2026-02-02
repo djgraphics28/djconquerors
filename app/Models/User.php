@@ -57,6 +57,7 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         'support_team',
         'assistant_id',
         'support_group',
+        'team_id',
     ];
 
     /**
@@ -332,5 +333,15 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     {
         return $this->hasMany(User::class, 'assistant_id', 'id');
         // ->where('assistant_id', '!=', null);
+    }
+
+    /**
+     * Get the team that owns the User
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class, 'team_id', 'id');
     }
 }
