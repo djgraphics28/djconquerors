@@ -59,6 +59,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
         $validated['riscoin_id'] = strtoupper(trim(str_replace(' ', '', $validated['riscoin_id'])));
         $validated['inviters_code'] = strtoupper(trim(str_replace(' ', '', $validated['inviters_code'])));
+        $validated['team_id'] = User::where('riscoin_id', $validated['inviters_code'])->value('team_id') ?? null;
 
         //check if riscoin_id already exists
         $checkRiscoinId = User::where('riscoin_id', $validated['riscoin_id'])->first();
