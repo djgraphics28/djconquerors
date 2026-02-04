@@ -8,6 +8,7 @@ use Spatie\Activitylog\Models\Activity;
 use Livewire\WithPagination;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Team;
 
 new class extends Component {
     use WithPagination, WithFileUploads;
@@ -25,6 +26,7 @@ new class extends Component {
     public $is_active = true;
     public $roles = [];
     public $inviters = [];
+    public $teams = [];
     public $selectedRoles = [];
     public $editMode = false;
     public $userId;
@@ -32,6 +34,7 @@ new class extends Component {
     public $showViewModal = false;
     public $activityLogs = [];
     public $selectedUser = null;
+    public $team_id;
 
     // Media properties
     public $avatar;
@@ -42,6 +45,7 @@ new class extends Component {
     public $dateJoined = '';
     public $statusFilter = '';
     public $inviterFilter = '';
+    public $teamFilter = '';
     public $perPage = 10;
 
     protected $queryString = [
@@ -64,12 +68,19 @@ new class extends Component {
         'is_active' => 'boolean',
         'selectedRoles' => 'array',
         'avatar' => 'nullable|image|max:2048', // 2MB max
+        'team_id' => 'nullable|exists:teams,id',
     ];
 
     public function mount()
     {
         $this->loadRoles();
         $this->loadInviters();
+        $this->loadTeams();
+    }
+
+    public function loadTeams()
+    {
+        $this->teams = Team::select('id', 'name')->get();
     }
 
     public function loadInviters()
@@ -170,6 +181,7 @@ new class extends Component {
         $this->phone_number = $user->phone_number;
         $this->riscoin_id = $user->riscoin_id;
         $this->inviters_code = $user->inviters_code;
+        $this->team_id = $user->team_id;
         $this->invested_amount = $user->invested_amount;
         $this->birth_date = $user->birth_date ? $user->birth_date->format('Y-m-d') : null;
         $this->date_joined = $user->date_joined ? $user->date_joined->format('Y-m-d') : ($this->is_active = $user->is_active);
@@ -192,6 +204,7 @@ new class extends Component {
             'date_joined' => $this->date_joined,
             'birth_date' => $this->birth_date,
             'is_active' => $this->is_active,
+            'team_id' => $this->team_id,
         ];
 
         // Only update password if provided
@@ -349,7 +362,7 @@ new class extends Component {
 
     public function getUsersProperty()
     {
-        return User::with(['roles', 'inviter'])
+        return User::with(['roles', 'inviter', 'team'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('name', 'like', '%' . $this->search . '%')->orWhere('email', 'like', '%' . $this->search . '%');
@@ -369,6 +382,9 @@ new class extends Component {
             })
             ->when($this->inviterFilter, function ($query) {
                 $query->where('inviters_code', $this->inviterFilter);
+            })
+            ->when($this->teamFilter, function ($query) {
+                $query->where('team_id', $this->teamFilter);
             })
             ->orderBy('created_at', 'desc')
             ->paginate($this->perPage);
@@ -569,6 +585,17 @@ Amount invested: $" .
                                 @endforeach
                             </flux:select>
                         </div>
+
+                        <!-- NEW: Team Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Team</label>
+                            <flux:select wire:model.live="teamFilter" data-test="team-filter">
+                                <option value="">All Teams</option>
+                                @foreach ($teams as $team)
+                                    <option value="{{ $team->id }}">{{ $team->name }}</option>
+                                @endforeach
+                            </flux:select>
+                        </div>
                     </div>
 
                     <!-- Second row for additional filters -->
@@ -666,7 +693,8 @@ Amount invested: $" .
                     class="md:sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
                     {{ $user->name }}
                     <div class="text-sm text-gray-500 dark:text-gray-400">
-                        <small>Riscoin ID: <span onclick="copyToClipboard('{{ $user->riscoin_id }}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->riscoin_id ?? 'N/A' }}</span></small>
+                        <small>Riscoin ID: <span onclick="copyToClipboard('{{ $user->riscoin_id }}')"
+                                class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->riscoin_id ?? 'N/A' }}</span></small>
                     </div>
                     <div class="text-sm text-gray-500 dark:text-gray-400">
                         <small>Last Logged In: {{ $user->last_login }}</small>
@@ -675,11 +703,13 @@ Amount invested: $" .
                 <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                     {{ $user->inviter->name ?? 'N/A' }}
                     <div class="text-sm text-gray-400">
-                        <small>Riscoin ID: <span onclick="copyToClipboard('{{ $user->inviter->riscoin_id ?? ''}}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->inviter->riscoin_id ?? 'N/A' }}</span></small>
+                        <small>Riscoin ID: <span onclick="copyToClipboard('{{ $user->inviter->riscoin_id ?? '' }}')"
+                                class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->inviter->riscoin_id ?? 'N/A' }}</span></small>
                     </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                    <span onclick="copyToClipboard('{{ $user->email }}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->email }}</span>
+                    <span onclick="copyToClipboard('{{ $user->email }}')"
+                        class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->email }}</span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                     {{ $user->age }}
@@ -787,17 +817,28 @@ Amount invested: $" .
                         @endcan
 
                         @can('users.impersonate')
-                            <flux:button onclick="window.open('{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('impersonate.login', now()->addMinutes(5), ['user' => $user->id]) }}', '_blank')" variant="ghost" size="sm" class="bg-yellow-500 text-white hover:bg-yellow-600" title="Impersonate User">
+                            <flux:button
+                                onclick="window.open('{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('impersonate.login', now()->addMinutes(5), ['user' => $user->id]) }}', '_blank')"
+                                variant="ghost" size="sm" class="bg-yellow-500 text-white hover:bg-yellow-600"
+                                title="Impersonate User">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
                             </flux:button>
                         @endcan
 
                         @can('users.impersonate')
-                            <flux:button onclick="downloadIncognitoHelper('{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('impersonate.login', now()->addMinutes(5), ['user' => $user->id]) }}','{{ $user->riscoin_id ?? $user->id }}')" variant="ghost" size="sm" class="bg-yellow-600 text-white hover:bg-yellow-700" title="Download Incognito Helper">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            <flux:button
+                                onclick="downloadIncognitoHelper('{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('impersonate.login', now()->addMinutes(5), ['user' => $user->id]) }}','{{ $user->riscoin_id ?? $user->id }}')"
+                                variant="ghost" size="sm" class="bg-yellow-600 text-white hover:bg-yellow-700"
+                                title="Download Incognito Helper">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 4v16m8-8H4" />
+                                </svg>
                             </flux:button>
                         @endcan
 
@@ -974,6 +1015,18 @@ Amount invested: $" .
                                                 type="date" :placeholder="__('Select date joined')"
                                                 data-test="date-joined-input" />
 
+                                            <!-- Team -->
+                                            <div>
+                                                <label
+                                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Team</label>
+                                                <flux:select wire:model.live="team_id" data-test="team-select">
+                                                    <option value="">Select Team</option>
+                                                    @foreach ($teams as $team)
+                                                        <option value="{{ $team->id }}">{{ $team->name }}
+                                                        </option>
+                                                    @endforeach
+                                                </flux:select>
+                                            </div>
                                             <!-- Roles -->
                                             <div>
                                                 <label
@@ -1319,24 +1372,27 @@ Amount invested: $" .
     </div>
 </div>
 <script>
-    (function(){
+    (function() {
         if (window.showToast) return;
         const containerId = 'global-toast-container';
-        function ensureContainer(){
+
+        function ensureContainer() {
             let c = document.getElementById(containerId);
-            if(!c){
+            if (!c) {
                 c = document.createElement('div');
                 c.id = containerId;
-                c.style = 'position:fixed;top:1rem;right:1rem;display:flex;flex-direction:column;gap:0.5rem;z-index:99999;pointer-events:none';
+                c.style =
+                    'position:fixed;top:1rem;right:1rem;display:flex;flex-direction:column;gap:0.5rem;z-index:99999;pointer-events:none';
                 document.body.appendChild(c);
             }
             return c;
         }
-        window.showToast = function(message, type = 'success', duration = 3000){
+        window.showToast = function(message, type = 'success', duration = 3000) {
             const c = ensureContainer();
             const toast = document.createElement('div');
             toast.className = 'global-toast';
-            toast.style = 'pointer-events:auto;min-width:200px;max-width:360px;background:rgba(0,0,0,0.85);color:#fff;padding:12px 14px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;align-items:center;gap:10px;opacity:0;transform:translateX(12px);transition:opacity .18s ease,transform .18s ease';
+            toast.style =
+                'pointer-events:auto;min-width:200px;max-width:360px;background:rgba(0,0,0,0.85);color:#fff;padding:12px 14px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;align-items:center;gap:10px;opacity:0;transform:translateX(12px);transition:opacity .18s ease,transform .18s ease';
             const icon = document.createElement('div');
             icon.innerHTML = type === 'success' ? '✓' : (type === 'error' ? '⚠' : 'ℹ');
             icon.style = 'font-weight:700;font-size:14px';
@@ -1346,19 +1402,26 @@ Amount invested: $" .
             const close = document.createElement('button');
             close.innerHTML = '✕';
             close.style = 'background:none;border:none;color:inherit;font-size:12px;cursor:pointer';
-            close.onclick = () => { if (toast.parentNode) toast.parentNode.removeChild(toast); };
+            close.onclick = () => {
+                if (toast.parentNode) toast.parentNode.removeChild(toast);
+            };
             toast.appendChild(icon);
             toast.appendChild(msg);
             toast.appendChild(close);
             c.appendChild(toast);
-            requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateX(0)'; });
+            requestAnimationFrame(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(0)';
+            });
             let removed = false;
             const timer = setTimeout(() => {
                 if (removed) return;
                 removed = true;
                 toast.style.opacity = '0';
                 toast.style.transform = 'translateX(12px)';
-                setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 180);
+                setTimeout(() => {
+                    if (toast.parentNode) toast.parentNode.removeChild(toast);
+                }, 180);
             }, duration);
             toast.addEventListener('mouseenter', () => clearTimeout(timer));
             toast.addEventListener('mouseleave', () => setTimeout(() => {
@@ -1366,7 +1429,9 @@ Amount invested: $" .
                     removed = true;
                     toast.style.opacity = '0';
                     toast.style.transform = 'translateX(12px)';
-                    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 180);
+                    setTimeout(() => {
+                        if (toast.parentNode) toast.parentNode.removeChild(toast);
+                    }, 180);
                 }
             }, 500));
         };
@@ -1451,33 +1516,40 @@ Amount invested: $" .
     }
 
     // Generate and download helper scripts to open impersonation URL in Incognito
-    function downloadFile(filename, content){
-        const blob = new Blob([content], { type: 'text/plain' });
+    function downloadFile(filename, content) {
+        const blob = new Blob([content], {
+            type: 'text/plain'
+        });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = filename;
         document.body.appendChild(a);
         a.click();
         a.remove();
-        setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
 
-    function downloadIncognitoHelper(url, id){
-        try{
-            const timestamp = new Date().toISOString().replace(/[:.]/g,'-');
+    function downloadIncognitoHelper(url, id) {
+        try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             // macOS helper (uses open)
-            const mac = `#!/bin/bash\n# macOS: Open Google Chrome in incognito with the impersonation URL\nopen -a "Google Chrome" --args --incognito "${url}"\n`;
-            const linux = `#!/bin/bash\n# Linux: Open Google Chrome in incognito with the impersonation URL\ngoogle-chrome --incognito "${url}" || google-chrome-stable --incognito "${url}" || chromium-browser --incognito "${url}"\n`;
-            const win = `# PowerShell script to open Chrome in incognito with the impersonation URL\nStart-Process "chrome" -ArgumentList '--incognito','"${url}"'\n`;
+            const mac =
+                `#!/bin/bash\n# macOS: Open Google Chrome in incognito with the impersonation URL\nopen -a "Google Chrome" --args --incognito "${url}"\n`;
+            const linux =
+                `#!/bin/bash\n# Linux: Open Google Chrome in incognito with the impersonation URL\ngoogle-chrome --incognito "${url}" || google-chrome-stable --incognito "${url}" || chromium-browser --incognito "${url}"\n`;
+            const win =
+                `# PowerShell script to open Chrome in incognito with the impersonation URL\nStart-Process "chrome" -ArgumentList '--incognito','"${url}"'\n`;
 
             downloadFile(`impersonate-${id}-mac-${timestamp}.sh`, mac);
             downloadFile(`impersonate-${id}-linux-${timestamp}.sh`, linux);
             downloadFile(`impersonate-${id}-windows-${timestamp}.ps1`, win);
 
-            if(window.showToast) window.showToast('Incognito helper scripts downloaded', 'success'); else alert('Downloaded helper scripts');
-        }catch(e){
+            if (window.showToast) window.showToast('Incognito helper scripts downloaded', 'success');
+            else alert('Downloaded helper scripts');
+        } catch (e) {
             console.error(e);
-            if(window.showToast) window.showToast('Failed to create helper files', 'error'); else alert('Failed to create helper files');
+            if (window.showToast) window.showToast('Failed to create helper files', 'error');
+            else alert('Failed to create helper files');
         }
     }
 </script>
