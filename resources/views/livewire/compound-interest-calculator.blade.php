@@ -1,9 +1,29 @@
 <?php
 
 use Livewire\Volt\Component;
+use App\Models\CalculatorUsageLog;
 
 new class extends Component {
-    //
+    public function logCalculation($calculationData)
+    {
+        try {
+            CalculatorUsageLog::create([
+                'user_id' => auth()->id(),
+                'calculator_type' => 'compound_interest',
+                'invested_amount' => $calculationData['initial_investment'] ?? null,
+                'first_reward' => $calculationData['first_reward'] ?? null,
+                'signals_per_day' => $calculationData['signals_per_day'] ?? null,
+                'number_of_days' => $calculationData['days'] ?? null,
+                'is_first_time' => $calculationData['is_first_time'] ?? false,
+                'final_amount' => $calculationData['final_amount'] ?? null,
+                'calculation_data' => $calculationData,
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Calculator usage log failed: ' . $e->getMessage());
+        }
+    }
 }; ?>
 
 <div>
@@ -377,10 +397,8 @@ new class extends Component {
 
                     tableHtml += '</tbody></table>';
 
-                    // render with reveal animation
+                    // render table
                     results.innerHTML = tableHtml;
-                    results.classList.remove('opacity-0');
-                    setTimeout(()=> results.classList.add('opacity-100'), 10);
 
                     const cells = results.querySelectorAll('.cell-content');
                     cells.forEach((c, idx) => {
@@ -416,9 +434,34 @@ new class extends Component {
                         </div>
                     `;
                     results.appendChild(summary);
+
+                    // Log the calculation to database using fetch (avoids Livewire refresh)
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+                        || document.querySelector('input[name="_token"]')?.value
+                        || '{{ csrf_token() }}';
+
+                    fetch('{{ route("calculator.log") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            initial_investment: invested,
+                            first_reward: firstReward,
+                            signals_per_day: defaultSignals,
+                            days: totalDays,
+                            is_first_time: firstTime,
+                            final_amount: currentAssets,
+                            total_gain: totalGain,
+                            total_gain_percent: totalGainPercent,
+                            max_signals_used: maxSignals
+                        })
+                    }).catch(e => console.log('Logging skipped:', e.message));
                 }
 
-                computeBtn.addEventListener('click', onCalculate);
+                if (computeBtn) computeBtn.addEventListener('click', onCalculate);
 
                 // Export to Excel (SpreadsheetML) with formulas so users can tweak inputs
                 function colLetter(n) {
@@ -449,8 +492,7 @@ new class extends Component {
 
                 if (exportBtn) exportBtn.addEventListener('click', exportExcel);
 
-                // initialize
-                results.classList.add('opacity-0');
+                // initialize - run compute on load to show default calculation
                 compute();
             })();
         </script>

@@ -147,6 +147,12 @@
                     </flux:navlist.item>
                 @endcan
 
+                @can('calculator.usage-logs')
+                    <flux:navlist.item icon="clock" :href="route('calculator-usage-logs')"
+                        :current="request()->routeIs('calculator-usage-logs')" wire:navigate>{{ __('Calculator Usage Logs') }}
+                    </flux:navlist.item>
+                @endcan
+
                 @can('calculator.view')
                     <flux:navlist.item icon="chart-bar" :href="route('compound-calculator')"
                         :current="request()->routeIs('compound-calculator')" wire:navigate>{{ __('Compound Calculator') }}
