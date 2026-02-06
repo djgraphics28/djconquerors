@@ -135,6 +135,53 @@ new class extends Component {
             <!-- Table will be injected here -->
         </div>
 
+        <!-- Custom Confirmation Modal -->
+        <div id="confirmModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4 transform transition-all">
+                <div class="flex items-center mb-4">
+                    <div class="flex-shrink-0 w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Calculate Compound Interest</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Proceed with calculation?</p>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 mb-4">
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Investment:</span>
+                            <span class="font-semibold text-gray-900 dark:text-white ml-1" id="modalInvested"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">First Reward:</span>
+                            <span class="font-semibold text-gray-900 dark:text-white ml-1" id="modalFirstReward"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Signals/Day:</span>
+                            <span class="font-semibold text-gray-900 dark:text-white ml-1" id="modalSignals"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Days:</span>
+                            <span class="font-semibold text-gray-900 dark:text-white ml-1" id="modalDays"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button id="confirmCancel" class="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button id="confirmCalculate" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors shadow-lg shadow-indigo-500/50">
+                        Calculate
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <style>
             /* lightweight animation for updated cells */
             .pulse-update {
@@ -206,6 +253,17 @@ new class extends Component {
                 const drawerBackdrop = document.getElementById('drawerBackdrop');
                 const firstTimeToggle = document.getElementById('firstTimeToggle');
                 const firstTimeToggleDrawer = document.getElementById('firstTimeToggleDrawer');
+
+                // Confirmation modal elements
+                const confirmModal = document.getElementById('confirmModal');
+                const confirmCancel = document.getElementById('confirmCancel');
+                const confirmCalculate = document.getElementById('confirmCalculate');
+                const modalInvested = document.getElementById('modalInvested');
+                const modalFirstReward = document.getElementById('modalFirstReward');
+                const modalSignals = document.getElementById('modalSignals');
+                const modalDays = document.getElementById('modalDays');
+
+                let pendingCalculation = null;
 
                 // viewport helpers to toggle desktop vs mobile controls
                 function isMobileViewport() {
@@ -296,18 +354,66 @@ new class extends Component {
                     return 0.50 + Math.random() * 0.02;
                 }
 
-                // show confirmation then compute
+                // Show custom confirmation modal
                 function onCalculate() {
-                    const ok = window.confirm('Proceed with calculation?');
-                    if (!ok) return;
-                    compute();
-                }
-
-                function compute() {
                     const invested = parseFloat(investedEl.value) || 0;
                     const firstReward = parseFloat(firstRewardEl.value) || 0;
                     const defaultSignals = Math.max(1, parseInt(signalsPerDayEl.value) || 2);
                     const totalDays = Math.max(1, parseInt(daysEl.value) || 30);
+
+                    // Update modal with values
+                    modalInvested.textContent = formatAmount(invested);
+                    modalFirstReward.textContent = formatAmount(firstReward);
+                    modalSignals.textContent = defaultSignals;
+                    modalDays.textContent = totalDays;
+
+                    // Store calculation parameters
+                    pendingCalculation = { invested, firstReward, defaultSignals, totalDays };
+
+                    // Show modal
+                    confirmModal.classList.remove('hidden');
+                    confirmModal.classList.add('flex');
+                }
+
+                // Handle modal cancel
+                if (confirmCancel) {
+                    confirmCancel.addEventListener('click', () => {
+                        confirmModal.classList.add('hidden');
+                        confirmModal.classList.remove('flex');
+                        pendingCalculation = null;
+                    });
+                }
+
+                // Handle modal confirm - proceed with calculation
+                if (confirmCalculate) {
+                    confirmCalculate.addEventListener('click', () => {
+                        confirmModal.classList.add('hidden');
+                        confirmModal.classList.remove('flex');
+                        if (pendingCalculation) {
+                            compute(pendingCalculation.invested, pendingCalculation.firstReward, pendingCalculation.defaultSignals, pendingCalculation.totalDays, true);
+                            pendingCalculation = null;
+                        }
+                    });
+                }
+
+                // Close modal on backdrop click
+                if (confirmModal) {
+                    confirmModal.addEventListener('click', (e) => {
+                        if (e.target === confirmModal) {
+                            confirmModal.classList.add('hidden');
+                            confirmModal.classList.remove('flex');
+                            pendingCalculation = null;
+                        }
+                    });
+                }
+
+                function compute(invested = null, firstReward = null, defaultSignals = null, totalDays = null, shouldLog = false) {
+                    // If parameters not provided, read from inputs
+                    if (invested === null) invested = parseFloat(investedEl.value) || 0;
+                    if (firstReward === null) firstReward = parseFloat(firstRewardEl.value) || 0;
+                    if (defaultSignals === null) defaultSignals = Math.max(1, parseInt(signalsPerDayEl.value) || 2);
+                    if (totalDays === null) totalDays = Math.max(1, parseInt(daysEl.value) || 30);
+
                     const firstTime = (firstTimeToggle && firstTimeToggle.checked) || (firstTimeToggleDrawer && firstTimeToggleDrawer.checked);
 
                     // decide maximum columns (we'll render up to 5 signals for flexibility)
@@ -435,30 +541,32 @@ new class extends Component {
                     `;
                     results.appendChild(summary);
 
-                    // Log the calculation to database using fetch (avoids Livewire refresh)
-                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
-                        || document.querySelector('input[name="_token"]')?.value
-                        || '{{ csrf_token() }}';
+                    // Log the calculation to database only if confirmed by user
+                    if (shouldLog) {
+                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+                            || document.querySelector('input[name="_token"]')?.value
+                            || '{{ csrf_token() }}';
 
-                    fetch('{{ route("calculator.log") }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken,
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            initial_investment: invested,
-                            first_reward: firstReward,
-                            signals_per_day: defaultSignals,
-                            days: totalDays,
-                            is_first_time: firstTime,
-                            final_amount: currentAssets,
-                            total_gain: totalGain,
-                            total_gain_percent: totalGainPercent,
-                            max_signals_used: maxSignals
-                        })
-                    }).catch(e => console.log('Logging skipped:', e.message));
+                        fetch('{{ route("calculator.log") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                initial_investment: invested,
+                                first_reward: firstReward,
+                                signals_per_day: defaultSignals,
+                                days: totalDays,
+                                is_first_time: firstTime,
+                                final_amount: currentAssets,
+                                total_gain: totalGain,
+                                total_gain_percent: totalGainPercent,
+                                max_signals_used: maxSignals
+                            })
+                        }).catch(e => console.log('Logging skipped:', e.message));
+                    }
                 }
 
                 if (computeBtn) computeBtn.addEventListener('click', onCalculate);
@@ -492,8 +600,8 @@ new class extends Component {
 
                 if (exportBtn) exportBtn.addEventListener('click', exportExcel);
 
-                // initialize - run compute on load to show default calculation
-                compute();
+                // initialize - run compute on load to show default calculation (without logging)
+                compute(null, null, null, null, false);
             })();
         </script>
     </div>
