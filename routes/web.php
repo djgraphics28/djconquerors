@@ -62,6 +62,32 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Compound Interest Calculator
     Volt::route('compound-calculator', 'compound-interest-calculator')->name('compound-calculator');
 
+    // Calculator logging endpoint
+    Route::post('calculator/log', function(\Illuminate\Http\Request $request) {
+        try {
+            \App\Models\CalculatorUsageLog::create([
+                'user_id' => auth()->id(),
+                'calculator_type' => 'compound_interest',
+                'invested_amount' => $request->input('initial_investment'),
+                'first_reward' => $request->input('first_reward'),
+                'signals_per_day' => $request->input('signals_per_day'),
+                'number_of_days' => $request->input('days'),
+                'is_first_time' => $request->input('is_first_time', false),
+                'final_amount' => $request->input('final_amount'),
+                'calculation_data' => $request->all(),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            \Log::error('Calculator usage log failed: ' . $e->getMessage());
+            return response()->json(['success' => false], 500);
+        }
+    })->name('calculator.log');
+
+    // Calculator Usage Logs (Admin only)
+    Volt::route('calculator-usage-logs', 'calculator-usage-logs')->name('calculator-usage-logs');
+
     // Export endpoint for compound calculator
     Route::match(['GET','POST'], 'compound-calculator/export', [\App\Http\Controllers\CompoundCalculatorExportController::class, 'export'])->name('compound-calculator.export');
 

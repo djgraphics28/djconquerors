@@ -344,4 +344,14 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     {
         return $this->belongsTo(Team::class, 'team_id', 'id');
     }
+
+    /**
+     * Get all calculator usage logs for the user
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function calculatorUsageLogs(): HasMany
+    {
+        return $this->hasMany(CalculatorUsageLog::class);
+    }
 }

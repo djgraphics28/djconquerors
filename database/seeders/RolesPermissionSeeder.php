@@ -108,6 +108,7 @@ class RolesPermissionSeeder extends Seeder
             // Compound Interest Calculator
             'calculator.view',
             'calculator.access',
+            'calculator.usage-logs',
 
             'opalite.view',
             'opalite.manage',
