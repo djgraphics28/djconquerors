@@ -285,6 +285,11 @@ new class extends Component {
         <livewire:widget.share-link />
     </div>
 
+    {{-- copy riscoin link widget --}}
+    <div class="mb-6">
+        <livewire:widget.copy-riscoin-link />
+    </div>
+
     <!-- Statistics Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
 

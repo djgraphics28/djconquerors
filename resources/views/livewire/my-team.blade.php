@@ -2,6 +2,7 @@
 
 use Livewire\Volt\Component;
 use App\Models\User;
+use App\Models\RiscoinLink;
 use Spatie\Permission\Models\Role;
 use Spatie\Activitylog\Models\Activity;
 use Livewire\WithPagination;
@@ -160,6 +161,20 @@ new class extends Component {
                 'color' => 'green',
             ];
         }
+    }
+
+    // Get Riscoin Link with user's riscoin_id
+    public function getRiscoinLinkWithCode($riscoinId)
+    {
+        // Get the first active Riscoin link
+        $activeLink = RiscoinLink::where('is_active', true)->first();
+
+        if (!$activeLink) {
+            return null;
+        }
+
+        // Append the riscoin_id as a query parameter
+        return $activeLink->url . '?code=' . $riscoinId;
     }
 
     private function getFilteredUserIdsByCapitalRecovery()
@@ -1035,6 +1050,24 @@ new class extends Component {
                                                     </svg>
                                                 </flux:button>
                                             @endcan
+                                            @php
+                                                $riscoinLink = $this->getRiscoinLinkWithCode($user->riscoin_id);
+                                            @endphp
+                                            @if($riscoinLink)
+                                                <flux:button
+                                                    onclick="copyToClipboard('{{ $riscoinLink }}')"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    data-test="copy-link-{{ $user->id }}"
+                                                    title="Copy Riscoin Link">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                                    </svg>
+                                                </flux:button>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
