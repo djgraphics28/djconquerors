@@ -169,6 +169,12 @@
                         :current="request()->routeIs('opalite.manage')" wire:navigate>{{ __('Manage Opalite Dance') }}
                     </flux:navlist.item>
                 @endcan
+
+                @can('riscoin-links.manage')
+                    <flux:navlist.item icon="link" :href="route('riscoin-links.index')"
+                        :current="request()->routeIs('riscoin-links.index')" wire:navigate>{{ __('Riscoin Links') }}
+                    </flux:navlist.item>
+                @endcan
             </flux:navlist.group>
         </flux:navlist>
 

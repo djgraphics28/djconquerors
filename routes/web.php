@@ -100,6 +100,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Teams Management
     Volt::route('teams', 'teams.index')->name('teams.index')->middleware('can:teams.view');
 
+    // Riscoin Links Management (Admin Only)
+    Volt::route('riscoin-links', 'riscoin-links.index')->name('riscoin-links.index')->middleware('can:riscoin-links.manage');
+
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(
             when(
