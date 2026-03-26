@@ -93,16 +93,39 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public function promoteToManager($code): void
     {
         $user = User::where('riscoin_id', strtoupper($code))->first();
-        if ($user && $user->invites()->count() >= 3) {
-            //check if already a manager
-            if (!$user->managerLevel) {
+        if (!$user) return;
 
-                // dd( 'Promoting user ID ' . $user->id . ' to manager level 1.');
-                Manager::create([
-                    'user_id' => $user->id,
-                    'level' => 1,
-                ]);
-            }
+        $directs = $user->invites()->count();
+        $totalMembers = $user->descendants->count();
+
+        // Determine the highest level the user qualifies for
+        $qualifiedLevel = 0;
+
+        if ($directs >= 20 && $totalMembers >= 500) {
+            $qualifiedLevel = 6;
+        } elseif ($directs >= 15 && $totalMembers >= 200) {
+            $qualifiedLevel = 5;
+        } elseif ($directs >= 10 && $totalMembers >= 100) {
+            $qualifiedLevel = 4;
+        } elseif ($directs >= 6 && $totalMembers >= 50) {
+            $qualifiedLevel = 3;
+        } elseif ($directs >= 5 && $totalMembers >= 15) {
+            $qualifiedLevel = 2;
+        } elseif ($directs >= 3) {
+            $qualifiedLevel = 1;
+        }
+
+        if ($qualifiedLevel === 0) return;
+
+        $managerLevel = $user->managerLevel;
+
+        if (!$managerLevel) {
+            Manager::create([
+                'user_id' => $user->id,
+                'level' => $qualifiedLevel,
+            ]);
+        } elseif ($qualifiedLevel > $managerLevel->level) {
+            $managerLevel->update(['level' => $qualifiedLevel]);
         }
     }
 }; ?>
