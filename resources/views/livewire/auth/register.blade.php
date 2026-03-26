@@ -4,10 +4,12 @@ use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 use App\Models\Manager;
+use App\Mail\ManagerCongratulations;
 
 new #[Layout('components.layouts.auth')] class extends Component {
     public string $name = '';
@@ -124,8 +126,10 @@ new #[Layout('components.layouts.auth')] class extends Component {
                 'user_id' => $user->id,
                 'level' => $qualifiedLevel,
             ]);
+            Mail::to($user->email)->queue(new ManagerCongratulations($user, $qualifiedLevel, false));
         } elseif ($qualifiedLevel > $managerLevel->level) {
             $managerLevel->update(['level' => $qualifiedLevel]);
+            Mail::to($user->email)->queue(new ManagerCongratulations($user, $qualifiedLevel, true));
         }
     }
 }; ?>
