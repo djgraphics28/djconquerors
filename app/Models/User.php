@@ -326,7 +326,7 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     public function managerLevel(): HasOne
     {
         // include user_id so the relation can be properly hydrated when selecting specific columns
-        return $this->hasOne(Manager::class, 'user_id', 'id')->select('user_id', 'level');
+        return $this->hasOne(Manager::class, 'user_id', 'id')->select('id', 'user_id', 'level');
     }
 
     public function assistedUsers(): HasMany
