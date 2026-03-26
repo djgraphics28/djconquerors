@@ -46,6 +46,7 @@ new class extends Component {
     public $statusFilter = '';
     public $inviterFilter = '';
     public $teamFilter = '';
+    public $managerLevelFilter = '';
     public $perPage = 10;
 
     protected $queryString = [
@@ -54,6 +55,7 @@ new class extends Component {
         'statusFilter' => ['except' => ''],
         'perPage' => ['except' => 10],
         'inviterFilter' => ['except' => ''],
+        'managerLevelFilter' => ['except' => ''],
     ];
 
     protected $rules = [
@@ -338,7 +340,7 @@ new class extends Component {
     // Reset filters
     public function resetFilters()
     {
-        $this->reset(['search', 'dateJoined', 'statusFilter', 'inviterFilter']);
+        $this->reset(['search', 'dateJoined', 'statusFilter', 'inviterFilter', 'managerLevelFilter']);
         $this->resetPage();
     }
 
@@ -362,7 +364,7 @@ new class extends Component {
 
     public function getUsersProperty()
     {
-        return User::with(['roles', 'inviter', 'team'])
+        return User::with(['roles', 'inviter', 'team', 'managerLevel'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('name', 'like', '%' . $this->search . '%')->orWhere('email', 'like', '%' . $this->search . '%');
@@ -385,6 +387,11 @@ new class extends Component {
             })
             ->when($this->teamFilter, function ($query) {
                 $query->where('team_id', $this->teamFilter);
+            })
+            ->when($this->managerLevelFilter, function ($query) {
+                $query->whereHas('managerLevel', function ($q) {
+                    $q->where('level', $this->managerLevelFilter);
+                });
             })
             ->orderBy('created_at', 'desc')
             ->paginate($this->perPage);
@@ -436,6 +443,11 @@ new class extends Component {
     }
 
     public function updatingInviterFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingManagerLevelFilter()
     {
         $this->resetPage();
     }
@@ -501,6 +513,9 @@ Amount invested: $" .
 }; ?>
 
 <div class="max-w-10xl mx-auto">
+    <!-- User Info Modal Component -->
+    <livewire:components.user-info-modal />
+
     <!-- Breadcrumb Navigation -->
     <nav class="flex mb-6" aria-label="Breadcrumb">
         <ol class="flex items-center space-x-2 text-sm">
@@ -596,6 +611,17 @@ Amount invested: $" .
                                 @endforeach
                             </flux:select>
                         </div>
+
+                        <!-- Manager Level Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Manager Level</label>
+                            <flux:select wire:model.live="managerLevelFilter" data-test="manager-level-filter">
+                                <option value="">All Levels</option>
+                                @for ($lvl = 1; $lvl <= 6; $lvl++)
+                                    <option value="{{ $lvl }}">Level {{ $lvl }}</option>
+                                @endfor
+                            </flux:select>
+                        </div>
                     </div>
 
                     <!-- Second row for additional filters -->
@@ -654,6 +680,9 @@ Amount invested: $" .
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Tenure</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Manager Level</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Roles</th>
@@ -725,6 +754,26 @@ Amount invested: $" .
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                     {{ $user->months_and_days_since_joined }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    @if ($user->managerLevel)
+                        @php
+                            $levelColors = [
+                                1 => 'bg-gray-100 text-gray-800',
+                                2 => 'bg-blue-100 text-blue-800',
+                                3 => 'bg-green-100 text-green-800',
+                                4 => 'bg-yellow-100 text-yellow-800',
+                                5 => 'bg-orange-100 text-orange-800',
+                                6 => 'bg-purple-100 text-purple-800',
+                            ];
+                            $lvlClass = $levelColors[$user->managerLevel->level] ?? 'bg-gray-100 text-gray-800';
+                        @endphp
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $lvlClass }}">
+                            Level {{ $user->managerLevel->level }}
+                        </span>
+                    @else
+                        <span class="px-2 py-1 text-xs font-medium bg-gray-50 text-gray-400 rounded-full">—</span>
+                    @endif
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex flex-wrap gap-1">
@@ -812,6 +861,22 @@ Amount invested: $" .
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                            </flux:button>
+                        @endcan
+
+                        @can('admin')
+                            <flux:button
+                                onclick="Livewire.dispatch('loadUserData', { userId: {{ $user->id }} })"
+                                variant="ghost"
+                                size="sm"
+                                data-test="info-user-{{ $user->id }}"
+                                title="Complete User Info">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </flux:button>
                         @endcan

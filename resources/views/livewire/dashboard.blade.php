@@ -248,6 +248,9 @@ new class extends Component {
     }
 }; ?>
 <div>
+    <!-- User Info Modal Component -->
+    <livewire:components.user-info-modal />
+
     <!-- Breadcrumb Navigation -->
     <nav class="flex mb-6" aria-label="Breadcrumb">
         <ol class="inline-flex items-center space-x-1 md:space-x-3">
