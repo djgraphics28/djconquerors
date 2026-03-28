@@ -52,6 +52,16 @@ new class extends Component {
                 </div>
 
                 <form id="calcFormDrawer" class="grid grid-cols-1 gap-3 mb-2" onsubmit="return false;">
+
+                    {{-- First Time Investor toggle — first position --}}
+                    <label class="flex items-center gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700/50 rounded-xl cursor-pointer">
+                        <input id="firstTimeToggleDrawer" type="checkbox" class="h-4 w-4 accent-indigo-600 flex-shrink-0" />
+                        <div>
+                            <span class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 block">First Time Investor</span>
+                            <span class="text-xs text-indigo-500 dark:text-indigo-400">Reward auto-fills by amount</span>
+                        </div>
+                    </label>
+
                     <label class="flex flex-col text-base">
                         <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">Invested Amount or Current Assets</span>
                         <input id="investedDrawer" type="number" step="0.01" min="0" value="1000"
@@ -59,9 +69,10 @@ new class extends Component {
                     </label>
 
                     <label class="flex flex-col text-base">
-                        <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">First Recharge Reward (this is for new invite)</span>
+                        <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">First Recharge Reward <span class="text-xs text-gray-400">(for new invite)</span></span>
                         <input id="firstRewardDrawer" type="number" step="0.01" min="0" value="0"
                             class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
+                        <span id="firstRewardBadgeDrawer" class="hidden mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full"></span>
                     </label>
 
                     <label class="flex flex-col text-base">
@@ -76,11 +87,6 @@ new class extends Component {
                             class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
                     </label>
 
-                    <label class="flex items-center space-x-2 text-base">
-                        <input id="firstTimeToggleDrawer" type="checkbox" class="h-4 w-4" />
-                        <span class="text-sm text-gray-600 dark:text-gray-300">First Time Investor</span>
-                    </label>
-
                     <div class="mt-3 flex items-center justify-end space-x-2">
                         <button id="computeBtnDrawer" class="px-4 py-2 bg-indigo-600 text-white rounded shadow hover:bg-indigo-500">Calculate</button>
                         <button id="exportBtnDrawer" class="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-500">Export</button>
@@ -91,6 +97,16 @@ new class extends Component {
 
         <!-- Inline form for larger screens -->
         <form id="calcForm" class="hidden sm:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4" onsubmit="return false;">
+
+            {{-- First Time Investor — first position --}}
+            <label class="flex items-start gap-2.5 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700/50 rounded-xl cursor-pointer">
+                <input id="firstTimeToggle" type="checkbox" class="h-4 w-4 mt-0.5 accent-indigo-600 flex-shrink-0" />
+                <div>
+                    <span class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 block leading-tight">First Time Investor</span>
+                    <span class="text-xs text-indigo-500 dark:text-indigo-400 leading-tight">Reward auto-fills by amount</span>
+                </div>
+            </label>
+
             <label class="flex flex-col text-base">
                 <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">Invested Amount or Current Assets</span>
                 <input id="invested" type="number" step="0.01" min="0" value="1000"
@@ -98,9 +114,10 @@ new class extends Component {
             </label>
 
             <label class="flex flex-col text-base">
-                <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">First Recharge Reward (this is for new invite)</span>
+                <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">First Recharge Reward <span class="text-xs text-gray-400">(for new invite)</span></span>
                 <input id="firstReward" type="number" step="0.01" min="0" value="0"
                     class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
+                <span id="firstRewardBadge" class="hidden mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full"></span>
             </label>
 
             <label class="flex flex-col text-base">
@@ -115,10 +132,6 @@ new class extends Component {
                     class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
             </label>
 
-            <label class="flex items-center space-x-2 text-base">
-                <input id="firstTimeToggle" type="checkbox" class="h-4 w-4" />
-                <span class="text-sm text-gray-600 dark:text-gray-300">First Time Investor</span>
-            </label>
         </form>
 
         <div class="flex items-center justify-between mb-3">
@@ -309,6 +322,32 @@ new class extends Component {
                     firstTimeToggleDrawer.addEventListener('change', ()=> firstTimeToggle.checked = firstTimeToggleDrawer.checked);
                 }
 
+                // Auto-fill First Recharge Reward based on invested amount tiers
+                function autoFillFirstReward() {
+                    const ft = (firstTimeToggle && firstTimeToggle.checked) || (firstTimeToggleDrawer && firstTimeToggleDrawer.checked);
+                    const badge = document.getElementById('firstRewardBadge');
+                    const badgeDrawer = document.getElementById('firstRewardBadgeDrawer');
+                    if (!ft) {
+                        if (badge) badge.classList.add('hidden');
+                        if (badgeDrawer) badgeDrawer.classList.add('hidden');
+                        return;
+                    }
+                    const amount = parseFloat(investedEl ? investedEl.value : 0) || 0;
+                    let reward = 0;
+                    let tierLabel = '';
+                    if (amount >= 2000)      { reward = 120; tierLabel = '$2,000+'; }
+                    else if (amount >= 1000) { reward = 40;  tierLabel = '$1,000–1,999'; }
+                    else if (amount >= 500)  { reward = 15;  tierLabel = '$500–999'; }
+                    if (firstRewardEl) firstRewardEl.value = reward;
+                    const drawerFirstReward = document.getElementById('firstRewardDrawer');
+                    if (drawerFirstReward) drawerFirstReward.value = reward;
+                    const badgeText = reward > 0
+                        ? `✓ Auto-filled $${reward} (${tierLabel})`
+                        : '⚠ Enter $500+ to auto-fill';
+                    if (badge)       { badge.textContent = badgeText;       badge.classList.remove('hidden'); }
+                    if (badgeDrawer) { badgeDrawer.textContent = badgeText; badgeDrawer.classList.remove('hidden'); }
+                }
+
                 // when first-time toggle changes adjust signalsPerDay UI
                 function updateFirstTimeUI() {
                     const ft = (firstTimeToggle && firstTimeToggle.checked) || (firstTimeToggleDrawer && firstTimeToggleDrawer.checked);
@@ -320,16 +359,30 @@ new class extends Component {
                         // disable both inputs to avoid confusion
                         if (signalsPerDayEl) signalsPerDayEl.setAttribute('disabled','true');
                         if (drawerSignals) drawerSignals.setAttribute('disabled','true');
+                        autoFillFirstReward();
                     } else {
                         // re-enable
                         if (signalsPerDayEl) signalsPerDayEl.removeAttribute('disabled');
                         const drawerSignals = document.getElementById('signalsPerDayDrawer');
                         if (drawerSignals) drawerSignals.removeAttribute('disabled');
+                        // hide badges, clear reward when unchecked
+                        const badge = document.getElementById('firstRewardBadge');
+                        const badgeDrawer = document.getElementById('firstRewardBadgeDrawer');
+                        if (badge) badge.classList.add('hidden');
+                        if (badgeDrawer) badgeDrawer.classList.add('hidden');
+                        if (firstRewardEl) firstRewardEl.value = 0;
+                        const drawerFirstReward = document.getElementById('firstRewardDrawer');
+                        if (drawerFirstReward) drawerFirstReward.value = 0;
                     }
                 }
 
                 if (firstTimeToggle) firstTimeToggle.addEventListener('change', updateFirstTimeUI);
                 if (firstTimeToggleDrawer) firstTimeToggleDrawer.addEventListener('change', updateFirstTimeUI);
+
+                // Re-run auto-fill whenever invested amount changes (while first-time is checked)
+                if (investedEl) investedEl.addEventListener('input', autoFillFirstReward);
+                const investedDrawerEl = document.getElementById('investedDrawer');
+                if (investedDrawerEl) investedDrawerEl.addEventListener('input', autoFillFirstReward);
 
                 // Drawer open/close
                 if (openDrawer) openDrawer.addEventListener('click', () => { drawer.classList.remove('translate-y-full'); drawer.classList.add('translate-y-0'); });
@@ -513,18 +566,26 @@ new class extends Component {
                     });
 
                     // summary
-                    const initialInvestment = invested + firstReward;
-                    const totalGainPercent = (totalGain / initialInvestment) * 100;
+                    // Initial capital = invested amount only (first reward is a bonus, not capital)
+                    const initialInvestment = invested;
+                    const totalGainPercent = initialInvestment > 0 ? (totalGain / initialInvestment) * 100 : 0;
 
                     const summary = document.createElement('div');
                     summary.className = 'mt-4 p-4 bg-gradient-to-r from-indigo-50 to-green-50 dark:from-indigo-900/20 dark:to-green-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800';
+                    const firstRewardRow = firstReward > 0
+                        ? `<div class="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded border border-indigo-100 dark:border-indigo-800">
+                                <div class="text-xs text-gray-500 dark:text-gray-400">First Investor Bonus</div>
+                                <div class="text-lg font-bold text-indigo-700 dark:text-indigo-300">+${formatAmount(firstReward)}</div>
+                            </div>`
+                        : '';
                     summary.innerHTML = `
                         <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 mb-3">Investment Summary</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-base">
+                        <div class="grid grid-cols-1 sm:grid-cols-${firstReward > 0 ? 5 : 4} gap-3 text-base">
                             <div class="p-3 bg-white dark:bg-gray-800 rounded border">
-                                <div class="text-xs text-gray-500 dark:text-gray-400">Initial Investment</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Initial Capital</div>
                                 <div class="text-lg font-bold text-gray-900 dark:text-white">${formatAmount(initialInvestment)}</div>
                             </div>
+                            ${firstRewardRow}
                             <div class="p-3 bg-white dark:bg-gray-800 rounded border">
                                 <div class="text-xs text-gray-500 dark:text-gray-400">Final Amount (Day ${totalDays})</div>
                                 <div class="text-lg font-bold text-gray-900 dark:text-white">${formatAmount(currentAssets)}</div>
@@ -534,7 +595,7 @@ new class extends Component {
                                 <div class="text-lg font-bold text-green-700 dark:text-green-400">+${formatAmount(totalGain)}</div>
                             </div>
                             <div class="p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-100 dark:border-green-800">
-                                <div class="text-xs text-gray-500 dark:text-gray-400">Total Return %</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Return on Capital</div>
                                 <div class="text-lg font-bold text-green-700 dark:text-green-400">${totalGainPercent.toFixed(2)}%</div>
                             </div>
                         </div>
