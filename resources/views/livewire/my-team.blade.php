@@ -54,6 +54,10 @@ new class extends Component {
     public $managerLevelFilter = '';
     public $perPage = 10;
 
+    // Export / selection
+    public array $selectedUsers = [];
+    public bool $selectAll = false;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'dateJoined' => ['except' => ''],
@@ -677,33 +681,14 @@ new class extends Component {
         return $changedFields;
     }
 
-    public function updatingSearch()
+    public function applyFilters()
     {
         $this->resetPage();
     }
 
-    public function updatingDateJoined()
+    public function clearFilter(string $field)
     {
-        $this->resetPage();
-    }
-
-    public function updatingStatusFilter()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingPerPage()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingInviterFilter()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingManagerLevelFilter()
-    {
+        $this->reset($field);
         $this->resetPage();
     }
 
@@ -738,6 +723,110 @@ new class extends Component {
             'managers_count'    => $managersCount,
             'capital_recovered' => $capitalRecovered,
         ];
+    }
+
+    public function toggleSelectAll(): void
+    {
+        if ($this->selectAll) {
+            $this->selectedUsers = $this->getAllFilteredUserIds();
+        } else {
+            $this->selectedUsers = [];
+        }
+    }
+
+    private function getAllFilteredUserIds(): array
+    {
+        $currentUser = User::find(auth()->user()->id);
+        $allTeamMembers = $this->getAllTeamMembers($currentUser->riscoin_id);
+        $userIds = $allTeamMembers->pluck('id')->toArray();
+
+        if (empty($userIds)) {
+            return [];
+        }
+
+        return User::whereIn('id', $userIds)
+            ->when($this->search, function ($query) {
+                $query->where(function ($q) {
+                    $q->where('name', 'like', '%' . $this->search . '%')
+                      ->orWhere('email', 'like', '%' . $this->search . '%');
+                });
+            })
+            ->when($this->dateJoined, function ($query) {
+                $query->whereDate('created_at', $this->dateJoined);
+            })
+            ->when($this->statusFilter === 'active', function ($query) {
+                $query->where('is_active', true);
+            })
+            ->when($this->statusFilter === 'inactive', function ($query) {
+                $query->where('is_active', false);
+            })
+            ->when($this->inviterFilter, function ($query) {
+                $query->where('inviters_code', $this->inviterFilter);
+            })
+            ->when($this->capitalRecoveryFilter, function ($query) {
+                $query->whereIn('id', $this->getFilteredUserIdsByCapitalRecovery());
+            })
+            ->when($this->managerLevelFilter, function ($query) {
+                $query->whereHas('managerLevel', function ($q) {
+                    $q->where('level', $this->managerLevelFilter);
+                });
+            })
+            ->pluck('id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
+    }
+
+    private function getExportData(): array
+    {
+        $ids = !empty($this->selectedUsers) ? $this->selectedUsers : $this->getAllFilteredUserIds();
+
+        return \App\Models\User::with(['managerLevel'])
+            ->whereIn('id', $ids)
+            ->get()
+            ->map(function ($u) {
+                $level = $u->managerLevel?->level;
+                return [
+                    'name'          => $u->name,
+                    'riscoin_id'    => $u->riscoin_id ?? 'N/A',
+                    'manager_level' => $level ? 'Level ' . $level : 'not yet manager',
+                    'sort_key'      => $level ?? 0,
+                ];
+            })
+            ->sortByDesc('sort_key')
+            ->values()
+            ->toArray();
+    }
+
+    public function exportExcel()
+    {
+        $rows = $this->getExportData();
+        $filename = 'team-export-' . now()->format('Y-m-d') . '.csv';
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+        $callback = function () use ($rows) {
+            $handle = fopen('php://output', 'w');
+            // BOM for Excel UTF-8 support
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['Name', 'Riscoin ID', 'Manager Level']);
+            foreach ($rows as $row) {
+                fputcsv($handle, [$row['name'], $row['riscoin_id'], $row['manager_level']]);
+            }
+            fclose($handle);
+        };
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function exportPdf()
+    {
+        $rows = $this->getExportData();
+        $html = view('exports.team-pdf', ['rows' => $rows])->render();
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html);
+        return response()->streamDownload(
+            fn () => print($pdf->output()),
+            'team-export-' . now()->format('Y-m-d') . '.pdf'
+        );
     }
 }; ?>
 
@@ -868,25 +957,25 @@ new class extends Component {
                 @if ($search)
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">
                         "{{ Str::limit($search, 15) }}"
-                        <button wire:click="$set('search', '')" class="ml-0.5 hover:text-blue-900 dark:hover:text-blue-100 font-bold">×</button>
+                        <button wire:click="clearFilter('search')" class="ml-0.5 hover:text-blue-900 dark:hover:text-blue-100 font-bold">×</button>
                     </span>
                 @endif
                 @if ($statusFilter)
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium">
                         {{ ucfirst($statusFilter) }}
-                        <button wire:click="$set('statusFilter', '')" class="ml-0.5 hover:text-green-900 dark:hover:text-green-100 font-bold">×</button>
+                        <button wire:click="clearFilter('statusFilter')" class="ml-0.5 hover:text-green-900 dark:hover:text-green-100 font-bold">×</button>
                     </span>
                 @endif
                 @if ($managerLevelFilter)
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium">
                         Mgr Lvl {{ $managerLevelFilter }}
-                        <button wire:click="$set('managerLevelFilter', '')" class="ml-0.5 hover:text-purple-900 dark:hover:text-purple-100 font-bold">×</button>
+                        <button wire:click="clearFilter('managerLevelFilter')" class="ml-0.5 hover:text-purple-900 dark:hover:text-purple-100 font-bold">×</button>
                     </span>
                 @endif
                 @if ($capitalRecoveryFilter)
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 font-medium">
                         {{ ucfirst($capitalRecoveryFilter) }}
-                        <button wire:click="$set('capitalRecoveryFilter', '')" class="ml-0.5 hover:text-yellow-900 dark:hover:text-yellow-100 font-bold">×</button>
+                        <button wire:click="clearFilter('capitalRecoveryFilter')" class="ml-0.5 hover:text-yellow-900 dark:hover:text-yellow-100 font-bold">×</button>
                     </span>
                 @endif
                 @if ($activeFiltersCount > 0)
@@ -900,57 +989,106 @@ new class extends Component {
         {{-- Collapsible filter body --}}
         <div x-show="filtersOpen" x-collapse
             class="border-t border-gray-100 dark:border-gray-700 px-4 py-4">
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div class="col-span-2 lg:col-span-2">
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Search</label>
-                    <flux:input wire:model.live.debounce.400ms="search" type="text"
-                        placeholder="Name, email, riscoin ID…" data-test="search-input" />
+            <form wire:submit.prevent="applyFilters">
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div class="col-span-2 lg:col-span-2">
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Search</label>
+                        <flux:input wire:model="search" type="text"
+                            placeholder="Name, email, riscoin ID…" data-test="search-input" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Status</label>
+                        <flux:select wire:model="statusFilter" data-test="status-filter">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </flux:select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Capital</label>
+                        <flux:select wire:model="capitalRecoveryFilter" data-test="capital-recovery-filter">
+                            <option value="">All Capital</option>
+                            <option value="recovered">Recovered</option>
+                            <option value="recovering">Recovering</option>
+                        </flux:select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Manager Level</label>
+                        <flux:select wire:model="managerLevelFilter" data-test="manager-level-filter">
+                            <option value="">All Levels</option>
+                            @for ($lvl = 1; $lvl <= 6; $lvl++)
+                                <option value="{{ $lvl }}">Level {{ $lvl }}</option>
+                            @endfor
+                        </flux:select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Per Page</label>
+                        <flux:select wire:model="perPage" data-test="per-page-selector">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </flux:select>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Status</label>
-                    <flux:select wire:model.live="statusFilter" data-test="status-filter">
-                        <option value="">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </flux:select>
+                <div class="flex justify-end mt-3">
+                    <button type="submit"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                        </svg>
+                        Apply Filters
+                    </button>
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Capital</label>
-                    <flux:select wire:model.live="capitalRecoveryFilter" data-test="capital-recovery-filter">
-                        <option value="">All Capital</option>
-                        <option value="recovered">Recovered</option>
-                        <option value="recovering">Recovering</option>
-                    </flux:select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Manager Level</label>
-                    <flux:select wire:model.live="managerLevelFilter" data-test="manager-level-filter">
-                        <option value="">All Levels</option>
-                        @for ($lvl = 1; $lvl <= 6; $lvl++)
-                            <option value="{{ $lvl }}">Level {{ $lvl }}</option>
-                        @endfor
-                    </flux:select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Per Page</label>
-                    <flux:select wire:model.live="perPage" data-test="per-page-selector">
-                        <option value="10">10</option>
-                        <option value="25">25</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </flux:select>
-                </div>
-            </div>
+            </form>
         </div>
     </div>
 
     {{-- Table --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {{-- Export Toolbar --}}
+        <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/40">
+            <span class="text-xs text-gray-500 dark:text-gray-400">
+                @if ($selectAll)
+                    <span class="font-semibold text-blue-600 dark:text-blue-400">All {{ count($selectedUsers) }}</span> filtered members selected
+                    &nbsp;&bull;&nbsp;
+                    <button type="button" wire:click="$set('selectAll', false); $set('selectedUsers', [])"
+                        class="text-red-500 hover:underline">Clear selection</button>
+                @elseif (count($selectedUsers) > 0)
+                    <span class="font-semibold text-blue-600 dark:text-blue-400">{{ count($selectedUsers) }}</span> selected
+                    &nbsp;&bull;&nbsp;
+                    <button type="button" wire:click="$set('selectedUsers', [])"
+                        class="text-red-500 hover:underline">Clear</button>
+                @else
+                    Use the checkbox to select rows, or export all
+                @endif
+            </span>
+            <div class="flex items-center gap-2">
+                <button wire:click="exportExcel"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Export Excel
+                </button>
+                <button wire:click="exportPdf"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                    Export PDF
+                </button>
+            </div>
+        </div>
         @if ($this->users->isNotEmpty())
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="bg-gray-50 dark:bg-gray-700/60 border-b border-gray-200 dark:border-gray-700">
+                            <th class="px-3 py-2.5 w-8">
+                                <input type="checkbox" wire:model.live="selectAll" wire:click="toggleSelectAll"
+                                    class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:focus:ring-blue-400 cursor-pointer">
+                            </th>
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Lvl</th>
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Member</th>
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Network</th>
@@ -958,7 +1096,7 @@ new class extends Component {
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Mgr</th>
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Status</th>
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Joined</th>
-                            <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap sticky right-0 bg-gray-50 dark:bg-gray-700/60">Actions</th>
+                            <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap sticky right-0 bg-gray-50 dark:bg-gray-700/60 w-10"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-700/60">
@@ -982,7 +1120,13 @@ new class extends Component {
                                     6 => 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
                                 ];
                             @endphp
-                            <tr class="hover:bg-gray-50/70 dark:hover:bg-gray-700/30 transition-colors {{ $teamLevel > 1 ? 'bg-gray-50/40 dark:bg-gray-800/50' : '' }}">
+                            <tr class="group/row hover:bg-gray-50/70 dark:hover:bg-gray-700/30 transition-colors {{ $teamLevel > 1 ? 'bg-gray-50/40 dark:bg-gray-800/50' : '' }}">
+
+                                {{-- Select --}}
+                                <td class="px-3 py-3 whitespace-nowrap w-8">
+                                    <input type="checkbox" wire:model.live="selectedUsers" value="{{ $user->id }}"
+                                        class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:focus:ring-blue-400 cursor-pointer">
+                                </td>
 
                                 {{-- Team Level --}}
                                 <td class="px-3 py-3 whitespace-nowrap">
@@ -1110,45 +1254,79 @@ new class extends Component {
                                     <div class="text-xs text-gray-400 dark:text-gray-500">{{ $user->age }}</div>
                                 </td>
 
-                                {{-- Actions --}}
-                                <td class="px-3 py-3 whitespace-nowrap sticky right-0 bg-white dark:bg-gray-800 border-l border-gray-100 dark:border-gray-700/50">
-                                    <div class="flex items-center justify-end gap-0.5">
-                                        @if (auth()->user()->riscoin_id === $user->inviters_code || auth()->user()->hasRole('admin') || auth()->user()->hasPermissionTo('my-team.add-assister'))
-                                            <button wire:click="addAssistant({{ $user->id }})"
-                                                class="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-                                                title="Add Assistant">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                                            </button>
-                                        @endif
-                                        @can('my-team.view')
-                                            <button wire:click="viewUser({{ $user->id }})"
-                                                class="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                                                title="View Info" data-test="view-user-{{ $user->id }}">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                            </button>
-                                        @endcan
-                                        @can('my-team.edit')
-                                            <button wire:click="edit({{ $user->id }})"
-                                                class="p-1.5 rounded-lg text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors"
-                                                title="Edit" data-test="edit-user-{{ $user->id }}">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                                            </button>
-                                        @endcan
-                                        @php $riscoinLink = $this->getRiscoinLinkWithCode($user->riscoin_id); @endphp
-                                        @if ($riscoinLink)
-                                            <button onclick="copyToClipboard('{{ $riscoinLink }}')"
-                                                class="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-                                                title="Copy Referral Link" data-test="copy-link-{{ $user->id }}">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-                                            </button>
-                                        @endif
-                                        @can('admin')
-                                            <button onclick="Livewire.dispatch('loadUserData', { userId: {{ $user->id }} })"
-                                                class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                                title="User Info" data-test="info-user-{{ $user->id }}">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                            </button>
-                                        @endcan
+                                {{-- Actions dropdown --}}
+                                <td class="px-2 py-3 whitespace-nowrap sticky right-0 bg-white dark:bg-gray-800 border-l border-gray-100 dark:border-gray-700/50 w-10">
+                                    <div class="relative flex items-center justify-center opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity"
+                                         x-data="{ open: false }"
+                                         @keydown.escape.window="open = false">
+                                        <button @click.stop="open = !open"
+                                                type="button"
+                                                class="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                :aria-expanded="open"
+                                                title="Actions">
+                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z"/>
+                                            </svg>
+                                        </button>
+
+                                        <div x-show="open"
+                                             x-cloak
+                                             x-transition:enter="transition ease-out duration-100"
+                                             x-transition:enter-start="opacity-0 scale-95"
+                                             x-transition:enter-end="opacity-100 scale-100"
+                                             x-transition:leave="transition ease-in duration-75"
+                                             x-transition:leave-start="opacity-100 scale-100"
+                                             x-transition:leave-end="opacity-0 scale-95"
+                                             @click.outside="open = false"
+                                             class="absolute z-50 top-full right-0 mt-1 w-44 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 text-sm">
+
+                                            @if (auth()->user()->riscoin_id === $user->inviters_code || auth()->user()->hasRole('admin') || auth()->user()->hasPermissionTo('my-team.add-assister'))
+                                                <button wire:click="addAssistant({{ $user->id }})" @click="open = false"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">
+                                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                                    Add Assistant
+                                                </button>
+                                            @endif
+
+                                            @can('my-team.view')
+                                                <button wire:click="viewUser({{ $user->id }})" @click="open = false"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                                                        data-test="view-user-{{ $user->id }}">
+                                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                    View Info
+                                                </button>
+                                            @endcan
+
+                                            @can('my-team.edit')
+                                                <button wire:click="edit({{ $user->id }})" @click="open = false"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-gray-700 dark:text-gray-200 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 hover:text-yellow-700 dark:hover:text-yellow-300 transition-colors"
+                                                        data-test="edit-user-{{ $user->id }}">
+                                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                                    Edit
+                                                </button>
+                                            @endcan
+
+                                            @php $riscoinLink = $this->getRiscoinLinkWithCode($user->riscoin_id); @endphp
+                                            @if ($riscoinLink)
+                                                <button data-referral-link="{{ $riscoinLink }}"
+                                                        @click="copyToClipboard($el.getAttribute('data-referral-link')); open = false"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-700 dark:hover:text-green-300 transition-colors"
+                                                        data-test="copy-link-{{ $user->id }}">
+                                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                                                    Copy Referral Link
+                                                </button>
+                                            @endif
+
+                                            @can('admin')
+                                                <div class="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+                                                <button onclick="Livewire.dispatch('loadUserData', { userId: {{ $user->id }} })" @click="open = false"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                        data-test="info-user-{{ $user->id }}">
+                                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                    User Details
+                                                </button>
+                                            @endcan
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
