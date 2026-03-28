@@ -137,8 +137,7 @@ new class extends Component {
 <div>
     @if($this->isAdmin())
         <!-- Modal -->
-        <div x-data="{ open: @entangle('showModal') }"
-             x-show="open"
+        <div x-data="{ open: @entangle('showModal') }"             x-init="window.addEventListener('open-user-info', (e) => { $wire.loadUserData(e.detail.userId); })"             x-show="open"
              x-on:keydown.escape.window="$wire.closeModal()"
              class="fixed inset-0 z-50 overflow-hidden"
              style="display: none;">

@@ -2,6 +2,7 @@
 
 use Livewire\Volt\Component;
 use App\Models\Manager;
+use Illuminate\Support\Facades\Auth;
 
 new class extends Component {
     public $message;
@@ -84,6 +85,7 @@ new class extends Component {
         draggedFromLevel: null,
         showConfirmModal: false,
         confirmData: null,
+        searchQuery: '',
         showToast(type, text) {
             this.messageType = type;
             this.messageText = text;
@@ -123,6 +125,9 @@ new class extends Component {
         Livewire.on('show-message', (data) => {
             showToast(data.type, data.text);
         });
+        window.addEventListener('show-reassign-confirm', (e) => {
+            showConfirm(e.detail.managerId, e.detail.currentLevel, e.detail.targetLevel, e.detail.userName);
+        });
     " class="relative">
         <!-- Toast Notification -->
         <div x-show="showMessage" x-transition
@@ -135,9 +140,33 @@ new class extends Component {
             <span x-text="messageText"></span>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <!-- Search Bar -->
+        <div class="mb-4">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"></path>
+                    </svg>
+                </div>
+                <input type="text"
+                       x-model="searchQuery"
+                       placeholder="Search managers by name..."
+                       class="w-full pl-10 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <button x-show="searchQuery"
+                        x-cloak
+                        @click="searchQuery = ''"
+                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto pb-3">
+        <div class="grid gap-4" style="grid-template-columns: repeat(6, minmax(200px, 1fr)); min-width: max-content; width: 100%;">
             @foreach ($this->levels as $level => $managers)
-                <div class="kanban-column bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 kanban-dropzone"
+                <div class="kanban-column bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 kanban-dropzone transition-all duration-150"
                      data-level="{{ $level }}"
                      ondragover="handleDragOver(event)"
                      ondragleave="handleDragLeave(event)"
@@ -146,33 +175,55 @@ new class extends Component {
                         <h3 class="text-sm font-medium text-gray-700 dark:text-gray-200">Level {{ $level }}</h3>
                         <span class="text-xs text-gray-500">{{ $managers->count() }} </span>
                     </div>
-                    <div class="space-y-2 min-h-[120px]">
+                    <div class="space-y-2 min-h-[120px] lg:max-h-[560px] lg:overflow-y-auto lg:pr-0.5">
                         @forelse ($managers as $manager)
                             @php $user = $manager->user; @endphp
                             @if ($user)
-                            <div class="kanban-card bg-white dark:bg-gray-700 rounded-lg shadow-sm p-3 flex items-center gap-3 hover:shadow-md transition-all duration-200 group"
+                            <div class="kanban-card bg-white dark:bg-gray-700 rounded-lg shadow-sm p-2.5 flex items-center gap-2 hover:shadow-md transition-all duration-200 group cursor-grab active:cursor-grabbing select-none"
                                  data-manager-id="{{ $manager->id }}"
-                                 data-current-level="{{ $level }}">
-                                <div class="h-10 w-10 flex-shrink-0 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center cursor-move"
-                                     draggable="true"
-                                     ondragstart="handleDragStart(event, {{ $level }})"
-                                     ondragend="handleDragEnd(event)">
+                                 data-current-level="{{ $level }}"
+                                 data-search-name="{{ strtolower($user->name) }}"
+                                 draggable="true"
+                                 ondragstart="handleDragStart(event, {{ $level }})"
+                                 ondragend="handleDragEnd(event)"
+                                 x-show="!searchQuery || $el.getAttribute('data-search-name').includes(searchQuery.toLowerCase())">
+                                <!-- Drag handle -->
+                                <div class="flex-shrink-0 text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-400 transition-colors">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 10 16">
+                                        <circle cx="2.5" cy="2.5" r="1.5"/><circle cx="7.5" cy="2.5" r="1.5"/>
+                                        <circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/>
+                                        <circle cx="2.5" cy="13.5" r="1.5"/><circle cx="7.5" cy="13.5" r="1.5"/>
+                                    </svg>
+                                </div>
+                                                <div class="h-10 w-10 flex-shrink-0 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
                                     @if ($user->getFirstMediaUrl('avatar'))
-                                        <img src="{{ $user->getFirstMediaUrl('avatar') }}" alt="{{ $user->name }}" class="h-full w-full object-cover">
+                                        <img src="{{ $user->getFirstMediaUrl('avatar') }}" alt="{{ $user->name }}" class="h-full w-full object-cover" draggable="false">
                                     @else
-                                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
+                                        <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
                                     @endif
                                 </div>
-                                <div class="flex-1 min-w-0 cursor-move"
-                                     draggable="true"
-                                     ondragstart="handleDragStart(event, {{ $level }})"
-                                     ondragend="handleDragEnd(event)">
-                                    <div class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ $user->name }}</div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-300 truncate">{{ $user->riscoin_id ?? '—' }}</div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-medium text-gray-900 dark:text-white break-words leading-tight">{{ $user->name }}</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-300 break-all mt-0.5">{{ $user->riscoin_id ?? '—' }}</div>
                                 </div>
+                                <!-- Info button -->
                                 <button type="button"
+                                        draggable="false"
+                                        @mousedown.stop
+                                        @click.stop="window.dispatchEvent(new CustomEvent('open-user-info', { detail: { userId: {{ $user->id }} } }))"
+                                        class="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded flex-shrink-0"
+                                        title="View user info">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                </button>
+                                <!-- Delete button -->
+                                <button type="button"
+                                        draggable="false"
+                                        @mousedown.stop
                                         @click.stop="if(confirm('Are you sure you want to remove {{ addslashes($user->name) }} from managers?')) { $wire.deleteManager({{ $manager->id }}) }"
-                                        class="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                                        class="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded flex-shrink-0"
                                         title="Remove manager">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -186,6 +237,7 @@ new class extends Component {
                     </div>
                 </div>
             @endforeach
+        </div>
         </div>
 
         <!-- Confirmation Modal -->
@@ -249,6 +301,10 @@ new class extends Component {
             </div>
         </div>
     </div>
+
+    @if(Auth::user()?->hasRole('admin'))
+        <livewire:components.user-info-modal />
+    @endif
 
     <script>
         let draggedElement = null;
@@ -365,10 +421,15 @@ new class extends Component {
                     return;
                 }
 
-                if (confirm('Move this manager from Level ' + currentLevel + ' to Level ' + targetLevel + '?')) {
-                    // Call Livewire method with both managerId and targetLevel
-                    @this.reassignUser(parseInt(managerId), targetLevel, currentLevel);
-                }
+                const userName = dragData.userName || 'this manager';
+                window.dispatchEvent(new CustomEvent('show-reassign-confirm', {
+                    detail: {
+                        managerId: managerId,
+                        currentLevel: currentLevel,
+                        targetLevel: targetLevel,
+                        userName: userName
+                    }
+                }));
             } catch (error) {
                 console.error('Error parsing drag data:', error);
             }
@@ -381,16 +442,6 @@ new class extends Component {
                 zone.addEventListener('dragover', handleDragOver);
                 zone.addEventListener('dragleave', handleDragLeave);
             });
-
-            // Set up event listeners for cards
-            document.querySelectorAll('.kanban-card').forEach(card => {
-                // Get current level from data attribute
-                const currentLevel = card.getAttribute('data-current-level');
-                if (currentLevel) {
-                    card.addEventListener('dragstart', (e) => handleDragStart(e, parseInt(currentLevel)));
-                    card.addEventListener('dragend', handleDragEnd);
-                }
-            });
         });
 
         // Reinitialize when Livewire updates the DOM
@@ -399,14 +450,6 @@ new class extends Component {
             document.querySelectorAll('.kanban-dropzone').forEach(zone => {
                 zone.addEventListener('dragover', handleDragOver);
                 zone.addEventListener('dragleave', handleDragLeave);
-            });
-
-            document.querySelectorAll('.kanban-card').forEach(card => {
-                const currentLevel = card.getAttribute('data-current-level');
-                if (currentLevel) {
-                    card.addEventListener('dragstart', (e) => handleDragStart(e, parseInt(currentLevel)));
-                    card.addEventListener('dragend', handleDragEnd);
-                }
             });
         });
 
@@ -418,16 +461,6 @@ new class extends Component {
                     zone.removeEventListener('dragleave', handleDragLeave);
                     zone.addEventListener('dragover', handleDragOver);
                     zone.addEventListener('dragleave', handleDragLeave);
-                });
-
-                document.querySelectorAll('.kanban-card').forEach(card => {
-                    const currentLevel = card.getAttribute('data-current-level');
-                    if (currentLevel) {
-                        card.removeEventListener('dragstart', handleDragStart);
-                        card.removeEventListener('dragend', handleDragEnd);
-                        card.addEventListener('dragstart', (e) => handleDragStart(e, parseInt(currentLevel)));
-                        card.addEventListener('dragend', handleDragEnd);
-                    }
                 });
             }, 50);
         });
