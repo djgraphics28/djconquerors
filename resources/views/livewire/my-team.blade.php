@@ -1093,7 +1093,6 @@ new class extends Component {
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Member</th>
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Network</th>
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Financials</th>
-                            <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Mgr</th>
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Status</th>
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Joined</th>
                             <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap sticky right-0 bg-gray-50 dark:bg-gray-700/60 w-10"></th>
@@ -1128,11 +1127,16 @@ new class extends Component {
                                         class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:focus:ring-blue-400 cursor-pointer">
                                 </td>
 
-                                {{-- Team Level --}}
+                                {{-- Manager Level --}}
                                 <td class="px-3 py-3 whitespace-nowrap">
-                                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold {{ $tlColor }}">
-                                        {{ $teamLevel }}
-                                    </span>
+                                    @if ($user->managerLevel)
+                                        @php $mgrClass = $mgrLevelColors[$user->managerLevel->level] ?? 'bg-gray-100 text-gray-700'; @endphp
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold {{ $mgrClass }}">
+                                            L{{ $user->managerLevel->level }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-300 dark:text-gray-600">—</span>
+                                    @endif
                                 </td>
 
                                 {{-- Member --}}
@@ -1205,18 +1209,6 @@ new class extends Component {
                                             </span>
                                         </div>
                                     </div>
-                                </td>
-
-                                {{-- Manager Level --}}
-                                <td class="px-3 py-3 whitespace-nowrap">
-                                    @if ($user->managerLevel)
-                                        @php $mgrClass = $mgrLevelColors[$user->managerLevel->level] ?? 'bg-gray-100 text-gray-700'; @endphp
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold {{ $mgrClass }}">
-                                            L{{ $user->managerLevel->level }}
-                                        </span>
-                                    @else
-                                        <span class="text-gray-300 dark:text-gray-600">—</span>
-                                    @endif
                                 </td>
 
                                 {{-- Status --}}
