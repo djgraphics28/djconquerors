@@ -16,6 +16,7 @@
         tbody td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; }
         .level-badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 600; background: #dbeafe; color: #1d4ed8; }
         .no-manager { color: #9ca3af; font-style: italic; }
+        .capital { font-weight: 600; color: #065f46; }
         .footer { margin-top: 20px; font-size: 9px; color: #9ca3af; text-align: right; }
     </style>
 </head>
@@ -30,6 +31,7 @@
                 <th>Name</th>
                 <th>Riscoin ID</th>
                 <th>Manager Level</th>
+                <th>Capital (USD)</th>
             </tr>
         </thead>
         <tbody>
@@ -45,6 +47,7 @@
                             <span class="level-badge">{{ $row['manager_level'] }}</span>
                         @endif
                     </td>
+                    <td><span class="capital">${{ $row['invested_amount'] }}</span></td>
                 </tr>
             @endforeach
         </tbody>

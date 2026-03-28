@@ -725,6 +725,41 @@ new class extends Component {
         ];
     }
 
+    public function getDjcInsightProperty(): array
+    {
+        $currentUser = auth()->user()->load('managerLevel');
+        $stats = $this->teamStats;
+
+        $currentLevel = $currentUser->managerLevel?->level ?? 0;
+        $directs = $stats['direct'];
+        $total   = $stats['total'];
+
+        $levels = [
+            1 => ['directs' => 3,  'members' => 0,   'reward' => 15],
+            2 => ['directs' => 5,  'members' => 15,  'reward' => 40],
+            3 => ['directs' => 6,  'members' => 50,  'reward' => 100],
+            4 => ['directs' => 10, 'members' => 100, 'reward' => 250],
+            5 => ['directs' => 15, 'members' => 200, 'reward' => 1000],
+            6 => ['directs' => 20, 'members' => 500, 'reward' => 3000],
+        ];
+
+        $nextLevel      = $currentLevel < 6 ? $currentLevel + 1 : null;
+        $nextReq        = $nextLevel ? $levels[$nextLevel] : null;
+        $directsNeeded  = $nextReq ? max(0, $nextReq['directs'] - $directs) : 0;
+        $membersNeeded  = $nextReq ? max(0, $nextReq['members'] - $total) : 0;
+
+        return [
+            'currentLevel'  => $currentLevel,
+            'directs'       => $directs,
+            'total'         => $total,
+            'nextLevel'     => $nextLevel,
+            'nextReq'       => $nextReq,
+            'directsNeeded' => $directsNeeded,
+            'membersNeeded' => $membersNeeded,
+            'levels'        => $levels,
+        ];
+    }
+
     public function toggleSelectAll(): void
     {
         if ($this->selectAll) {
@@ -786,10 +821,11 @@ new class extends Component {
             ->map(function ($u) {
                 $level = $u->managerLevel?->level;
                 return [
-                    'name'          => $u->name,
-                    'riscoin_id'    => $u->riscoin_id ?? 'N/A',
-                    'manager_level' => $level ? 'Level ' . $level : 'not yet manager',
-                    'sort_key'      => $level ?? 0,
+                    'name'           => $u->name,
+                    'riscoin_id'     => $u->riscoin_id ?? 'N/A',
+                    'manager_level'  => $level ? 'Level ' . $level : 'not yet manager',
+                    'invested_amount' => $u->invested_amount !== null ? number_format((float) $u->invested_amount, 2) : '0.00',
+                    'sort_key'       => $level ?? 0,
                 ];
             })
             ->sortByDesc('sort_key')
@@ -809,9 +845,9 @@ new class extends Component {
             $handle = fopen('php://output', 'w');
             // BOM for Excel UTF-8 support
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, ['Name', 'Riscoin ID', 'Manager Level']);
+            fputcsv($handle, ['Name', 'Riscoin ID', 'Manager Level', 'Capital (USD)']);
             foreach ($rows as $row) {
-                fputcsv($handle, [$row['name'], $row['riscoin_id'], $row['manager_level']]);
+                fputcsv($handle, [$row['name'], $row['riscoin_id'], $row['manager_level'], $row['invested_amount']]);
             }
             fclose($handle);
         };
@@ -854,6 +890,159 @@ new class extends Component {
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Team</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage and monitor your downline network</p>
+        </div>
+    </div>
+
+    {{-- DJC Insights --}}
+    @php $insight = $this->djcInsight; @endphp
+    <div class="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-indigo-950/40 dark:via-gray-900 dark:to-purple-950/40 rounded-2xl border border-indigo-200 dark:border-indigo-800/60 p-5">
+        {{-- Decorative blobs --}}
+        <div class="absolute -right-12 -top-12 w-56 h-56 bg-indigo-200/25 dark:bg-indigo-700/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -left-8 -bottom-8 w-40 h-40 bg-purple-200/25 dark:bg-purple-700/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="relative">
+            {{-- Header row --}}
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow flex-shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-white tracking-tight">DJC Insights</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Your personalized manager progress</p>
+                </div>
+                @if ($insight['currentLevel'] > 0)
+                    <div class="ml-auto">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-600 dark:bg-indigo-500 text-white shadow-sm">
+                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                            Level {{ $insight['currentLevel'] }} Manager
+                        </span>
+                    </div>
+                @endif
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+                {{-- Left: Message + Progress --}}
+                <div class="lg:col-span-2 space-y-3">
+
+                    {{-- Personalized message --}}
+                    <div class="bg-white/80 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl px-4 py-3.5 border border-white dark:border-gray-700/50">
+                        @if ($insight['currentLevel'] === 0)
+                            <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                You are <strong class="text-gray-900 dark:text-white">not yet a Manager</strong>. You currently have <strong class="text-indigo-600 dark:text-indigo-400">{{ $insight['directs'] }} direct invite{{ $insight['directs'] != 1 ? 's' : '' }}</strong>.
+                                @if ($insight['directsNeeded'] > 0)
+                                    Invite <strong class="text-indigo-600 dark:text-indigo-400">{{ $insight['directsNeeded'] }} more member{{ $insight['directsNeeded'] != 1 ? 's' : '' }}</strong> directly to unlock <strong>Level 1 Manager</strong> status and start earning rewards! 💪
+                                @endif
+                            </p>
+                        @elseif ($insight['currentLevel'] === 6)
+                            <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                🎉 <strong class="text-indigo-600 dark:text-indigo-400">Congratulations!</strong> You have reached the <strong>highest rank — Level 6 Manager!</strong> You earn a minimum of <strong class="text-emerald-600 dark:text-emerald-400">$3,000 every 10 days</strong>. Keep inspiring and growing your network!
+                            </p>
+                        @else
+                            <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                You are a <strong class="text-indigo-600 dark:text-indigo-400">Level {{ $insight['currentLevel'] }} Manager</strong>.
+                                @if ($insight['directsNeeded'] === 0 && $insight['membersNeeded'] === 0)
+                                    You already qualify for <strong class="text-emerald-600 dark:text-emerald-400">Level {{ $insight['nextLevel'] }}</strong> — congratulations, you're ready for the next promotion! 🎉
+                                @else
+                                    You only need
+                                    @if ($insight['directsNeeded'] > 0)
+                                        <strong class="text-indigo-600 dark:text-indigo-400">{{ $insight['directsNeeded'] }} more direct{{ $insight['directsNeeded'] != 1 ? 's' : '' }}</strong>
+                                    @endif
+                                    @if ($insight['directsNeeded'] > 0 && $insight['membersNeeded'] > 0) and @endif
+                                    @if ($insight['membersNeeded'] > 0)
+                                        <strong class="text-purple-600 dark:text-purple-400">{{ $insight['membersNeeded'] }} more total member{{ $insight['membersNeeded'] != 1 ? 's' : '' }}</strong>
+                                    @endif
+                                    to become a <strong>Level {{ $insight['nextLevel'] }} Manager</strong>. Keep it up! 🚀
+                                @endif
+                            </p>
+                        @endif
+                    </div>
+
+                    {{-- Progress bars toward next level --}}
+                    @if ($insight['currentLevel'] < 6)
+                        @php
+                            $nextReq = $insight['nextReq'];
+                            $directPct = $nextReq['directs'] > 0
+                                ? min(100, (int) round(($insight['directs'] / $nextReq['directs']) * 100))
+                                : 100;
+                            $memberPct = $nextReq['members'] > 0
+                                ? min(100, (int) round(($insight['total'] / $nextReq['members']) * 100))
+                                : 100;
+                        @endphp
+                        <div class="bg-white/80 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl px-4 py-3.5 border border-white dark:border-gray-700/50 space-y-3">
+                            <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Progress to Level {{ $insight['nextLevel'] }}</p>
+
+                            {{-- Directs --}}
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Direct Invites</span>
+                                    <span class="text-xs font-bold text-indigo-600 dark:text-indigo-400">{{ $insight['directs'] }} / {{ $nextReq['directs'] }}</span>
+                                </div>
+                                <div class="h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-700" style="width: {{ $directPct }}%"></div>
+                                </div>
+                            </div>
+
+                            {{-- Total members (only when required) --}}
+                            @if ($nextReq['members'] > 0)
+                                <div>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-xs font-medium text-gray-600 dark:text-gray-300">Total Team Members</span>
+                                        <span class="text-xs font-bold text-purple-600 dark:text-purple-400">{{ $insight['total'] }} / {{ $nextReq['members'] }}</span>
+                                    </div>
+                                    <div class="h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                        <div class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-700" style="width: {{ $memberPct }}%"></div>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                </div>
+
+                {{-- Right: Rewards table --}}
+                <div class="bg-white/80 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white dark:border-gray-700/50 overflow-hidden">
+                    <div class="px-3.5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600">
+                        <p class="text-xs font-bold text-white uppercase tracking-wide">Manager Rewards</p>
+                        <p class="text-[11px] text-indigo-200 mt-0.5">Minimum payout every 10 days</p>
+                    </div>
+                    <div class="divide-y divide-gray-100 dark:divide-gray-700/50">
+                        @foreach ($insight['levels'] as $lvl => $req)
+                            @php
+                                $isCurrentLvl = $insight['currentLevel'] === $lvl;
+                                $isDone = $insight['currentLevel'] > $lvl;
+                            @endphp
+                            <div class="flex items-center justify-between px-3.5 py-2 {{ $isCurrentLvl ? 'bg-indigo-50 dark:bg-indigo-900/30' : '' }}">
+                                <div class="flex items-center gap-2">
+                                    @if ($isCurrentLvl)
+                                        <div class="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0">
+                                            <svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                        </div>
+                                    @elseif ($isDone)
+                                        <div class="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                                            <svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                        </div>
+                                    @else
+                                        <div class="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 flex-shrink-0"></div>
+                                    @endif
+                                    <span class="text-xs font-semibold
+                                        {{ $isCurrentLvl ? 'text-indigo-700 dark:text-indigo-300' : ($isDone ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400') }}">
+                                        Level {{ $lvl }}
+                                    </span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs font-bold
+                                        {{ $isCurrentLvl ? 'text-indigo-700 dark:text-indigo-300' : ($isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400') }}">
+                                        ${{ number_format($req['reward']) }}
+                                    </span>
+                                    <span class="block text-[10px] text-gray-400">/ 10 days</span>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+            </div>
         </div>
     </div>
 
