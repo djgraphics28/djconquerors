@@ -312,12 +312,12 @@ new class extends Component {
         </div>
     @endif
 
-    @if ($this->showLatestInvitesWidget)
+    {{-- @if ($this->showLatestInvitesWidget) --}}
         {{-- latest invites widget --}}
         <div class="mb-6">
             <livewire:widget.latest-invites :currentNode="$currentNode" />
         </div>
-    @endif
+    {{-- @endif --}}
 
     {{-- share link widget --}}
     <div class="mb-6">
