@@ -122,6 +122,16 @@
                         :current="request()->routeIs('reply-template.index')" wire:navigate>{{ __('Reply Templates') }}
                     </flux:navlist.item>
                 @endcan
+                @auth
+                    <flux:navlist.item icon="heart" :href="route('donate.index')"
+                        :current="request()->routeIs('donate.index')" wire:navigate>{{ __('Donate') }}
+                    </flux:navlist.item>
+                @endauth
+                @can('donate.manage')
+                    <flux:navlist.item icon="currency-dollar" :href="route('donate.manage')"
+                        :current="request()->routeIs('donate.manage')" wire:navigate>{{ __('Donation Methods') }}
+                    </flux:navlist.item>
+                @endcan
                 @can('teams.view')
                     <flux:navlist.item icon="user-group" :href="route('teams.index')"
                         :current="request()->routeIs('teams.index')" wire:navigate>{{ __('Teams') }}
