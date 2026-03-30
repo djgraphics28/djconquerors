@@ -180,6 +180,14 @@ new class extends Component {
         session()->flash('success', 'Status updated successfully!');
     }
 
+    // Update order after drag-and-drop
+    public function updateOptionOrder($orderedIds): void
+    {
+        foreach ($orderedIds as $order => $id) {
+            GuideOption::where('id', $id)->update(['order' => $order + 1]);
+        }
+    }
+
     public function with()
     {
         $query = GuideOption::query();
@@ -200,46 +208,59 @@ new class extends Component {
     }
 }; ?>
 
-<div class="p-6">
-    <!-- Success Message -->
-    @if (session('success'))
-        <div class="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-            <p class="text-green-700 dark:text-green-300">{{ session('success') }}</p>
-        </div>
-    @endif
-
-    <!-- Header with Search and Create Button -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Guide Options</h2>
-            <p class="text-gray-600 dark:text-gray-400 mt-1">Manage your guide options and their display order</p>
-        </div>
-        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <!-- Search Input -->
-            <div class="relative w-full sm:w-64">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+<div>
+    <!-- Header Card -->
+    <div class="bg-gradient-to-r from-teal-600 via-cyan-600 to-sky-600 rounded-2xl p-5 mb-5 text-white shadow-sm">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                 </div>
-                <input wire:model.live.debounce.300ms="search" type="text"
-                    class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Search guide options...">
+                <div>
+                    <h1 class="text-lg font-bold">Guide Options</h1>
+                    <p class="text-teal-100 text-sm">Manage guide categories and their display order</p>
+                </div>
             </div>
-
-            <!-- Create Button -->
             <button wire:click="openModal"
-                class="inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                class="inline-flex items-center gap-1.5 text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg transition-colors duration-200 font-medium">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                Create Guide Option
+                New Option
             </button>
         </div>
     </div>
 
+    <!-- Success Message -->
+    @if (session('success'))
+        <div class="mb-5 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center gap-3">
+            <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-sm text-emerald-700 dark:text-emerald-300">{{ session('success') }}</p>
+        </div>
+    @endif
+
+    <!-- Search Bar -->
+    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mb-5">
+        <div class="p-4">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <input wire:model.live.debounce.300ms="search" type="text"
+                    class="block w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    placeholder="Search guide options...">
+            </div>
+        </div>
+    </div>
+
     <!-- Table -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-900/50">
@@ -269,13 +290,46 @@ new class extends Component {
                         </th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody
+                    class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700"
+                    x-data="{
+                        draggedRow: null,
+                        reorderRows() {
+                            const ids = Array.from(this.$el.querySelectorAll('tr[data-id]')).map(r => parseInt(r.getAttribute('data-id')));
+                            $wire.updateOptionOrder(ids);
+                        }
+                    }">
                     @forelse($guideOptions as $option)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition duration-150">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition duration-150 cursor-move"
+                            data-id="{{ $option->id }}"
+                            draggable="true"
+                            @dragstart="draggedRow = $event.currentTarget; $event.currentTarget.classList.add('opacity-50')"
+                            @dragend="$event.currentTarget.classList.remove('opacity-50')"
+                            @dragover.prevent="$event.currentTarget.classList.add('ring-2', 'ring-inset', 'ring-teal-400')"
+                            @dragleave="$event.currentTarget.classList.remove('ring-2', 'ring-inset', 'ring-teal-400')"
+                            @drop.prevent="
+                                $event.currentTarget.classList.remove('ring-2', 'ring-inset', 'ring-teal-400');
+                                if (draggedRow && draggedRow !== $event.currentTarget) {
+                                    const all = Array.from($el.querySelectorAll('tr[data-id]'));
+                                    const fromIdx = all.indexOf(draggedRow);
+                                    const toIdx = all.indexOf($event.currentTarget);
+                                    if (fromIdx < toIdx) {
+                                        $event.currentTarget.parentNode.insertBefore(draggedRow, $event.currentTarget.nextSibling);
+                                    } else {
+                                        $event.currentTarget.parentNode.insertBefore(draggedRow, $event.currentTarget);
+                                    }
+                                    reorderRows();
+                                }
+                            ">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium">
-                                    {{ $option->order }}
-                                </span>
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+                                    </svg>
+                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium">
+                                        {{ $option->order }}
+                                    </span>
+                                </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 @if($option->hasMedia('option-image'))
@@ -295,10 +349,10 @@ new class extends Component {
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <button wire:click="togglePublish({{ $option->id }})"
-                                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition duration-200
+                                    class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium transition duration-200
                                         {{ $option->is_published
-                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
-                                            : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50' }}">
+                                            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/50'
+                                            : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50' }}">
                                     {{ $option->is_published ? 'Published' : 'Draft' }}
                                 </button>
                             </td>

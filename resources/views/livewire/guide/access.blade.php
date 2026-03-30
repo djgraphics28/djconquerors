@@ -1,100 +1,81 @@
 <?php
 
 use Livewire\Volt\Component;
-use Illuminate\Support\Facades\Log;
+use App\Models\GuideOption;
 
 new class extends Component {
     public $selectedItem = null;
+    public $options = [];
 
-    public function selectItem($item)
+    public function mount()
     {
-        $this->selectedItem = $item;
+        $this->options = GuideOption::where('is_published', true)->orderBy('order')->get();
+    }
 
-        return redirect()->route('guide.show', $item);
-        // You can add additional logic here when an item is selected
+    public function selectItem($id)
+    {
+        $this->selectedItem = $id;
+
+        return redirect()->route('guide.show', $id);
     }
 }; ?>
 
-<div class="p-4 dark:bg-gray-900">
-    <h2 class="text-xl font-bold mb-6 text-center text-gray-800 dark:text-gray-200">Select Option Guide</h2>
-
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-4xl mx-auto">
-        @foreach (['rules', 'bonchat', 'riscoin', 'binance', 'okx', 'gcash', 'maya'] as $item)
-            <a href="{{ route('guide.show', $item) }}" wire:click.prevent="selectItem('{{ $item }}')"
-                class="selection-item block aspect-square p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-300 flex flex-col items-center justify-center {{ $selectedItem === $item ? 'selected border-blue-500 shadow-lg scale-105' : '' }}">
-                @if ($item === 'binance')
-                    <img src="{{ asset('images/guide/binance.jpg') }}" alt="Binance">
-                @elseif ($item === 'rules')
-                    <img src="{{ asset('images/guide/rules.png') }}" alt="Rules">
-                @elseif ($item === 'bonchat')
-                    <img src="{{ asset('images/guide/bonchat.jpeg') }}" alt="Bonchat">
-                @elseif ($item === 'riscoin')
-                    <img src="{{ asset('images/guide/riscoin.jpeg') }}" alt="Riscoin">
-                @elseif ($item === 'okx')
-                    <img src="{{ asset('images/guide/okx.png') }}" alt="OKX">
-                @elseif ($item === 'gcash')
-                    <img src="{{ asset('images/guide/gcash.png') }}" alt="GCash">
-                @elseif ($item === 'maya')
-                    <img src="{{ asset('images/guide/maya.png') }}" alt="Maya">
-                @elseif ($item === 'ios')
-                    <img src="{{ asset('images/guide/ios.jpg') }}" alt="iOS">
-                @elseif ($item === 'android')
-                    <img src="{{ asset('images/guide/android.jpg') }}" alt="Android">
-                @endif {{-- <div class="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center mb-2">
-                    @if ($item === 'rules')
-                        <i class="fas fa-gavel text-2xl md:text-3xl text-blue-600 dark:text-blue-400"></i>
-                    @elseif($item === 'bonchat')
-                        <i class="fas fa-comments text-2xl md:text-3xl text-green-600 dark:text-green-400"></i>
-                    @elseif($item === 'riscoin')
-                        <i class="fas fa-coins text-2xl md:text-3xl text-yellow-600 dark:text-yellow-400"></i>
-                    @elseif($item === 'binance')
-                        <i class="fab fa-bitcoin text-2xl md:text-3xl text-yellow-500 dark:text-yellow-300"></i>
-                    @elseif($item === 'okx')
-                        <i class="fas fa-exchange-alt text-2xl md:text-3xl text-purple-600 dark:text-purple-400"></i>
-                    @elseif($item === 'gcash')
-                        <i class="fas fa-mobile-alt text-2xl md:text-3xl text-blue-500 dark:text-blue-300"></i>
-                    @elseif($item === 'maya')
-                        <i class="fas fa-wallet text-2xl md:text-3xl text-pink-600 dark:text-pink-400"></i>
-                    @elseif($item === 'ios')
-                        <i class="fab fa-apple text-2xl md:text-3xl text-gray-800 dark:text-gray-200"></i>
-                    @elseif($item === 'android')
-                        <i class="fab fa-android text-2xl md:text-3xl text-green-500 dark:text-green-300"></i>
-                    @endif
-                </div> --}}
-                <span
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">{{ $item }}</span>
-            </a>
-        @endforeach
+<div>
+    <!-- Header Card -->
+    <div class="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 rounded-2xl p-5 mb-5 text-white shadow-sm">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold">Learning Center</h1>
+                    <p class="text-emerald-100 text-sm">Choose a guide category to get started</p>
+                </div>
+            </div>
+            <span class="text-xs bg-white/20 text-white px-3 py-1 rounded-full font-medium">7 Guides</span>
+        </div>
     </div>
 
-    @if ($selectedItem)
-        <div class="mt-8 p-4 bg-blue-50 dark:bg-blue-900 rounded-lg max-w-md mx-auto text-center">
-            <p class="text-blue-800 dark:text-blue-200 font-medium">Selected: <span
-                    class="capitalize">{{ $selectedItem }}</span></p>
+    <!-- Options Grid -->
+    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div class="p-5">
+            @if (count($options) > 0)
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    @foreach ($options as $option)
+                        <a href="{{ route('guide.show', $option->id) }}" wire:click.prevent="selectItem({{ $option->id }})"
+                            class="group block aspect-square p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border-2 transition-all duration-200 flex flex-col items-center justify-center overflow-hidden
+                                {{ $selectedItem === $option->id
+                                    ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20 shadow-md scale-105'
+                                    : 'border-gray-200 dark:border-gray-600 hover:border-teal-400 dark:hover:border-teal-500 hover:-translate-y-1 hover:shadow-md' }}">
+                            @if($option->getFirstMediaUrl('option-image'))
+                                <img src="{{ $option->getFirstMediaUrl('option-image') }}" alt="{{ $option->name }}"
+                                    class="mb-2 w-14 h-14 object-contain rounded-lg">
+                            @else
+                                <div class="w-14 h-14 flex items-center justify-center mb-3 bg-teal-100 dark:bg-teal-900/30 rounded-xl group-hover:bg-teal-200 dark:group-hover:bg-teal-900/50 transition-colors duration-200">
+                                    <span class="text-xl font-bold text-teal-700 dark:text-teal-300">{{ strtoupper(substr($option->name, 0, 1)) }}</span>
+                                </div>
+                            @endif
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 capitalize text-center leading-tight">{{ $option->name }}</span>
+                            @if($selectedItem === $option->id)
+                                <span class="mt-1.5 inline-block w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                            @endif
+                        </a>
+                    @endforeach
+                </div>
+            @else
+                <div class="text-center py-16">
+                    <div class="w-16 h-16 bg-teal-50 dark:bg-teal-900/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                    </div>
+                    <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 mb-1">No guides available</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Check back soon — content is being prepared.</p>
+                </div>
+            @endif
         </div>
-    @endif
-
-    <style>
-        .selection-item {
-            transition: all 0.3s ease;
-        }
-
-        .selection-item:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-        }
-
-        .selection-item.selected {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
-        }
-
-        .dark .selection-item:hover {
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        .dark .selection-item.selected {
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
-        }
-    </style>
+    </div>
 </div>
