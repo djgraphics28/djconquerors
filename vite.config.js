@@ -15,4 +15,14 @@ export default defineConfig({
     server: {
         cors: true,
     },
+    build: {
+        chunkSizeWarningLimit: 600,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    apexcharts: ['apexcharts'],
+                },
+            },
+        },
+    },
 });
