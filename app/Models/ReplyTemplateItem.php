@@ -80,6 +80,13 @@ class ReplyTemplateItem extends Model
             return $defaults[$variable];
         }
 
+        // Computed: {language} → "English/Tagalog" or "English"
+        if ($variable === 'language') {
+            $primary   = ucfirst($user->primary_language ?? 'english');
+            $secondary = $user->secondary_language ?? null;
+            return $secondary ? $primary . '/' . ucfirst($secondary) : $primary;
+        }
+
         // Try to get the value from the user model (supports dot notation)
         try {
             $value = data_get($user, $variable);
@@ -118,6 +125,9 @@ class ReplyTemplateItem extends Model
             'age' => 'Not specified',
             'gender' => 'Not specified',
             'inviters_code' => 'N/A',
+            'primary_language' => 'english',
+            'secondary_language' => 'N/A',
+            'language' => 'English',
             'assistant.riscoin_id' => 'N/A',
         ];
 

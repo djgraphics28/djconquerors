@@ -407,7 +407,7 @@ new class extends Component {
                     <div class="px-5 py-3 bg-indigo-50/60 dark:bg-indigo-900/10 border-b border-indigo-100 dark:border-indigo-900/30">
                         <p class="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wide mb-2">Available Variables — click to copy</p>
                         <div class="flex flex-wrap gap-1.5">
-                            @foreach (['{name}', '{riscoin_id}', '{email}', '{invested_amount}', '{age}', '{gender}', '{inviters_code}', '{assistant.riscoin_id}'] as $var)
+                            @foreach (['{name}', '{riscoin_id}', '{email}', '{invested_amount}', '{age}', '{gender}', '{inviters_code}', '{primary_language}', '{secondary_language}', '{language}', '{assistant.riscoin_id}'] as $var)
                                 <div x-data="{ copied: false }">
                                     <button
                                         @click="navigator.clipboard.writeText('{{ $var }}').then(() => { copied = true; setTimeout(() => copied = false, 1500) })"
@@ -755,7 +755,7 @@ new class extends Component {
 
                     <!-- Variable insertion chips -->
                     <div class="flex flex-wrap gap-1.5 mb-2 p-2.5 bg-indigo-50/60 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
-                        @foreach (['{name}', '{riscoin_id}', '{email}', '{invested_amount}', '{age}', '{gender}', '{inviters_code}', '{assistant.riscoin_id}'] as $var)
+                        @foreach (['{name}', '{riscoin_id}', '{email}', '{invested_amount}', '{age}', '{gender}', '{inviters_code}', '{primary_language}', '{secondary_language}', '{language}', '{assistant.riscoin_id}'] as $var)
                             <button type="button"
                                 @click.prevent="insertVariable('{{ $var }}')"
                                 class="inline-block text-[11px] font-mono px-2 py-0.5 rounded-md border bg-white dark:bg-gray-700 border-indigo-200 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors cursor-pointer">

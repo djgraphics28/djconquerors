@@ -27,6 +27,8 @@ new class extends Component {
     public $gender = '';
     public $occupation = '';
     public $support_group = '';
+    public $primary_language = 'english';
+    public $secondary_language = '';
 
     /**
      * Mount the component.
@@ -48,6 +50,8 @@ new class extends Component {
         $this->gender = $user->gender;
         $this->occupation = $user->occupation;
         $this->support_group = $user->support_group ?? '';
+        $this->primary_language = $user->primary_language ?? 'english';
+        $this->secondary_language = $user->secondary_language ?? '';
 
         // dd($user->getFirstMediaUrl('avatar'));
     }
@@ -99,6 +103,8 @@ new class extends Component {
             'gender' => ['required', 'string', 'max:50'],
             'occupation' => ['required', 'string', 'max:100'],
             'support_group' => ['nullable', 'string', 'max:100'],
+            'primary_language' => ['required', 'string', 'in:english,tagalog'],
+            'secondary_language' => ['nullable', 'string', 'in:english,tagalog'],
         ]);
 
         $validated['riscoin_id'] = strtoupper($validated['riscoin_id']);
@@ -336,6 +342,18 @@ new class extends Component {
             <flux:input wire:model="occupation" :label="__('Occupation')" type="text" required autocomplete="occupation"
                 :placeholder="__('Occupation')" />
 
+            <!-- Primary Language -->
+            <flux:select wire:model="primary_language" :label="__('Primary Language')" required>
+                <option value="english">English</option>
+                <option value="tagalog">Tagalog</option>
+            </flux:select>
+
+            <!-- Secondary Language -->
+            <flux:select wire:model="secondary_language" :label="__('Secondary Language (optional)')">
+                <option value="">None</option>
+                <option value="english">English</option>
+                <option value="tagalog">Tagalog</option>
+            </flux:select>
 
             {{-- Mentions --}}
             <div class="flex flex-col gap-4">

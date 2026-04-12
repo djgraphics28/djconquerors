@@ -26,6 +26,8 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $occupation = '';
     public string $support_group = '';
     public string $bonchat_id = '';
+    public string $primary_language = 'english';
+    public string $secondary_language = '';
 
     public function mount(): void
     {
@@ -54,6 +56,8 @@ new #[Layout('components.layouts.auth')] class extends Component {
             'occupation' => ['required', 'string', 'max:100'],
             'support_group' => ['nullable', 'string', 'max:100'],
             'bonchat_id' => ['required', 'string', 'max:255'],
+            'primary_language' => ['required', 'string', 'in:english,tagalog'],
+            'secondary_language' => ['nullable', 'string', 'in:english,tagalog'],
             // 'gRecaptcha-response' => ['required', 'captcha'],
         ]);
 
@@ -186,6 +190,19 @@ new #[Layout('components.layouts.auth')] class extends Component {
         <!-- Occupation -->
         <flux:input wire:model="occupation" :label="__('Occupation')" type="text" required autocomplete="occupation"
             :placeholder="__('Occupation')" />
+
+        <!-- Primary Language -->
+        <flux:select wire:model="primary_language" :label="__('Primary Language')" required>
+            <option value="english">English</option>
+            <option value="tagalog">Tagalog</option>
+        </flux:select>
+
+        <!-- Secondary Language -->
+        <flux:select wire:model="secondary_language" :label="__('Secondary Language (optional)')">
+            <option value="">None</option>
+            <option value="english">English</option>
+            <option value="tagalog">Tagalog</option>
+        </flux:select>
 
         <!-- Password -->
         <flux:input wire:model="password" :label="__('Password')" type="password" required autocomplete="new-password"

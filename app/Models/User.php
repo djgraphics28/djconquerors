@@ -58,6 +58,8 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         'assistant_id',
         'support_group',
         'team_id',
+        'primary_language',
+        'secondary_language',
     ];
 
     /**

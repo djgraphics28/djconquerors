@@ -22,6 +22,8 @@ new class extends Component {
     public $invested_amount;
     public $birth_date;
     public $date_joined;
+    public $primary_language = 'english';
+    public $secondary_language = '';
     public $is_active = true;
     public $roles = [];
     public $inviters = [];
@@ -312,6 +314,8 @@ new class extends Component {
             'is_active' => 'boolean',
             'selectedRoles' => 'array',
             'avatar' => 'nullable|image|max:2048', // 2MB max
+            'primary_language' => 'required|in:english,tagalog',
+            'secondary_language' => 'nullable|in:english,tagalog',
         ];
     }
 
@@ -329,6 +333,8 @@ new class extends Component {
             'birth_date' => $this->birth_date,
             'date_joined' => $this->date_joined,
             'is_active' => $this->is_active,
+            'primary_language' => $this->primary_language,
+            'secondary_language' => $this->secondary_language ?: null,
             'email_verified_at' => now(),
         ];
 
@@ -376,6 +382,8 @@ new class extends Component {
         $this->birth_date = $user->birth_date;
         $this->date_joined = $user->date_joined;
         $this->is_active = $user->is_active;
+        $this->primary_language = $user->primary_language ?? 'english';
+        $this->secondary_language = $user->secondary_language ?? '';
         $this->selectedRoles = $user->roles->pluck('name')->toArray();
         $this->avatarToRemove = false;
         $this->showModal = true;
@@ -392,6 +400,8 @@ new class extends Component {
             'inviters_code' => $this->inviters_code,
             'invested_amount' => $this->invested_amount ?? 0,
             'is_active' => $this->is_active,
+            'primary_language' => $this->primary_language,
+            'secondary_language' => $this->secondary_language ?: null,
         ];
 
         // Only update password if provided
@@ -1597,6 +1607,23 @@ new class extends Component {
                                         <flux:input wire:model="birth_date" :label="__('Birth Date')" type="date" data-test="birth-date-input" />
                                         <flux:input wire:model="date_joined" :label="__('Date Joined')" type="date" data-test="date-joined-input" />
                                     </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Primary Language</label>
+                                            <select wire:model="primary_language" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                <option value="english">English</option>
+                                                <option value="tagalog">Tagalog</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Secondary Language</label>
+                                            <select wire:model="secondary_language" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                <option value="">None</option>
+                                                <option value="english">English</option>
+                                                <option value="tagalog">Tagalog</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Roles</label>
                                         <div class="flex flex-wrap gap-3">
@@ -1678,6 +1705,12 @@ new class extends Component {
                                                     {{ $cs['color'] === 'green' ? 'bg-green-100 text-green-700' : ($cs['color'] === 'yellow' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600') }}">{{ $cs['label'] }}</span>
                                             </div>
                                             <div><span class="text-xs text-gray-400 block">Date Joined</span><span class="font-medium text-gray-800 dark:text-gray-200">{{ $selectedUser->date_joined?->format('M j, Y') }}</span></div>
+                                            <div>
+                                                <span class="text-xs text-gray-400 block">Language</span>
+                                                <span class="font-medium text-gray-800 dark:text-gray-200">
+                                                    {{ ucfirst($selectedUser->primary_language ?? 'english') }}@if($selectedUser->secondary_language)/{{ ucfirst($selectedUser->secondary_language) }}@endif
+                                                </span>
+                                            </div>
                                             <div>
                                                 <span class="text-xs text-gray-400 block">Status</span>
                                                 <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium {{ $selectedUser->is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700' }}">

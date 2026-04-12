@@ -71,11 +71,21 @@ new class extends Component {
                 </div>
             </div>
             @if($currentNode?->riscoin_id)
-                <div class="flex items-center gap-1.5 bg-white/20 rounded-lg px-3 py-1.5">
-                    <svg class="w-3.5 h-3.5 text-violet-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2" />
-                    </svg>
-                    <span class="text-xs font-mono font-semibold text-white">{{ $currentNode->riscoin_id }}</span>
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1.5 bg-white/20 rounded-lg px-3 py-1.5">
+                        <svg class="w-3.5 h-3.5 text-violet-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2" />
+                        </svg>
+                        <span class="text-xs font-mono font-semibold text-white">{{ $currentNode->riscoin_id }}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 bg-white/20 rounded-lg px-3 py-1.5">
+                        <svg class="w-3.5 h-3.5 text-violet-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                        </svg>
+                        <span class="text-xs font-semibold text-white">
+                            {{ ucfirst($currentNode->primary_language ?? 'english') }}@if($currentNode->secondary_language)/{{ ucfirst($currentNode->secondary_language) }}@endif
+                        </span>
+                    </div>
                 </div>
             @endif
         </div>
