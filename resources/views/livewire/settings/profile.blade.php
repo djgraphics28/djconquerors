@@ -28,7 +28,7 @@ new class extends Component {
     public $occupation = '';
     public $support_group = '';
     public $primary_language = 'english';
-    public $secondary_language = '';
+    public $secondary_language = null;
 
     /**
      * Mount the component.
@@ -51,7 +51,7 @@ new class extends Component {
         $this->occupation = $user->occupation;
         $this->support_group = $user->support_group ?? '';
         $this->primary_language = $user->primary_language ?? 'english';
-        $this->secondary_language = $user->secondary_language ?? '';
+        $this->secondary_language = $user->secondary_language ?: null;
 
         // dd($user->getFirstMediaUrl('avatar'));
     }
@@ -88,6 +88,8 @@ new class extends Component {
     public function updateProfileInformation(): void
     {
         $user = Auth::user();
+
+        $this->secondary_language = $this->secondary_language ?: null;
 
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],

@@ -27,7 +27,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $support_group = '';
     public string $bonchat_id = '';
     public string $primary_language = 'english';
-    public string $secondary_language = '';
+    public ?string $secondary_language = null;
 
     public function mount(): void
     {
