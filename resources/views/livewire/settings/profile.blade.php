@@ -107,6 +107,7 @@ new class extends Component {
             'secondary_language' => ['nullable', 'string', 'in:english,tagalog'],
         ]);
 
+        $validated['secondary_language'] = $validated['secondary_language'] ?: null;
         $validated['riscoin_id'] = strtoupper($validated['riscoin_id']);
         $validated['inviters_code'] = strtoupper($validated['inviters_code']);
         $validated['is_birthday_mention'] = $this->isBirthdayMention;
