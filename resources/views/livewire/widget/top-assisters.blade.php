@@ -10,6 +10,9 @@ new class extends Component {
     public string $endDate = '';
     public array $topAssisters = [];
     public bool $showCustomRange = false;
+    public int $topAssistersPage = 1;
+    public int $topAssistersPerPage = 10;
+    public bool $topAssistersHasMore = false;
 
     protected const PERIODS = [
         'today' => 'today',
@@ -24,6 +27,12 @@ new class extends Component {
         $this->startDate = now()->format('Y-m-d');
         $this->endDate = now()->format('Y-m-d');
         $this->loadTopAssisters();
+    }
+
+    public function loadMoreAssisters(): void
+    {
+        $this->topAssistersPage++;
+        $this->topAssistersHasMore = count($this->topAssisters) > ($this->topAssistersPage * $this->topAssistersPerPage);
     }
 
     public function changePeriod(string $period): void
@@ -66,6 +75,8 @@ new class extends Component {
     {
         $dateRange = $this->getDateRangeForPeriod($this->filter);
         $this->topAssisters = $this->getTopAssisters($dateRange);
+        $this->topAssistersPage = 1;
+        $this->topAssistersHasMore = count($this->topAssisters) > $this->topAssistersPerPage;
     }
 
     private function getDateRangeForPeriod(string $period): array
@@ -113,7 +124,6 @@ new class extends Component {
                 $q->whereBetween('date_joined', [$start, $end]);
             }])
             ->orderByDesc('assists_count')
-            ->take(10)
             ->get();
 
         return $top->map(function ($user) {
@@ -134,6 +144,11 @@ new class extends Component {
             </svg>';
 
         return 'data:image/svg+xml;base64,' . base64_encode($svg);
+    }
+
+    public function getCurrentTopAssistersProperty(): array
+    {
+        return array_slice($this->topAssisters, 0, $this->topAssistersPage * $this->topAssistersPerPage);
     }
 
     public function getMaxAssistsProperty(): int
@@ -183,98 +198,142 @@ new class extends Component {
 ?>
 
 <div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div class="space-y-6">
-            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Top Assisters</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                        Period: <span class="font-medium text-blue-600 dark:text-blue-400">{{ $this->dateRangeLabel }}</span>
-                    </p>
-                </div>
+    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
 
-                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                    <div class="flex flex-wrap items-center gap-2">
-                        @foreach(['today', 'week', 'month', 'year', 'custom'] as $period)
-                            <button
-                                wire:click="changePeriod('{{ $period }}')"
-                                class="px-3 py-1.5 text-sm rounded-full border transition-colors duration-200 {{ $this->filter === $period ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600' }}"
-                            >
-                                {{ ucfirst($period) }}
-                            </button>
-                        @endforeach
+        {{-- Gradient Header --}}
+        <div class="relative px-5 pt-5 pb-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-sm">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
                     </div>
+                    <div>
+                        <h3 class="text-base font-semibold text-white">Top Assisters</h3>
+                        <p class="text-xs text-white/70">{{ $this->dateRangeLabel }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold bg-white/20 text-white px-2.5 py-1 rounded-full backdrop-blur-sm">
+                        {{ $this->totalAssists }} assists
+                    </span>
+                    <span class="text-xs font-medium bg-white/15 text-white/80 px-2.5 py-1 rounded-full backdrop-blur-sm">
+                        {{ count($topAssisters) }} referrers
+                    </span>
+                </div>
+            </div>
+        </div>
 
-                    @if($showCustomRange)
-                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg w-full sm:w-auto">
-                            <div class="flex items-center gap-2">
-                                <input type="date" wire:model.live="startDate" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full" />
-                                <span class="text-gray-500 dark:text-gray-400">to</span>
-                                <input type="date" wire:model.live="endDate" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full" />
+        {{-- Period Filter Bar --}}
+        <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center gap-1.5">
+            @foreach(['today' => 'Today', 'week' => 'Week', 'month' => 'Month', 'year' => 'Year', 'custom' => 'Custom'] as $period => $label)
+                <button
+                    wire:click="changePeriod('{{ $period }}')"
+                    class="px-3 py-1 text-xs font-medium rounded-full border transition-all duration-150 {{ $filter === $period ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' : 'bg-gray-50 dark:bg-gray-700/60 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700' }}"
+                >
+                    {{ $label }}
+                </button>
+            @endforeach
+        </div>
+
+        {{-- Custom Date Range --}}
+        @if($showCustomRange)
+            <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                <input type="date" wire:model.live="startDate" class="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 w-full sm:w-auto" />
+                <span class="text-xs text-gray-400 hidden sm:inline">to</span>
+                <input type="date" wire:model.live="endDate" class="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 w-full sm:w-auto" />
+                <button wire:click="applyCustomRange" class="px-4 py-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors text-xs font-medium whitespace-nowrap">Apply</button>
+            </div>
+        @endif
+
+        {{-- Assisters List --}}
+        <div class="p-5">
+            @if(empty($this->currentTopAssisters))
+                <div class="flex flex-col items-center justify-center py-10 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                    <svg class="w-10 h-10 text-gray-300 dark:text-gray-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">No assisters this period</p>
+                </div>
+            @else
+                <div
+                    wire:ignore.self
+                    class="space-y-2 overflow-y-auto pr-0.5 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700"
+                    style="max-height: 420px;"
+                    x-data="{
+                        observer: null,
+                        init() {
+                            this.$nextTick(() => this.setupObserver());
+                        },
+                        setupObserver() {
+                            if (this.observer) { this.observer.disconnect(); this.observer = null; }
+                            const sentinel = this.$refs.sentinel;
+                            if (!sentinel) return;
+                            this.observer = new IntersectionObserver((entries) => {
+                                if (entries[0].isIntersecting) {
+                                    $wire.loadMoreAssisters().then(() => {
+                                        this.$nextTick(() => this.setupObserver());
+                                    });
+                                }
+                            }, { root: this.$el, threshold: 0.1 });
+                            this.observer.observe(sentinel);
+                        }
+                    }"
+                >
+                    @foreach($this->currentTopAssisters as $index => $assister)
+                        @php
+                            $rankColors = [
+                                0 => ['badge' => 'bg-gradient-to-br from-yellow-400 to-amber-500', 'bar' => 'from-yellow-400 to-amber-500', 'text' => 'text-amber-600 dark:text-amber-400'],
+                                1 => ['badge' => 'bg-gradient-to-br from-gray-300 to-gray-400', 'bar' => 'from-gray-400 to-gray-500', 'text' => 'text-gray-600 dark:text-gray-400'],
+                                2 => ['badge' => 'bg-gradient-to-br from-orange-400 to-amber-600', 'bar' => 'from-orange-400 to-amber-600', 'text' => 'text-orange-600 dark:text-orange-400'],
+                            ];
+                            $rank = $rankColors[$index] ?? ['badge' => 'bg-gray-100 dark:bg-gray-600', 'bar' => 'from-emerald-400 to-teal-500', 'text' => 'text-emerald-600 dark:text-emerald-400'];
+                        @endphp
+                        <div class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/40 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors duration-150">
+                            {{-- Rank --}}
+                            <div class="flex-shrink-0 w-7 h-7 {{ $rank['badge'] }} rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                {{ $index < 3 ? ['🥇','🥈','🥉'][$index] : $index + 1 }}
                             </div>
-                            <button wire:click="applyCustomRange" class="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap mt-2 sm:mt-0">Apply Range</button>
+
+                            {{-- Avatar --}}
+                            <img src="{{ $assister['avatar'] }}" alt="{{ $assister['name'] }}"
+                                class="w-9 h-9 rounded-full object-cover ring-2 ring-white dark:ring-gray-700 flex-shrink-0"
+                                onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGNsYXNzPSJoLTEwIHctMTAiIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCAyNCAyNCIgc3Ryb2tlPSJjdXJyZW50Q29sb3IiPjxwYXRoIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLXdpZHRoPSIyIiBkPSJNMTYgN2E0IDQgMCAxMS04IDAgNCA0IDAgMDE4IDB6TTEyIDE0YTcgNyAwIDAwLTcgN2gxNGE3IDcgMCAwMC03LTd6IiAvPjwvc3ZnPg=='" />
+
+                            {{-- Info + bar --}}
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between mb-1">
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-semibold text-gray-800 dark:text-white truncate">{{ $assister['name'] }}</p>
+                                        <p class="text-xs text-gray-400 dark:text-gray-500 truncate">{{ $assister['riscoin_id'] ?? $assister['id'] }}</p>
+                                    </div>
+                                    <span class="text-sm font-bold {{ $rank['text'] }} ml-2 whitespace-nowrap">{{ $assister['assists_count'] }}</span>
+                                </div>
+                                <div class="h-1.5 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                                    <div class="h-full rounded-full bg-gradient-to-r {{ $rank['bar'] }} transition-all duration-500"
+                                        style="width: {{ $this->calculateProgress($assister['assists_count']) }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+
+                    {{-- IntersectionObserver sentinel --}}
+                    @if($topAssistersHasMore)
+                        <div x-ref="sentinel" class="flex items-center justify-center py-3 gap-2 text-xs text-gray-400 dark:text-gray-500">
+                            <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                            </svg>
+                            Loading more…
+                        </div>
+                    @else
+                        <div class="py-2 text-center text-xs text-gray-400 dark:text-gray-500">
+                            All {{ count($this->currentTopAssisters) }} assisters loaded
                         </div>
                     @endif
                 </div>
-            </div>
-
-            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h4 class="text-md font-semibold text-gray-700 dark:text-gray-300">Top Assisters</h4>
-                    <div class="flex items-center gap-4">
-                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ count($topAssisters) }} assisters found</span>
-                        <span class="text-sm font-medium text-blue-600 dark:text-blue-400">
-                            {{ $this->totalAssists }} total assists
-                        </span>
-                    </div>
-                </div>
-
-                @if(empty($topAssisters))
-                    <div class="text-gray-500 dark:text-gray-400 text-center py-8 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                        No assisters found for this period
-                    </div>
-                @else
-                    <div class="space-y-3">
-                        @foreach($topAssisters as $index => $assister)
-                            <div class="flex items-center p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
-                                <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full {{ $index < 3 ? 'bg-gradient-to-br from-yellow-500 to-yellow-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300' }} font-bold mr-3 text-sm">
-                                    {{ $index + 1 }}
-                                </div>
-
-                                <img
-                                    src="{{ $assister['avatar'] }}"
-                                    alt="{{ $assister['name'] }}"
-                                    class="w-10 h-10 rounded-full mr-3 object-cover border-2 border-white dark:border-gray-600 shadow-sm"
-                                    onerror="this.src='{{ $this->getDefaultAvatar() }}'"
-                                />
-
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex justify-between items-center mb-1">
-                                        <div>
-                                            <div class="font-semibold text-gray-700 dark:text-gray-300 text-sm truncate">
-                                                {{ $assister['name'] }}
-                                            </div>
-                                            <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                ID: {{ $assister['riscoin_id'] ?? $assister['id'] }}
-                                            </div>
-                                        </div>
-                                        <div class="text-base font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap ml-2">
-                                            {{ $assister['assists_count'] }}
-                                            <span class="text-xs font-normal text-gray-500 dark:text-gray-400">assists</span>
-                                        </div>
-                                    </div>
-
-                                    <div class="mt-1 bg-gray-200 dark:bg-gray-600 h-1.5 rounded-full overflow-hidden">
-                                        <div class="h-1.5 bg-gradient-to-r {{ $index < 3 ? 'from-yellow-500 to-orange-500' : 'from-blue-500 to-blue-600' }} rounded-full transition-all duration-500"
-                                             style="width: {{ $this->calculateProgress($assister['assists_count']) }}%">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-            </div>
+            @endif
         </div>
     </div>
 </div>

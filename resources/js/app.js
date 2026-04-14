@@ -1,3 +1,6 @@
+import ApexCharts from 'apexcharts';
+window.ApexCharts = ApexCharts;
+
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function (registration) {
         console.log(`SW registered successfully!`);

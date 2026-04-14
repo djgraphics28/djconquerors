@@ -39,6 +39,7 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     protected $fillable = [
         'name',
         'email',
+        'bonchat_id',
         'password',
         'riscoin_id',
         'inviters_code',
@@ -55,6 +56,10 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         'occupation',
         'support_team',
         'assistant_id',
+        'support_group',
+        'team_id',
+        'primary_language',
+        'secondary_language',
     ];
 
     /**
@@ -323,12 +328,32 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     public function managerLevel(): HasOne
     {
         // include user_id so the relation can be properly hydrated when selecting specific columns
-        return $this->hasOne(Manager::class, 'user_id', 'id')->select('user_id', 'level');
+        return $this->hasOne(Manager::class, 'user_id', 'id')->select('id', 'user_id', 'level');
     }
 
     public function assistedUsers(): HasMany
     {
         return $this->hasMany(User::class, 'assistant_id', 'id');
         // ->where('assistant_id', '!=', null);
+    }
+
+    /**
+     * Get the team that owns the User
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class, 'team_id', 'id');
+    }
+
+    /**
+     * Get all calculator usage logs for the user
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function calculatorUsageLogs(): HasMany
+    {
+        return $this->hasMany(CalculatorUsageLog::class);
     }
 }

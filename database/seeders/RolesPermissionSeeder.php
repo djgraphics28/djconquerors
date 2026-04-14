@@ -48,6 +48,12 @@ class RolesPermissionSeeder extends Seeder
             'my-withdrawals.edit',
             'my-withdrawals.delete',
 
+            //Withdrawals
+            'withdrawals.view',
+            'withdrawals.create',
+            'withdrawals.edit',
+            'withdrawals.delete',
+
             //Genealogy
             'genealogy.view',
 
@@ -67,6 +73,9 @@ class RolesPermissionSeeder extends Seeder
             'my-team.access',
             'my-team.view',
             'my-team.edit',
+            'my-team.delete',
+            'my-team.add-assister',
+
 
             //Apointments
             'appointments.book',
@@ -99,9 +108,15 @@ class RolesPermissionSeeder extends Seeder
             // Compound Interest Calculator
             'calculator.view',
             'calculator.access',
+            'calculator.usage-logs',
 
             'opalite.view',
             'opalite.manage',
+
+            'teams.view',
+            'teams.create',
+            'teams.edit',
+            'teams.delete',
         ];
 
         foreach ($adminPermissions as $permission) {

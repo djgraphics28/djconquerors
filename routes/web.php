@@ -20,6 +20,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('genealogy/{riscoinId}', 'genealogy.index')->name('genealogy.show');
     Volt::route('my-team','my-team')->name('my-team');
     Volt::route('my-withdrawals', 'my-withdrawals')->name('my-withdrawals');
+    Volt::route('withdrawals', 'withdrawals.index')->name('withdrawals.index');
+    // Volt::route('withdrawals/create', 'withdrawals.create')->name('withdrawals.create');
 
     Volt::route('book-appointment', 'appointments.create')->name('appointments.book');
     Volt::route('appointments', 'appointments.index')->name('appointments.index');
@@ -54,17 +56,69 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('settings/password', 'settings.password')->name('password.edit');
     Volt::route('settings/appearance', 'settings.appearance')->name('appearance.edit');
     Volt::route('settings/share-link', 'settings.share-link')->name('share-link');
+    Volt::route('settings/reply-to-sir-martin', 'settings.reply-to-sir-martin')->name('reply-to-sir-martin');
 
     Volt::route('managers', 'managers.index')->name('managers.index');
 
     // Compound Interest Calculator
     Volt::route('compound-calculator', 'compound-interest-calculator')->name('compound-calculator');
 
+    // Calculator logging endpoint
+    Route::post('calculator/log', function(\Illuminate\Http\Request $request) {
+        try {
+            \App\Models\CalculatorUsageLog::create([
+                'user_id' => auth()->id(),
+                'calculator_type' => 'compound_interest',
+                'invested_amount' => $request->input('initial_investment'),
+                'first_reward' => $request->input('first_reward'),
+                'signals_per_day' => $request->input('signals_per_day'),
+                'number_of_days' => $request->input('days'),
+                'is_first_time' => $request->input('is_first_time', false),
+                'final_amount' => $request->input('final_amount'),
+                'calculation_data' => $request->all(),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            \Log::error('Calculator usage log failed: ' . $e->getMessage());
+            return response()->json(['success' => false], 500);
+        }
+    })->name('calculator.log');
+
+    // Calculator Usage Logs (Admin only)
+    Volt::route('calculator-usage-logs', 'calculator-usage-logs')->name('calculator-usage-logs');
+
     // Export endpoint for compound calculator
     Route::match(['GET','POST'], 'compound-calculator/export', [\App\Http\Controllers\CompoundCalculatorExportController::class, 'export'])->name('compound-calculator.export');
 
     Volt::route('/manage-opalite','opalite.manage')->name('opalite.manage');
     Volt::route('/opalite-winners','opalite.index')->name('opalite.index');
+
+    // Reply Templates - Using Livewire Volt
+    Volt::route('reply-template', 'reply-template.index')->name('reply-template.index')->middleware('can:reply-template.access');
+
+    // Support Tickets (all authenticated users)
+    Volt::route('tickets', 'tickets.index')->name('tickets.index');
+    Volt::route('tickets/create', 'tickets.create')->name('tickets.create');
+    Volt::route('tickets/{ticketId}', 'tickets.show')->name('tickets.show');
+
+    // FAQ (all authenticated users can browse; admin can manage)
+    Volt::route('faq', 'faq.index')->name('faq.index');
+    Volt::route('faq/manage', 'faq.manage')->name('faq.manage')->middleware('can:faq.manage');
+
+    // Chatbot logs (admin only)
+    Volt::route('chatbot/logs', 'chatbot.logs')->name('chatbot.logs')->middleware('can:chatbot.manage');
+
+    // Donate
+    Volt::route('donate', 'donate.index')->name('donate.index');
+    Volt::route('donate/manage', 'donate.manage')->name('donate.manage')->middleware('can:donate.manage');
+
+    // Teams Management
+    Volt::route('teams', 'teams.index')->name('teams.index')->middleware('can:teams.view');
+
+    // Riscoin Links Management (Admin Only)
+    Volt::route('riscoin-links', 'riscoin-links.index')->name('riscoin-links.index')->middleware('can:riscoin-links.manage');
 
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(

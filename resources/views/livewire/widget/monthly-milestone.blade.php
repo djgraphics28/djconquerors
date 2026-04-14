@@ -9,11 +9,25 @@ new class extends Component {
     public ?string $riscoinId = null;
     public array $membershipAnniversaries = [];
     public string $bulkMessage = '';
+    public int $milestonesPage = 1;
+    public int $milestonesPerPage = 10;
+    public bool $milestonesHasMore = false;
 
     public function mount(?string $riscoinId = null): void
     {
         $this->riscoinId = $riscoinId;
         $this->calculateMembershipAnniversaries();
+    }
+
+    public function loadMoreMilestones(): void
+    {
+        $this->milestonesPage++;
+        $this->milestonesHasMore = count($this->membershipAnniversaries) > ($this->milestonesPage * $this->milestonesPerPage);
+    }
+
+    public function getCurrentMilestonesProperty(): array
+    {
+        return array_slice($this->membershipAnniversaries, 0, $this->milestonesPage * $this->milestonesPerPage);
     }
 
     private function calculateMembershipAnniversaries(): void
@@ -61,6 +75,8 @@ new class extends Component {
             })
             ->values()
             ->toArray();
+        $this->milestonesPage = 1;
+        $this->milestonesHasMore = count($this->membershipAnniversaries) > $this->milestonesPerPage;
     }
 
     private function getAllTeamMemberIds($userId)
@@ -161,158 +177,162 @@ new class extends Component {
 ?>
 
 <div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+    @php
+        $bulkMilestones = collect($membershipAnniversaries)->filter(fn($m) => !($m['is_today_joined'] ?? false) && ($m['is_monthly_milestone_mention'] ?? false))->values()->toArray();
+    @endphp
+
+    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+
+        {{-- Gradient Header --}}
+        <div class="px-5 pt-5 pb-4 bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500">
             <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    <div class="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900 mr-4">
-                        <svg class="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-lg shadow-sm">
+                        🏆
                     </div>
                     <div>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Membership</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Monthly milestones</p>
+                        <h3 class="text-base font-semibold text-white">Membership Milestones</h3>
+                        <p class="text-xs text-white/70">Monthly anniversaries today</p>
                     </div>
                 </div>
-                <div class="flex items-center space-x-2">
-                    <div class="bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full text-sm font-semibold">
-                        {{ count($membershipAnniversaries) }}
-                    </div>
-                    @php
-                        $bulkMilestones = collect($membershipAnniversaries)->filter(fn($m) => !($m['is_today_joined'] ?? false) && ($m['is_monthly_milestone_mention'] ?? false))->values()->toArray();
-                    @endphp
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold bg-white/20 text-white px-2.5 py-1 rounded-full backdrop-blur-sm">
+                        {{ count($membershipAnniversaries) }} today
+                    </span>
                     @if(count($bulkMilestones) > 0)
                         <button type="button"
-                                wire:click="copyBulkMilestones"
-                                onclick="copyToClipboard()"
-                                class="ml-2 px-3 py-1 bg-indigo-500 text-white text-sm rounded hover:bg-indigo-600 transition-colors"
-                                title="Copy all monthly milestones">
+                            wire:click="copyBulkMilestones"
+                            onclick="copyMilestoneBulk()"
+                            class="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-full transition-colors backdrop-blur-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
                             Copy all milestones
                         </button>
                     @endif
                 </div>
             </div>
         </div>
-        <div class="p-6">
-            @if (count($membershipAnniversaries) > 0)
-                <div class="space-y-3">
-                    @foreach ($membershipAnniversaries as $index => $member)
-                        @php
-                            $isTodayJoined = \Carbon\Carbon::parse($member['date_joined'])->format('Y-m-d') === now()->format('Y-m-d');
-                        @endphp
+
+        {{-- Milestones List --}}
+        <div class="p-5">
+            @if(count($membershipAnniversaries) > 0)
+                <div
+                    wire:ignore.self
+                    class="space-y-2 overflow-y-auto pr-0.5 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700"
+                    style="max-height: 420px;"
+                    x-data="{
+                        observer: null,
+                        init() {
+                            this.$nextTick(() => this.setupObserver());
+                        },
+                        setupObserver() {
+                            if (this.observer) { this.observer.disconnect(); this.observer = null; }
+                            const sentinel = this.$refs.sentinel;
+                            if (!sentinel) return;
+                            this.observer = new IntersectionObserver((entries) => {
+                                if (entries[0].isIntersecting) {
+                                    $wire.loadMoreMilestones().then(() => {
+                                        this.$nextTick(() => this.setupObserver());
+                                    });
+                                }
+                            }, { root: this.$el, threshold: 0.1 });
+                            this.observer.observe(sentinel);
+                        }
+                    }"
+                >
+                    @foreach($this->currentMilestones as $index => $member)
+                        @php $isTodayJoined = \Carbon\Carbon::parse($member['date_joined'])->format('Y-m-d') === now()->format('Y-m-d'); @endphp
                         <div x-data="{
-                            copied: false,
-                            async copyToClipboard() {
-                                if (!{{ $member['is_monthly_milestone_mention'] }}) return;
-
-                                // Get the message from Livewire
-                                const message = await $wire.getIndividualMessage({{ $index }});
-
-                                // Simple copy function that works on both mobile and desktop
-                                if (navigator.clipboard && navigator.clipboard.writeText) {
-                                    try {
-                                        await navigator.clipboard.writeText(message);
-                                        this.showSuccess();
-                                        return;
-                                    } catch (err) {
-                                        console.log('Clipboard API failed, trying fallback...', err);
+                                copied: false,
+                                async copyToClipboard() {
+                                    if (!{{ $member['is_monthly_milestone_mention'] ? 'true' : 'false' }}) return;
+                                    const message = await $wire.getIndividualMessage({{ $index }});
+                                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                                        try { await navigator.clipboard.writeText(message); this.showSuccess(); return; } catch(err) {}
                                     }
-                                }
+                                    this.fallbackCopy(message);
+                                },
+                                fallbackCopy(text) {
+                                    const ta = document.createElement('textarea');
+                                    ta.value = text; ta.style.position='fixed'; ta.style.left='-999999px';
+                                    document.body.appendChild(ta); ta.focus(); ta.select();
+                                    try { document.execCommand('copy'); this.showSuccess(); } catch(e) { this.showError(); } finally { document.body.removeChild(ta); }
+                                },
+                                showSuccess() { this.copied = true; setTimeout(() => this.copied = false, 2000); },
+                                showError() { alert('Failed to copy. Please try again.'); }
+                            }"
+                            class="relative group flex items-center gap-3 p-3 {{ $isTodayJoined ? 'bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-indigo-200 dark:ring-indigo-700/50' : 'bg-gray-50 dark:bg-gray-700/40 hover:bg-gray-100 dark:hover:bg-gray-700/60' }} rounded-xl transition-colors duration-150">
 
-                                // Fallback method
-                                this.fallbackCopy(message);
-                            },
-                            fallbackCopy(text) {
-                                const textArea = document.createElement('textarea');
-                                textArea.value = text;
-                                textArea.style.position = 'fixed';
-                                textArea.style.left = '-999999px';
-                                textArea.style.top = '-999999px';
-                                document.body.appendChild(textArea);
-                                textArea.focus();
-                                textArea.select();
+                            {{-- Avatar --}}
+                            <img src="{{ $member['avatar'] }}" alt="{{ $member['name'] }}"
+                                class="w-10 h-10 rounded-full object-cover ring-2 {{ $isTodayJoined ? 'ring-indigo-300 dark:ring-indigo-600' : 'ring-white dark:ring-gray-700' }} flex-shrink-0" />
 
-                                try {
-                                    const successful = document.execCommand('copy');
-                                    if (successful) {
-                                        this.showSuccess();
-                                    } else {
-                                        this.showError();
-                                    }
-                                } catch (err) {
-                                    console.error('Fallback copy failed:', err);
-                                    this.showError();
-                                } finally {
-                                    document.body.removeChild(textArea);
-                                }
-                            },
-                            showSuccess() {
-                                this.copied = true;
-                                setTimeout(() => {
-                                    this.copied = false;
-                                }, 2000);
-                            },
-                            showError() {
-                                alert('Failed to copy. Please try again or copy manually.');
-                            }
-                        }"
-                            class="group flex items-center p-3 {{ $isTodayJoined ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-700' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg transition duration-200 relative">
-                            <img class="w-10 h-10 rounded-full mr-3" src="{{ $member['avatar'] }}" alt="{{ $member['name'] }}">
+                            {{-- Info --}}
                             <div class="flex-1 min-w-0">
-                                <h4 class="font-medium text-gray-900 dark:text-white flex items-center truncate">
+                                <p class="text-xs font-semibold text-gray-800 dark:text-white truncate">
                                     {{ $member['name'] }}
-                                    @if ($isTodayJoined)
-                                        <span class="ml-2 inline-flex">🎊🎉✨</span>
-                                    @endif
-                                </h4>
-                                <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                    Joined: {{ $member['join_date'] }} •
-                                    {{ $member['months_with_team'] }}
-                                    month{{ $member['months_with_team'] > 1 ? 's' : '' }} with team
-                                    @if ($isTodayJoined)
-                                        <span class="ml-2 text-indigo-600 dark:text-indigo-400 font-medium">Joined Today! 🎉</span>
-                                    @endif
+                                    @if($isTodayJoined)<span class="ml-1">🎊🎉</span>@endif
+                                </p>
+                                <p class="text-xs text-gray-400 dark:text-gray-500 truncate">
+                                    Joined {{ $member['join_date'] }} ·
+                                    {{ $member['months_with_team'] }} month{{ $member['months_with_team'] > 1 ? 's' : '' }} with team
                                 </p>
                             </div>
 
-                            @if ($member['is_monthly_milestone_mention'])
+                            {{-- Badge --}}
+                            @if($isTodayJoined)
+                                <span class="flex-shrink-0 text-xs font-bold bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full whitespace-nowrap">Joined Today 🎉</span>
+                            @else
+                                <span class="flex-shrink-0 text-xs font-semibold bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded-full whitespace-nowrap">{{ $member['months_with_team'] }}mo 🏅</span>
+                            @endif
+
+                            {{-- Copy button --}}
+                            @if($member['is_monthly_milestone_mention'])
                                 <button @click="copyToClipboard()" :disabled="copied"
-                                    class="ml-3 p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Copy anniversary message">
-                                    <svg x-show="!copied" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    class="flex-shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors duration-150"
+                                    title="Copy milestone message">
+                                    <svg x-show="!copied" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                                     </svg>
-                                    <svg x-show="copied" class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    <svg x-show="copied" class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                     </svg>
                                 </button>
                             @else
-                                <div class="ml-3 p-2 text-gray-300 dark:text-gray-600 cursor-not-allowed" title="Copy disabled">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                <div class="flex-shrink-0 p-1.5 text-gray-200 dark:text-gray-700" title="Copy disabled">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                                     </svg>
                                 </div>
                             @endif
 
-                            <!-- Copy feedback -->
-                            <div x-show="copied" x-transition class="absolute inset-0 bg-green-500 bg-opacity-90 flex items-center justify-center rounded-lg z-10">
-                                <span class="text-white font-semibold flex items-center">
-                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                    </svg>
-                                    Copied! 📋
-                                </span>
+                            {{-- Copied overlay --}}
+                            <div x-show="copied" x-transition class="absolute inset-0 bg-green-500/90 flex items-center justify-center rounded-xl z-10">
+                                <span class="text-white font-semibold text-sm">Copied! 📋</span>
                             </div>
                         </div>
                     @endforeach
+
+                    {{-- IntersectionObserver sentinel --}}
+                    @if($milestonesHasMore)
+                        <div x-ref="sentinel" class="flex items-center justify-center py-3 gap-2 text-xs text-gray-400 dark:text-gray-500">
+                            <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                            </svg>
+                            Loading more…
+                        </div>
+                    @else
+                        <div class="py-2 text-center text-xs text-gray-400 dark:text-gray-500">
+                            All {{ count($this->currentMilestones) }} milestones loaded
+                        </div>
+                    @endif
                 </div>
             @else
-                <div class="text-center py-8">
-                    <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <p class="mt-2 text-gray-500 dark:text-gray-400">No anniversaries today</p>
+                <div class="flex flex-col items-center justify-center py-10 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                    <span class="text-4xl mb-2">🏆</span>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">No anniversaries today</p>
                 </div>
             @endif
         </div>
@@ -320,11 +340,9 @@ new class extends Component {
 
     <!-- Bulk copy holder (always present) -->
     <div id="bulkMessageHolder" style="display: none;">{{ $bulkMessage }}</div>
-    <!-- The copy action is handled globally by the Livewire hook script below -->
 
     <script>
-        // Client-side bulk copy using server-provided array (avoids race with Livewire)
-        async function copyToClipboard() {
+        async function copyMilestoneBulk() {
             try {
                 const users = @json($bulkMilestones ?? []);
                 if (!users || users.length === 0) return;

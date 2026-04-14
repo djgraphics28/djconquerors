@@ -1,118 +1,237 @@
 <?php
 
 use Livewire\Volt\Component;
+use App\Models\CalculatorUsageLog;
 
 new class extends Component {
-    //
+    public function logCalculation($calculationData)
+    {
+        try {
+            CalculatorUsageLog::create([
+                'user_id' => auth()->id(),
+                'calculator_type' => 'compound_interest',
+                'invested_amount' => $calculationData['initial_investment'] ?? null,
+                'first_reward' => $calculationData['first_reward'] ?? null,
+                'signals_per_day' => $calculationData['signals_per_day'] ?? null,
+                'number_of_days' => $calculationData['days'] ?? null,
+                'is_first_time' => $calculationData['is_first_time'] ?? false,
+                'final_amount' => $calculationData['final_amount'] ?? null,
+                'calculation_data' => $calculationData,
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Calculator usage log failed: ' . $e->getMessage());
+        }
+    }
 }; ?>
 
 <div>
-    <div id="compound-calculator"
-        class="p-4 sm:p-6 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg shadow-md">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg sm:text-xl font-semibold">Compound Interest Calculator</h2>
-            <div class="flex items-center space-x-2">
-                {{-- <button id="themeToggle" class="px-3 py-1 bg-gray-200 dark:bg-gray-800 rounded text-sm">Toggle
-                    Theme</button> --}}
-            </div>
-        </div>
+    <div id="compound-calculator" class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden text-gray-900 dark:text-gray-100">
 
-        <!-- Mobile drawer trigger -->
-        <div class="sm:hidden mb-3">
-            <button id="openDrawer" class="px-3 py-2 bg-indigo-600 text-white rounded">Open Form</button>
+        {{-- Header --}}
+        <div class="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 px-5 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-base font-semibold text-white">Compound Interest Calculator</h2>
+                    <p class="text-xs text-indigo-200">Simulate daily signal trading growth</p>
+                </div>
+            </div>
+            {{-- Mobile drawer trigger --}}
+            <button id="openDrawer" class="sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                Configure
+            </button>
         </div>
 
         <!-- Form (inline on desktop, drawer on mobile) -->
         <div id="drawer" class="fixed inset-0 z-40 transform translate-y-full transition-transform duration-300 sm:hidden">
-            <div class="absolute inset-0 bg-black/40" id="drawerBackdrop"></div>
-            <div class="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-900 p-4 rounded-t-lg shadow-lg">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-base font-semibold">Calculator</h3>
-                    <button id="closeDrawer" class="text-sm px-2 py-1">Close</button>
+            <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" id="drawerBackdrop"></div>
+            <div class="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-900 p-5 rounded-t-2xl shadow-xl border-t border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg flex items-center justify-center">
+                            <svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                        </div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Calculator</h3>
+                    </div>
+                    <button id="closeDrawer" class="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
                 </div>
 
                 <form id="calcFormDrawer" class="grid grid-cols-1 gap-3 mb-2" onsubmit="return false;">
-                    <label class="flex flex-col text-base">
-                        <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">Invested Amount or Current Assets</span>
-                        <input id="investedDrawer" type="number" step="0.01" min="0" value="1000"
-                            class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
+
+                    {{-- First Time Investor toggle — first position --}}
+                    <label class="flex items-center gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700/50 rounded-xl cursor-pointer">
+                        <input id="firstTimeToggleDrawer" type="checkbox" class="h-4 w-4 accent-indigo-600 flex-shrink-0" />
+                        <div>
+                            <span class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 block">First Time Investor</span>
+                            <span class="text-xs text-indigo-500 dark:text-indigo-400">Reward auto-fills by amount</span>
+                        </div>
                     </label>
 
-                    <label class="flex flex-col text-base">
-                        <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">First Recharge Reward (this is for new invite)</span>
-                        <input id="firstRewardDrawer" type="number" step="0.01" min="0" value="0"
-                            class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
+                    <label class="flex flex-col">
+                        <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Invested Amount / Current Assets</span>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+                            <input id="investedDrawer" type="number" step="0.01" min="0" value="1000"
+                                class="w-full pl-7 pr-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+                        </div>
                     </label>
 
-                    <label class="flex flex-col text-base">
-                        <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">Signals per Day</span>
-                        <input id="signalsPerDayDrawer" type="number" min="1" step="1" value="2"
-                            class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
+                    <label class="flex flex-col">
+                        <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">First Recharge Reward</span>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+                            <input id="firstRewardDrawer" type="number" step="0.01" min="0" value="0"
+                                class="w-full pl-7 pr-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+                        </div>
+                        <span id="firstRewardBadgeDrawer" class="hidden mt-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-0.5 rounded-full w-fit"></span>
                     </label>
 
-                    <label class="flex flex-col text-base">
-                        <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">Number of Days</span>
-                        <input id="daysDrawer" type="number" min="1" step="1" value="30"
-                            class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
-                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="flex flex-col">
+                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Signals / Day</span>
+                            <input id="signalsPerDayDrawer" type="number" min="1" step="1" value="2"
+                                class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+                        </label>
+                        <label class="flex flex-col">
+                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Number of Days</span>
+                            <input id="daysDrawer" type="number" min="1" step="1" value="30"
+                                class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+                        </label>
+                    </div>
 
-                    <label class="flex items-center space-x-2 text-base">
-                        <input id="firstTimeToggleDrawer" type="checkbox" class="h-4 w-4" />
-                        <span class="text-sm text-gray-600 dark:text-gray-300">First Time Investor</span>
-                    </label>
-
-                    <div class="mt-3 flex items-center justify-end space-x-2">
-                        <button id="computeBtnDrawer" class="px-4 py-2 bg-indigo-600 text-white rounded shadow hover:bg-indigo-500">Calculate</button>
-                        <button id="exportBtnDrawer" class="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-500">Export</button>
+                    <div class="flex items-center gap-2 pt-1">
+                        <button id="computeBtnDrawer" class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                            Calculate
+                        </button>
+                        <button id="exportBtnDrawer" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            Export
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
 
         <!-- Inline form for larger screens -->
-        <form id="calcForm" class="hidden sm:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4" onsubmit="return false;">
-            <label class="flex flex-col text-base">
-                <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">Invested Amount or Current Assets</span>
-                <input id="invested" type="number" step="0.01" min="0" value="1000"
-                    class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
+        <form id="calcForm" class="hidden sm:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4 p-5 border-b border-gray-100 dark:border-gray-700" onsubmit="return false;">
+
+            {{-- First Time Investor — first position --}}
+            <label class="flex items-start gap-2.5 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700/50 rounded-xl cursor-pointer">
+                <input id="firstTimeToggle" type="checkbox" class="h-4 w-4 mt-0.5 accent-indigo-600 flex-shrink-0" />
+                <div>
+                    <span class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 block leading-tight">First Time Investor</span>
+                    <span class="text-xs text-indigo-500 dark:text-indigo-400 leading-tight">Reward auto-fills by amount</span>
+                </div>
             </label>
 
-            <label class="flex flex-col text-base">
-                <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">First Recharge Reward (this is for new invite)</span>
-                <input id="firstReward" type="number" step="0.01" min="0" value="0"
-                    class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
+            <label class="flex flex-col">
+                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Invested / Current Assets</span>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+                    <input id="invested" type="number" step="0.01" min="0" value="1000"
+                        class="w-full pl-7 pr-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+                </div>
             </label>
 
-            <label class="flex flex-col text-base">
-                <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">Signals per Day</span>
+            <label class="flex flex-col">
+                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">First Recharge Reward</span>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+                    <input id="firstReward" type="number" step="0.01" min="0" value="0"
+                        class="w-full pl-7 pr-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+                </div>
+                <span id="firstRewardBadge" class="hidden mt-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-0.5 rounded-full w-fit"></span>
+            </label>
+
+            <label class="flex flex-col">
+                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Signals per Day</span>
                 <input id="signalsPerDay" type="number" min="1" step="1" value="2"
-                    class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
+                    class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
             </label>
 
-            <label class="flex flex-col text-base">
-                <span class="text-sm text-gray-500 dark:text-gray-400 mb-1">Number of Days</span>
+            <label class="flex flex-col">
+                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Number of Days</span>
                 <input id="days" type="number" min="1" step="1" value="30"
-                    class="px-3 py-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring text-base" />
+                    class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
             </label>
 
-            <label class="flex items-center space-x-2 text-base">
-                <input id="firstTimeToggle" type="checkbox" class="h-4 w-4" />
-                <span class="text-sm text-gray-600 dark:text-gray-300">First Time Investor</span>
-            </label>
         </form>
 
-        <div class="flex items-center justify-between mb-3">
-            <div class="text-sm text-gray-500 dark:text-gray-400">
-                Each signal: 1% of assets × random rate 50-52% (0.50-0.52)
+        <div class="hidden sm:flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-700">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <span class="text-xs text-gray-500 dark:text-gray-400">Each signal: <strong class="text-gray-700 dark:text-gray-300">1%</strong> of assets × random rate <strong class="text-gray-700 dark:text-gray-300">50–52%</strong></span>
             </div>
-            <div>
+            <div class="flex items-center gap-2">
                 <button id="computeBtn"
-                    class="px-4 py-2 bg-indigo-600 text-white rounded shadow hover:bg-indigo-500">Compute</button>
+                    class="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                    Calculate
+                </button>
             </div>
         </div>
 
-        <div id="results" class="overflow-x-auto">
+        <div id="results" class="overflow-x-auto p-4 sm:p-5">
             <!-- Table will be injected here -->
+        </div>
+
+        <!-- Custom Confirmation Modal -->
+        <div id="confirmModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4 transform transition-all">
+                <div class="flex items-center mb-4">
+                    <div class="flex-shrink-0 w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Calculate Compound Interest</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Proceed with calculation?</p>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 mb-4">
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Investment:</span>
+                            <span class="font-semibold text-gray-900 dark:text-white ml-1" id="modalInvested"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">First Reward:</span>
+                            <span class="font-semibold text-gray-900 dark:text-white ml-1" id="modalFirstReward"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Signals/Day:</span>
+                            <span class="font-semibold text-gray-900 dark:text-white ml-1" id="modalSignals"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500 dark:text-gray-400">Days:</span>
+                            <span class="font-semibold text-gray-900 dark:text-white ml-1" id="modalDays"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button id="confirmCancel" class="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button id="confirmCalculate" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors shadow-lg shadow-indigo-500/50">
+                        Calculate
+                    </button>
+                </div>
+            </div>
         </div>
 
         <style>
@@ -187,6 +306,17 @@ new class extends Component {
                 const firstTimeToggle = document.getElementById('firstTimeToggle');
                 const firstTimeToggleDrawer = document.getElementById('firstTimeToggleDrawer');
 
+                // Confirmation modal elements
+                const confirmModal = document.getElementById('confirmModal');
+                const confirmCancel = document.getElementById('confirmCancel');
+                const confirmCalculate = document.getElementById('confirmCalculate');
+                const modalInvested = document.getElementById('modalInvested');
+                const modalFirstReward = document.getElementById('modalFirstReward');
+                const modalSignals = document.getElementById('modalSignals');
+                const modalDays = document.getElementById('modalDays');
+
+                let pendingCalculation = null;
+
                 // viewport helpers to toggle desktop vs mobile controls
                 function isMobileViewport() {
                     return window.matchMedia('(max-width: 639px)').matches;
@@ -231,6 +361,32 @@ new class extends Component {
                     firstTimeToggleDrawer.addEventListener('change', ()=> firstTimeToggle.checked = firstTimeToggleDrawer.checked);
                 }
 
+                // Auto-fill First Recharge Reward based on invested amount tiers
+                function autoFillFirstReward() {
+                    const ft = (firstTimeToggle && firstTimeToggle.checked) || (firstTimeToggleDrawer && firstTimeToggleDrawer.checked);
+                    const badge = document.getElementById('firstRewardBadge');
+                    const badgeDrawer = document.getElementById('firstRewardBadgeDrawer');
+                    if (!ft) {
+                        if (badge) badge.classList.add('hidden');
+                        if (badgeDrawer) badgeDrawer.classList.add('hidden');
+                        return;
+                    }
+                    const amount = parseFloat(investedEl ? investedEl.value : 0) || 0;
+                    let reward = 0;
+                    let tierLabel = '';
+                    if (amount >= 2000)      { reward = 120; tierLabel = '$2,000+'; }
+                    else if (amount >= 1000) { reward = 40;  tierLabel = '$1,000–1,999'; }
+                    else if (amount >= 500)  { reward = 15;  tierLabel = '$500–999'; }
+                    if (firstRewardEl) firstRewardEl.value = reward;
+                    const drawerFirstReward = document.getElementById('firstRewardDrawer');
+                    if (drawerFirstReward) drawerFirstReward.value = reward;
+                    const badgeText = reward > 0
+                        ? `✓ Auto-filled $${reward} (${tierLabel})`
+                        : '⚠ Enter $500+ to auto-fill';
+                    if (badge)       { badge.textContent = badgeText;       badge.classList.remove('hidden'); }
+                    if (badgeDrawer) { badgeDrawer.textContent = badgeText; badgeDrawer.classList.remove('hidden'); }
+                }
+
                 // when first-time toggle changes adjust signalsPerDay UI
                 function updateFirstTimeUI() {
                     const ft = (firstTimeToggle && firstTimeToggle.checked) || (firstTimeToggleDrawer && firstTimeToggleDrawer.checked);
@@ -242,16 +398,30 @@ new class extends Component {
                         // disable both inputs to avoid confusion
                         if (signalsPerDayEl) signalsPerDayEl.setAttribute('disabled','true');
                         if (drawerSignals) drawerSignals.setAttribute('disabled','true');
+                        autoFillFirstReward();
                     } else {
                         // re-enable
                         if (signalsPerDayEl) signalsPerDayEl.removeAttribute('disabled');
                         const drawerSignals = document.getElementById('signalsPerDayDrawer');
                         if (drawerSignals) drawerSignals.removeAttribute('disabled');
+                        // hide badges, clear reward when unchecked
+                        const badge = document.getElementById('firstRewardBadge');
+                        const badgeDrawer = document.getElementById('firstRewardBadgeDrawer');
+                        if (badge) badge.classList.add('hidden');
+                        if (badgeDrawer) badgeDrawer.classList.add('hidden');
+                        if (firstRewardEl) firstRewardEl.value = 0;
+                        const drawerFirstReward = document.getElementById('firstRewardDrawer');
+                        if (drawerFirstReward) drawerFirstReward.value = 0;
                     }
                 }
 
                 if (firstTimeToggle) firstTimeToggle.addEventListener('change', updateFirstTimeUI);
                 if (firstTimeToggleDrawer) firstTimeToggleDrawer.addEventListener('change', updateFirstTimeUI);
+
+                // Re-run auto-fill whenever invested amount changes (while first-time is checked)
+                if (investedEl) investedEl.addEventListener('input', autoFillFirstReward);
+                const investedDrawerEl = document.getElementById('investedDrawer');
+                if (investedDrawerEl) investedDrawerEl.addEventListener('input', autoFillFirstReward);
 
                 // Drawer open/close
                 if (openDrawer) openDrawer.addEventListener('click', () => { drawer.classList.remove('translate-y-full'); drawer.classList.add('translate-y-0'); });
@@ -276,18 +446,66 @@ new class extends Component {
                     return 0.50 + Math.random() * 0.02;
                 }
 
-                // show confirmation then compute
+                // Show custom confirmation modal
                 function onCalculate() {
-                    const ok = window.confirm('Proceed with calculation?');
-                    if (!ok) return;
-                    compute();
-                }
-
-                function compute() {
                     const invested = parseFloat(investedEl.value) || 0;
                     const firstReward = parseFloat(firstRewardEl.value) || 0;
                     const defaultSignals = Math.max(1, parseInt(signalsPerDayEl.value) || 2);
                     const totalDays = Math.max(1, parseInt(daysEl.value) || 30);
+
+                    // Update modal with values
+                    modalInvested.textContent = formatAmount(invested);
+                    modalFirstReward.textContent = formatAmount(firstReward);
+                    modalSignals.textContent = defaultSignals;
+                    modalDays.textContent = totalDays;
+
+                    // Store calculation parameters
+                    pendingCalculation = { invested, firstReward, defaultSignals, totalDays };
+
+                    // Show modal
+                    confirmModal.classList.remove('hidden');
+                    confirmModal.classList.add('flex');
+                }
+
+                // Handle modal cancel
+                if (confirmCancel) {
+                    confirmCancel.addEventListener('click', () => {
+                        confirmModal.classList.add('hidden');
+                        confirmModal.classList.remove('flex');
+                        pendingCalculation = null;
+                    });
+                }
+
+                // Handle modal confirm - proceed with calculation
+                if (confirmCalculate) {
+                    confirmCalculate.addEventListener('click', () => {
+                        confirmModal.classList.add('hidden');
+                        confirmModal.classList.remove('flex');
+                        if (pendingCalculation) {
+                            compute(pendingCalculation.invested, pendingCalculation.firstReward, pendingCalculation.defaultSignals, pendingCalculation.totalDays, true);
+                            pendingCalculation = null;
+                        }
+                    });
+                }
+
+                // Close modal on backdrop click
+                if (confirmModal) {
+                    confirmModal.addEventListener('click', (e) => {
+                        if (e.target === confirmModal) {
+                            confirmModal.classList.add('hidden');
+                            confirmModal.classList.remove('flex');
+                            pendingCalculation = null;
+                        }
+                    });
+                }
+
+                function compute(invested = null, firstReward = null, defaultSignals = null, totalDays = null, shouldLog = false) {
+                    // If parameters not provided, read from inputs
+                    if (invested === null) invested = parseFloat(investedEl.value) || 0;
+                    if (firstReward === null) firstReward = parseFloat(firstRewardEl.value) || 0;
+                    if (defaultSignals === null) defaultSignals = Math.max(1, parseInt(signalsPerDayEl.value) || 2);
+                    if (totalDays === null) totalDays = Math.max(1, parseInt(daysEl.value) || 30);
+
                     const firstTime = (firstTimeToggle && firstTimeToggle.checked) || (firstTimeToggleDrawer && firstTimeToggleDrawer.checked);
 
                     // decide maximum columns (we'll render up to 5 signals for flexibility)
@@ -377,10 +595,8 @@ new class extends Component {
 
                     tableHtml += '</tbody></table>';
 
-                    // render with reveal animation
+                    // render table
                     results.innerHTML = tableHtml;
-                    results.classList.remove('opacity-0');
-                    setTimeout(()=> results.classList.add('opacity-100'), 10);
 
                     const cells = results.querySelectorAll('.cell-content');
                     cells.forEach((c, idx) => {
@@ -389,18 +605,26 @@ new class extends Component {
                     });
 
                     // summary
-                    const initialInvestment = invested + firstReward;
-                    const totalGainPercent = (totalGain / initialInvestment) * 100;
+                    // Initial capital = invested amount only (first reward is a bonus, not capital)
+                    const initialInvestment = invested;
+                    const totalGainPercent = initialInvestment > 0 ? (totalGain / initialInvestment) * 100 : 0;
 
                     const summary = document.createElement('div');
                     summary.className = 'mt-4 p-4 bg-gradient-to-r from-indigo-50 to-green-50 dark:from-indigo-900/20 dark:to-green-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800';
+                    const firstRewardRow = firstReward > 0
+                        ? `<div class="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded border border-indigo-100 dark:border-indigo-800">
+                                <div class="text-xs text-gray-500 dark:text-gray-400">First Investor Bonus</div>
+                                <div class="text-lg font-bold text-indigo-700 dark:text-indigo-300">+${formatAmount(firstReward)}</div>
+                            </div>`
+                        : '';
                     summary.innerHTML = `
                         <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 mb-3">Investment Summary</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-base">
+                        <div class="grid grid-cols-1 sm:grid-cols-${firstReward > 0 ? 5 : 4} gap-3 text-base">
                             <div class="p-3 bg-white dark:bg-gray-800 rounded border">
-                                <div class="text-xs text-gray-500 dark:text-gray-400">Initial Investment</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Initial Capital</div>
                                 <div class="text-lg font-bold text-gray-900 dark:text-white">${formatAmount(initialInvestment)}</div>
                             </div>
+                            ${firstRewardRow}
                             <div class="p-3 bg-white dark:bg-gray-800 rounded border">
                                 <div class="text-xs text-gray-500 dark:text-gray-400">Final Amount (Day ${totalDays})</div>
                                 <div class="text-lg font-bold text-gray-900 dark:text-white">${formatAmount(currentAssets)}</div>
@@ -410,15 +634,42 @@ new class extends Component {
                                 <div class="text-lg font-bold text-green-700 dark:text-green-400">+${formatAmount(totalGain)}</div>
                             </div>
                             <div class="p-3 bg-green-50 dark:bg-green-900/20 rounded border border-green-100 dark:border-green-800">
-                                <div class="text-xs text-gray-500 dark:text-gray-400">Total Return %</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Return on Capital</div>
                                 <div class="text-lg font-bold text-green-700 dark:text-green-400">${totalGainPercent.toFixed(2)}%</div>
                             </div>
                         </div>
                     `;
                     results.appendChild(summary);
+
+                    // Log the calculation to database only if confirmed by user
+                    if (shouldLog) {
+                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+                            || document.querySelector('input[name="_token"]')?.value
+                            || '{{ csrf_token() }}';
+
+                        fetch('{{ route("calculator.log") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                initial_investment: invested,
+                                first_reward: firstReward,
+                                signals_per_day: defaultSignals,
+                                days: totalDays,
+                                is_first_time: firstTime,
+                                final_amount: currentAssets,
+                                total_gain: totalGain,
+                                total_gain_percent: totalGainPercent,
+                                max_signals_used: maxSignals
+                            })
+                        }).catch(e => console.log('Logging skipped:', e.message));
+                    }
                 }
 
-                computeBtn.addEventListener('click', onCalculate);
+                if (computeBtn) computeBtn.addEventListener('click', onCalculate);
 
                 // Export to Excel (SpreadsheetML) with formulas so users can tweak inputs
                 function colLetter(n) {
@@ -449,9 +700,8 @@ new class extends Component {
 
                 if (exportBtn) exportBtn.addEventListener('click', exportExcel);
 
-                // initialize
-                results.classList.add('opacity-0');
-                compute();
+                // initialize - run compute on load to show default calculation (without logging)
+                compute(null, null, null, null, false);
             })();
         </script>
     </div>

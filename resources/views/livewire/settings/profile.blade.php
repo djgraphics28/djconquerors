@@ -12,6 +12,7 @@ new class extends Component {
 
     public string $name = '';
     public string $email = '';
+    public $bonchat_id = '';
     public $riscoin_id = '';
     public $inviters_code = '';
     public $invested_amount = '';
@@ -25,6 +26,9 @@ new class extends Component {
     public $isMonthlyMilestoneMention = true;
     public $gender = '';
     public $occupation = '';
+    public $support_group = '';
+    public $primary_language = 'english';
+    public $secondary_language = null;
 
     /**
      * Mount the component.
@@ -35,6 +39,7 @@ new class extends Component {
 
         $this->name = $user->name;
         $this->email = $user->email;
+        $this->bonchat_id = $user->bonchat_id ?? '';
         $this->riscoin_id = $user->riscoin_id;
         $this->inviters_code = $user->inviters_code;
         $this->invested_amount = $user->invested_amount;
@@ -44,6 +49,9 @@ new class extends Component {
         $this->isMonthlyMilestoneMention = $user->is_monthly_milestone_mention == 1 ? true : false;
         $this->gender = $user->gender;
         $this->occupation = $user->occupation;
+        $this->support_group = $user->support_group ?? '';
+        $this->primary_language = $user->primary_language ?? 'english';
+        $this->secondary_language = $user->secondary_language ?: null;
 
         // dd($user->getFirstMediaUrl('avatar'));
     }
@@ -81,9 +89,12 @@ new class extends Component {
     {
         $user = Auth::user();
 
+        $this->secondary_language = $this->secondary_language ?: null;
+
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class)->ignore($user->id)],
+            'bonchat_id' => ['nullable', 'string', 'max:255'],
             'phone_number' => ['required', 'string', 'max:20'],
             'birth_date' => ['required', 'date'],
             'date_joined' => ['required', 'date'],
@@ -93,8 +104,12 @@ new class extends Component {
             'avatar' => ['nullable', 'image', 'max:10240'],
             'gender' => ['required', 'string', 'max:50'],
             'occupation' => ['required', 'string', 'max:100'],
+            'support_group' => ['nullable', 'string', 'max:100'],
+            'primary_language' => ['required', 'string', 'in:english,tagalog'],
+            'secondary_language' => ['nullable', 'string', 'in:english,tagalog'],
         ]);
 
+        $validated['secondary_language'] = $validated['secondary_language'] ?: null;
         $validated['riscoin_id'] = strtoupper($validated['riscoin_id']);
         $validated['inviters_code'] = strtoupper($validated['inviters_code']);
         $validated['is_birthday_mention'] = $this->isBirthdayMention;
@@ -311,9 +326,11 @@ new class extends Component {
                     </div>
                 @endif
             </div>
+            <flux:input wire:model="bonchat_id" :label="__('Bonchat ID')" type="text" :placeholder="__('Bonchat ID')" />
 
             <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')" type="text" disabled />
             <flux:input wire:model="inviters_code" :label="__('Inviters Code')" type="text" disabled />
+            <flux:input wire:model="support_group" :label="__('Support Group (Bonchat Support Group)')" type="text" />
             <flux:input wire:model="invested_amount" :label="__('Invested Amount (USD)')" type="text" disabled />
             <flux:input wire:model="date_joined" :label="__('Date Joined')" type="date" disabled />
             <flux:input wire:model="birth_date" :label="__('Birth Date')" type="date" />
@@ -328,6 +345,18 @@ new class extends Component {
             <flux:input wire:model="occupation" :label="__('Occupation')" type="text" required autocomplete="occupation"
                 :placeholder="__('Occupation')" />
 
+            <!-- Primary Language -->
+            <flux:select wire:model="primary_language" :label="__('Primary Language')" required>
+                <option value="english">English</option>
+                <option value="tagalog">Tagalog</option>
+            </flux:select>
+
+            <!-- Secondary Language -->
+            <flux:select wire:model="secondary_language" :label="__('Secondary Language (optional)')">
+                <option value="">None</option>
+                <option value="english">English</option>
+                <option value="tagalog">Tagalog</option>
+            </flux:select>
 
             {{-- Mentions --}}
             <div class="flex flex-col gap-4">

@@ -8,6 +8,7 @@ use Spatie\Activitylog\Models\Activity;
 use Livewire\WithPagination;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Team;
 
 new class extends Component {
     use WithPagination, WithFileUploads;
@@ -25,6 +26,7 @@ new class extends Component {
     public $is_active = true;
     public $roles = [];
     public $inviters = [];
+    public $teams = [];
     public $selectedRoles = [];
     public $editMode = false;
     public $userId;
@@ -32,6 +34,7 @@ new class extends Component {
     public $showViewModal = false;
     public $activityLogs = [];
     public $selectedUser = null;
+    public $team_id;
 
     // Media properties
     public $avatar;
@@ -42,7 +45,13 @@ new class extends Component {
     public $dateJoined = '';
     public $statusFilter = '';
     public $inviterFilter = '';
+    public $teamFilter = '';
+    public $managerLevelFilter = '';
     public $perPage = 10;
+
+    // Export / selection
+    public array $selectedUsers = [];
+    public bool $selectAll = false;
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -50,6 +59,7 @@ new class extends Component {
         'statusFilter' => ['except' => ''],
         'perPage' => ['except' => 10],
         'inviterFilter' => ['except' => ''],
+        'managerLevelFilter' => ['except' => ''],
     ];
 
     protected $rules = [
@@ -64,12 +74,19 @@ new class extends Component {
         'is_active' => 'boolean',
         'selectedRoles' => 'array',
         'avatar' => 'nullable|image|max:2048', // 2MB max
+        'team_id' => 'nullable|exists:teams,id',
     ];
 
     public function mount()
     {
         $this->loadRoles();
         $this->loadInviters();
+        $this->loadTeams();
+    }
+
+    public function loadTeams()
+    {
+        $this->teams = Team::select('id', 'name')->get();
     }
 
     public function loadInviters()
@@ -170,6 +187,7 @@ new class extends Component {
         $this->phone_number = $user->phone_number;
         $this->riscoin_id = $user->riscoin_id;
         $this->inviters_code = $user->inviters_code;
+        $this->team_id = $user->team_id;
         $this->invested_amount = $user->invested_amount;
         $this->birth_date = $user->birth_date ? $user->birth_date->format('Y-m-d') : null;
         $this->date_joined = $user->date_joined ? $user->date_joined->format('Y-m-d') : ($this->is_active = $user->is_active);
@@ -192,6 +210,7 @@ new class extends Component {
             'date_joined' => $this->date_joined,
             'birth_date' => $this->birth_date,
             'is_active' => $this->is_active,
+            'team_id' => $this->team_id,
         ];
 
         // Only update password if provided
@@ -325,7 +344,7 @@ new class extends Component {
     // Reset filters
     public function resetFilters()
     {
-        $this->reset(['search', 'dateJoined', 'statusFilter', 'inviterFilter']);
+        $this->reset(['search', 'dateJoined', 'statusFilter', 'inviterFilter', 'managerLevelFilter']);
         $this->resetPage();
     }
 
@@ -349,7 +368,7 @@ new class extends Component {
 
     public function getUsersProperty()
     {
-        return User::with(['roles', 'inviter'])
+        return User::with(['roles', 'inviter', 'team', 'managerLevel'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('name', 'like', '%' . $this->search . '%')->orWhere('email', 'like', '%' . $this->search . '%');
@@ -369,6 +388,14 @@ new class extends Component {
             })
             ->when($this->inviterFilter, function ($query) {
                 $query->where('inviters_code', $this->inviterFilter);
+            })
+            ->when($this->teamFilter, function ($query) {
+                $query->where('team_id', $this->teamFilter);
+            })
+            ->when($this->managerLevelFilter, function ($query) {
+                $query->whereHas('managerLevel', function ($q) {
+                    $q->where('level', $this->managerLevelFilter);
+                });
             })
             ->orderBy('created_at', 'desc')
             ->paginate($this->perPage);
@@ -420,6 +447,11 @@ new class extends Component {
     }
 
     public function updatingInviterFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingManagerLevelFilter()
     {
         $this->resetPage();
     }
@@ -482,9 +514,121 @@ Amount invested: $" .
 
         session()->flash('message', 'User promoted to Level 1 manager.');
     }
+
+    public function applyFilters(): void
+    {
+        $this->resetPage();
+    }
+
+    public function clearFilter(string $field): void
+    {
+        $this->reset($field);
+        $this->resetPage();
+    }
+
+    public function toggleSelectAll(): void
+    {
+        if ($this->selectAll) {
+            $this->selectedUsers = $this->getAllFilteredUserIds();
+        } else {
+            $this->selectedUsers = [];
+        }
+    }
+
+    private function getAllFilteredUserIds(): array
+    {
+        return User::when($this->search, function ($query) {
+                $query->where(function ($q) {
+                    $q->where('name', 'like', '%' . $this->search . '%')
+                      ->orWhere('email', 'like', '%' . $this->search . '%');
+                });
+            })
+            ->when($this->dateJoined, function ($query) {
+                $query->whereDate('created_at', $this->dateJoined);
+            })
+            ->when($this->statusFilter === 'active', function ($query) {
+                $query->where('is_active', true);
+            })
+            ->when($this->statusFilter === 'inactive', function ($query) {
+                $query->where('is_active', false);
+            })
+            ->when($this->statusFilter === 'deleted', function ($query) {
+                $query->onlyTrashed();
+            })
+            ->when($this->inviterFilter, function ($query) {
+                $query->where('inviters_code', $this->inviterFilter);
+            })
+            ->when($this->teamFilter, function ($query) {
+                $query->where('team_id', $this->teamFilter);
+            })
+            ->when($this->managerLevelFilter, function ($query) {
+                $query->whereHas('managerLevel', function ($q) {
+                    $q->where('level', $this->managerLevelFilter);
+                });
+            })
+            ->pluck('id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
+    }
+
+    private function getExportData(): array
+    {
+        $ids = !empty($this->selectedUsers) ? $this->selectedUsers : $this->getAllFilteredUserIds();
+
+        return User::with(['managerLevel'])
+            ->whereIn('id', $ids)
+            ->get()
+            ->map(function ($u) {
+                $level = $u->managerLevel?->level;
+                return [
+                    'name'           => $u->name,
+                    'riscoin_id'     => $u->riscoin_id ?? 'N/A',
+                    'manager_level'  => $level ? 'Level ' . $level : 'not yet manager',
+                    'invested_amount' => $u->invested_amount !== null ? number_format((float) $u->invested_amount, 2) : '0.00',
+                    'sort_key'       => $level ?? 0,
+                ];
+            })
+            ->sortByDesc('sort_key')
+            ->values()
+            ->toArray();
+    }
+
+    public function exportExcel()
+    {
+        $rows = $this->getExportData();
+        $filename = 'users-export-' . now()->format('Y-m-d') . '.csv';
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+        $callback = function () use ($rows) {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['Name', 'Riscoin ID', 'Manager Level', 'Capital (USD)']);
+            foreach ($rows as $row) {
+                fputcsv($handle, [$row['name'], $row['riscoin_id'], $row['manager_level'], $row['invested_amount']]);
+            }
+            fclose($handle);
+        };
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function exportPdf()
+    {
+        $rows = $this->getExportData();
+        $html = view('exports.team-pdf', ['rows' => $rows])->render();
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html);
+        return response()->streamDownload(
+            fn () => print($pdf->output()),
+            'users-export-' . now()->format('Y-m-d') . '.pdf'
+        );
+    }
 }; ?>
 
 <div class="max-w-10xl mx-auto">
+    <!-- User Info Modal Component -->
+    <livewire:components.user-info-modal />
+
     <!-- Breadcrumb Navigation -->
     <nav class="flex mb-6" aria-label="Breadcrumb">
         <ol class="flex items-center space-x-2 text-sm">
@@ -527,13 +671,13 @@ Amount invested: $" .
                 @endif
 
                 <!-- Filters -->
-                <div class="mb-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <form wire:submit.prevent="applyFilters" class="mb-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <!-- Search -->
                         <div>
                             <label
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search</label>
-                            <flux:input wire:model.live.debounce.500ms="search" type="text"
+                            <flux:input wire:model="search" type="text"
                                 placeholder="Search by name or email..." data-test="search-input" />
                         </div>
 
@@ -541,14 +685,14 @@ Amount invested: $" .
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date
                                 Joined</label>
-                            <flux:input wire:model.live="dateJoined" type="date" data-test="date-joined-filter" />
+                            <flux:input wire:model="dateJoined" type="date" data-test="date-joined-filter" />
                         </div>
 
                         <!-- Status Filter -->
                         <div>
                             <label
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-                            <flux:select wire:model.live="statusFilter" data-test="status-filter">
+                            <flux:select wire:model="statusFilter" data-test="status-filter">
                                 <option value="">All Status</option>
                                 <option value="active">Active</option>
                                 <option value="inactive">Inactive</option>
@@ -560,13 +704,35 @@ Amount invested: $" .
                         <div>
                             <label
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Inviter</label>
-                            <flux:select wire:model.live="inviterFilter" data-test="inviter-filter">
+                            <flux:select wire:model="inviterFilter" data-test="inviter-filter">
                                 <option value="">All Inviters</option>
                                 @foreach ($inviters as $inviter)
                                     <option value="{{ $inviter->riscoin_id }}">{{ $inviter->name }}
                                         ({{ $inviter->riscoin_id }})
                                     </option>
                                 @endforeach
+                            </flux:select>
+                        </div>
+
+                        <!-- NEW: Team Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Team</label>
+                            <flux:select wire:model="teamFilter" data-test="team-filter">
+                                <option value="">All Teams</option>
+                                @foreach ($teams as $team)
+                                    <option value="{{ $team->id }}">{{ $team->name }}</option>
+                                @endforeach
+                            </flux:select>
+                        </div>
+
+                        <!-- Manager Level Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Manager Level</label>
+                            <flux:select wire:model="managerLevelFilter" data-test="manager-level-filter">
+                                <option value="">All Levels</option>
+                                @for ($lvl = 1; $lvl <= 6; $lvl++)
+                                    <option value="{{ $lvl }}">Level {{ $lvl }}</option>
+                                @endfor
                             </flux:select>
                         </div>
                     </div>
@@ -577,7 +743,7 @@ Amount invested: $" .
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rows Per
                                 Page</label>
-                            <flux:select wire:model.live="perPage" data-test="per-page-selector">
+                            <flux:select wire:model="perPage" data-test="per-page-selector">
                                 <option value="5">5</option>
                                 <option value="10">10</option>
                                 <option value="25">25</option>
@@ -587,256 +753,274 @@ Amount invested: $" .
                         </div>
                     </div>
 
-                    <!-- Reset Filters -->
-                    <div class="mt-4 flex justify-end">
+                    <!-- Filter Actions -->
+                    <div class="mt-4 flex items-center justify-end gap-2">
                         <flux:button wire:click="resetFilters" variant="ghost" size="sm" data-test="reset-filters">
                             Reset Filters
                         </flux:button>
+                        <button type="submit"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                            </svg>
+                            Apply Filters
+                        </button>
                     </div>
-                </div>
+                </form>
 
                 <!-- Table -->
-                <div class="overflow-x-auto relative">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th scope="col"
-                                    class="sticky md:left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Avatar</th>
-                                <th scope="col"
-                                    class="md:sticky md:left-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Name</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Inviter</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Email</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Age</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Riscoin ID</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Invested Amount</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Date Joined</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Tenure</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Roles</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Status</th>
-                                <th scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Is Verified?</th>
-                                <th scope="col"
-                                    class="md:sticky md:right-0 z-10 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Actions</th>
+                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-4">
+                    {{-- Export Toolbar --}}
+                    <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/40">
+                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                            @if ($selectAll)
+                                <span class="font-semibold text-blue-600 dark:text-blue-400">All {{ count($selectedUsers) }}</span> filtered users selected
+                                &nbsp;&bull;&nbsp;
+                                <button type="button" wire:click="$set('selectAll', false); $set('selectedUsers', [])"
+                                    class="text-red-500 hover:underline">Clear selection</button>
+                            @elseif (count($selectedUsers) > 0)
+                                <span class="font-semibold text-blue-600 dark:text-blue-400">{{ count($selectedUsers) }}</span> selected
+                                &nbsp;&bull;&nbsp;
+                                <button type="button" wire:click="$set('selectedUsers', [])"
+                                    class="text-red-500 hover:underline">Clear</button>
+                            @else
+                                Use the checkbox to select rows, or export all
+                            @endif
+                        </span>
+                        <div class="flex items-center gap-2">
+                            <button wire:click="exportExcel"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                Export Excel
+                            </button>
+                            <button wire:click="exportPdf"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                </svg>
+                                Export PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 dark:bg-gray-700/60 border-b border-gray-200 dark:border-gray-700">
+                                <th class="px-3 py-2.5 w-8">
+                                    <input type="checkbox" wire:model.live="selectAll" wire:click="toggleSelectAll"
+                                        class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:focus:ring-blue-400 cursor-pointer">
+                                </th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Manager Lvl</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Avatar</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Name</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Inviter</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Email</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Age</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Riscoin ID</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Invested</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Joined</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Tenure</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Roles</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Status</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Verified</th>
+                                <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap sticky right-0 bg-gray-50 dark:bg-gray-700/60 w-10"></th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700/60">
                             @forelse ($this->users as $user)
-                                <tr>
-                                    <td
-                                        class="sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
+                                <tr class="group/row hover:bg-gray-50/70 dark:hover:bg-gray-700/30 transition-colors">
+                                    <td class="px-3 py-3 whitespace-nowrap w-8">
+                                        <input type="checkbox" wire:model.live="selectedUsers" value="{{ $user->id }}"
+                                            class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:focus:ring-blue-400 cursor-pointer">
+                                    </td>
+                                    <td class="px-3 py-3 whitespace-nowrap">
+                                        @if ($user->managerLevel)
+                                            @php
+                                                $levelColors = [
+                                                    1 => 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+                                                    2 => 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+                                                    3 => 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+                                                    4 => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+                                                    5 => 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+                                                    6 => 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+                                                ];
+                                                $lvlClass = $levelColors[$user->managerLevel->level] ?? 'bg-gray-100 text-gray-700';
+                                            @endphp
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold {{ $lvlClass }}">
+                                                L{{ $user->managerLevel->level }}
+                                            </span>
+                                        @else
+                                            <span class="text-gray-300 dark:text-gray-600">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-3 whitespace-nowrap">
                                         <a href="{{ route('genealogy.show', $user->riscoin_id) }}">
                                             @if ($user->getFirstMediaUrl('avatar'))
-                                                <img class="h-10 w-10 rounded-full object-cover"
+                                                <img class="h-9 w-9 rounded-full object-cover ring-2 ring-white dark:ring-gray-700 shadow-sm"
                                                     src="{{ $user->getFirstMediaUrl('avatar') }}"
                                                     alt="{{ $user->name }} avatar">
                                             @else
-                                                <div
-                                                    class="h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
-                                                    <span class="text-gray-600 dark:text-gray-300 font-medium text-sm">
-                                                        {{ strtoupper(substr($user->name, 0, 1)) }}
-                                                    </span>
+                                                <div class="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center ring-2 ring-white dark:ring-gray-700 shadow-sm">
+                                                    <span class="text-white font-bold text-sm">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
                                                 </div>
                                             @endif
+                                        </a>
+                                    </td>
+                                    <td class="px-3 py-3 min-w-[180px]">
+                                        <div class="font-semibold text-gray-900 dark:text-white text-sm leading-tight">{{ $user->name }}</div>
+                                        <button onclick="copyToClipboard('{{ $user->riscoin_id }}')" class="text-xs text-blue-500 dark:text-blue-400 hover:underline font-mono" title="Copy Riscoin ID">{{ $user->riscoin_id ?? 'N/A' }}</button>
+                                        <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ $user->last_login }}</div>
+                                    </td>
+                                    <td class="px-3 py-3 whitespace-nowrap">
+                                        <div class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ $user->inviter->name ?? '—' }}</div>
+                                        <button onclick="copyToClipboard('{{ $user->inviter->riscoin_id ?? '' }}')" class="text-xs text-blue-500 dark:text-blue-400 hover:underline font-mono">{{ $user->inviter->riscoin_id ?? '—' }}</button>
+                                    </td>
+                                    <td class="px-3 py-3 whitespace-nowrap">
+                                        <button onclick="copyToClipboard('{{ $user->email }}')" class="text-xs text-gray-700 dark:text-gray-300 hover:underline">{{ $user->email }}</button>
+                                    </td>
+                                    <td class="px-3 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">{{ $user->age }}</td>
+                                    <td class="px-3 py-3 whitespace-nowrap">
+                                        <button onclick="copyToClipboard('{{ $user->riscoin_id }}')" class="text-xs font-mono text-blue-500 dark:text-blue-400 hover:underline">{{ $user->riscoin_id ?? 'N/A' }}</button>
+                                    </td>
+                                    <td class="px-3 py-3 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">${{ number_format($user->invested_amount, 2) }}</td>
+                                    <td class="px-3 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">{{ $user->date_joined ? \Carbon\Carbon::parse($user->date_joined)->format('M j, Y') : 'N/A' }}</td>
+                                    <td class="px-3 py-3 whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">{{ $user->months_and_days_since_joined }}</td>
+                                    <td class="px-3 py-3">
+                                        <div class="flex flex-wrap gap-1">
+                                            @foreach ($user->roles as $role)
+                                                <span class="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-full capitalize">{{ $role->name }}</span>
+                                            @endforeach
+                                            @if ($user->roles->isEmpty())
+                                                <span class="text-xs text-gray-400 dark:text-gray-500">—</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-3 whitespace-nowrap">
+                                        @if (method_exists($user, 'trashed') && $user->trashed())
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">Trashed</span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium {{ $user->is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' }}">
+                                                <span class="w-1.5 h-1.5 rounded-full {{ $user->is_active ? 'bg-green-500' : 'bg-red-500' }}"></span>
+                                                {{ $user->is_active ? 'Active' : 'Inactive' }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-3 whitespace-nowrap">
+                                        @if ($user->email_verified_at)
+                                            <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">Verified</span>
+                                        @else
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">Unverified</span>
+                                        @endif
+                                    </td>
+                                    {{-- Actions 3-dot dropdown --}}
+                                    <td class="px-3 py-3 whitespace-nowrap sticky right-0 bg-white dark:bg-gray-800 group-hover/row:bg-gray-50/70 dark:group-hover/row:bg-gray-700/30">
+                                        <div x-data="{ open: false }" class="relative flex justify-end">
+                                            <button @click="open = !open" @click.outside="open = false"
+                                                class="opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-700 transition-all"
+                                                title="Actions">
+                                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                                                </svg>
+                                            </button>
+                                            <div x-show="open" x-transition
+                                                class="absolute z-50 top-full right-0 mt-1 w-52 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1 text-sm">
+                                                @can('users.copy-welcome-message')
+                                                    <button wire:click="copyWelcomeMessage({{ $user->id }})" @click="open=false"
+                                                        data-test="copy-welcome-message-{{ $user->id }}"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60">
+                                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                                                        Copy Welcome Message
+                                                    </button>
+                                                @endcan
+                                                @can('users.promote')
+                                                    <button wire:click="promoteToLevelOne({{ $user->id }})" @click="open=false"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-indigo-600 dark:text-indigo-400 hover:bg-gray-50 dark:hover:bg-gray-700/60">
+                                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                                        Promote to Level 1
+                                                    </button>
+                                                @endcan
+                                                @can('users.verify-email')
+                                                    <button wire:click="verifyEmail({{ $user->id }})" @click="open=false"
+                                                        data-test="verify-email-{{ $user->id }}"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60">
+                                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                        Verify Email
+                                                    </button>
+                                                @endcan
+                                                @can('users.view')
+                                                    <button wire:click="viewUser({{ $user->id }})" @click="open=false"
+                                                        data-test="view-user-{{ $user->id }}"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60">
+                                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                        View Info
+                                                    </button>
+                                                @endcan
+                                                @can('users.edit')
+                                                    <button wire:click="edit({{ $user->id }})" @click="open=false"
+                                                        data-test="edit-user-{{ $user->id }}"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60">
+                                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                                        Edit
+                                                    </button>
+                                                @endcan
+                                                @can('admin')
+                                                    <button onclick="Livewire.dispatch('loadUserData', { userId: {{ $user->id }} })" @click="open=false"
+                                                        data-test="info-user-{{ $user->id }}"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60">
+                                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                        User Info Modal
+                                                    </button>
+                                                @endcan
+                                                @can('users.impersonate')
+                                                    <button onclick="window.open('{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('impersonate.login', now()->addMinutes(5), ['user' => $user->id]) }}', '_blank')" @click="open=false"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-yellow-600 dark:text-yellow-400 hover:bg-gray-50 dark:hover:bg-gray-700/60">
+                                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                        Impersonate
+                                                    </button>
+                                                    <button onclick="downloadIncognitoHelper('{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('impersonate.login', now()->addMinutes(5), ['user' => $user->id]) }}','{{ $user->riscoin_id ?? $user->id }}')" @click="open=false"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-yellow-700 dark:text-yellow-500 hover:bg-gray-50 dark:hover:bg-gray-700/60">
+                                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                                        Incognito Helper
+                                                    </button>
+                                                @endcan
+                                                @can('users.delete')
+                                                    @if (method_exists($user, 'trashed') && $user->trashed())
+                                                        <button wire:click="restore({{ $user->id }})" @click="open=false"
+                                                            onclick="return confirm('Are you sure you want to restore this user?')"
+                                                            data-test="restore-user-{{ $user->id }}"
+                                                            class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-green-600 dark:text-green-400 hover:bg-gray-50 dark:hover:bg-gray-700/60">
+                                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h4l3-6 4 12 3-6h4"/></svg>
+                                                            Restore
+                                                        </button>
+                                                    @else
+                                                        <button wire:click="delete({{ $user->id }})" @click="open=false"
+                                                            onclick="return confirm('Are you sure you want to delete this user?')"
+                                                            data-test="delete-user-{{ $user->id }}"
+                                                            class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700/60">
+                                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                            Delete
+                                                        </button>
+                                                    @endif
+                                                @endcan
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="15" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                                        No users found matching your criteria.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
-                </a>
-                </td>
-                <td
-                    class="md:sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap font-medium text-gray-900 dark:text-white">
-                    {{ $user->name }}
-                    <div class="text-sm text-gray-500 dark:text-gray-400">
-                        <small>Riscoin ID: <span onclick="copyToClipboard('{{ $user->riscoin_id }}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->riscoin_id ?? 'N/A' }}</span></small>
-                    </div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400">
-                        <small>Last Logged In: {{ $user->last_login }}</small>
-                    </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                    {{ $user->inviter->name }}
-                    <div class="text-sm text-gray-400">
-                        <small>Riscoin ID: <span onclick="copyToClipboard('{{ $user->inviter->riscoin_id }}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->inviter->riscoin_id ?? 'N/A' }}</span></small>
-                    </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                    <span onclick="copyToClipboard('{{ $user->email }}')" class="font-medium text-gray-900 dark:text-gray-300 cursor-pointer">{{ $user->email }}</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                    {{ $user->age }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                    {{ $user->riscoin_id ?? 'N/A' }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                    ${{ number_format($user->invested_amount, 2) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                    {{ $user->date_joined ? \Carbon\Carbon::parse($user->date_joined)->format('M j, Y') : 'N/A' }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                    {{ $user->months_and_days_since_joined }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="flex flex-wrap gap-1">
-                        @foreach ($user->roles as $role)
-                            <span
-                                class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full capitalize">
-                                {{ $role->name }}
-                            </span>
-                        @endforeach
-                        @if ($user->roles->isEmpty())
-                            <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
-                                No roles
-                            </span>
-                        @endif
-                    </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    @if (method_exists($user, 'trashed') && $user->trashed())
-                        <span
-                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Trashed</span>
-                    @else
-                        <span
-                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                            {{ $user->is_active ? 'Active' : 'Inactive' }}
-                        </span>
-                    @endif
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    @if ($user->email_verified_at)
-                        <span
-                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            Verified
-                        </span>
-                    @else
-                        <span
-                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                            Not Verified
-                        </span>
-                    @endif
-                </td>
-                <td class="md:sticky md:right-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap">
-                    <div class="flex space-x-2">
-                        @can('users.copy-welcome-message')
-                            <flux:button wire:click="copyWelcomeMessage({{ $user->id }})" variant="ghost"
-                                size="sm" data-test="copy-welcome-message-{{ $user->id }}"
-                                title="Copy Welcome Message">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                                </svg>
-                            </flux:button>
-                        @endcan
-                        @can('users.promote')
-                            <flux:button wire:click="promoteToLevelOne({{ $user->id }})" variant="ghost"
-                                size="sm" class="bg-indigo-600 text-white hover:bg-indigo-700"
-                                title="Promote to Level 1">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 4v16m8-8H4" />
-                                </svg>
-                            </flux:button>
-                        @endcan
-                        @can('users.verify-email')
-                            <flux:button wire:click="verifyEmail({{ $user->id }})" variant="ghost" size="sm"
-                                data-test="verify-email-{{ $user->id }}" title="Verify Email">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </flux:button>
-                            @endcan @can('users.view')
-                            <flux:button wire:click="viewUser({{ $user->id }})" variant="ghost" size="sm"
-                                data-test="view-user-{{ $user->id }}" title="View Info">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                            </flux:button>
-                        @endcan
-                        @can('users.edit')
-                            <flux:button wire:click="edit({{ $user->id }})" variant="ghost" size="sm"
-                                data-test="edit-user-{{ $user->id }}" title="Edit">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                            </flux:button>
-                        @endcan
-
-                        @can('users.impersonate')
-                            <flux:button onclick="window.open('{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('impersonate.login', now()->addMinutes(5), ['user' => $user->id]) }}', '_blank')" variant="ghost" size="sm" class="bg-yellow-500 text-white hover:bg-yellow-600" title="Impersonate User">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                            </flux:button>
-                        @endcan
-
-                        @can('users.impersonate')
-                            <flux:button onclick="downloadIncognitoHelper('{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('impersonate.login', now()->addMinutes(5), ['user' => $user->id]) }}','{{ $user->riscoin_id ?? $user->id }}')" variant="ghost" size="sm" class="bg-yellow-600 text-white hover:bg-yellow-700" title="Download Incognito Helper">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            </flux:button>
-                        @endcan
-
-                        @can('users.delete')
-                            @if (method_exists($user, 'trashed') && $user->trashed())
-                                <flux:button wire:click="restore({{ $user->id }})" variant="ghost" size="sm"
-                                    class="text-green-600 hover:text-green-900"
-                                    onclick="return confirm('Are you sure you want to restore this user?')"
-                                    data-test="restore-user-{{ $user->id }}" title="Restore">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M3 10h4l3-6 4 12 3-6h4" />
-                                    </svg>
-                                </flux:button>
-                            @else
-                                <flux:button wire:click="delete({{ $user->id }})" variant="ghost" size="sm"
-                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                                    onclick="return confirm('Are you sure you want to delete this user?')"
-                                    data-test="delete-user-{{ $user->id }}" title="Delete">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </flux:button>
-                            @endif
-                        @endcan
-                    </div>
-                </td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="13" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-                        No users found matching your criteria.
-                    </td>
-                </tr>
-                @endforelse
-                </tbody>
-                </table>
-            </div> <!-- Pagination -->
+                </div>
             <div class="mt-6">
                 {{ $this->users->links() }}
             </div>
@@ -974,6 +1158,18 @@ Amount invested: $" .
                                                 type="date" :placeholder="__('Select date joined')"
                                                 data-test="date-joined-input" />
 
+                                            <!-- Team -->
+                                            <div>
+                                                <label
+                                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Team</label>
+                                                <flux:select wire:model.live="team_id" data-test="team-select">
+                                                    <option value="">Select Team</option>
+                                                    @foreach ($teams as $team)
+                                                        <option value="{{ $team->id }}">{{ $team->name }}
+                                                        </option>
+                                                    @endforeach
+                                                </flux:select>
+                                            </div>
                                             <!-- Roles -->
                                             <div>
                                                 <label
@@ -1319,24 +1515,27 @@ Amount invested: $" .
     </div>
 </div>
 <script>
-    (function(){
+    (function() {
         if (window.showToast) return;
         const containerId = 'global-toast-container';
-        function ensureContainer(){
+
+        function ensureContainer() {
             let c = document.getElementById(containerId);
-            if(!c){
+            if (!c) {
                 c = document.createElement('div');
                 c.id = containerId;
-                c.style = 'position:fixed;top:1rem;right:1rem;display:flex;flex-direction:column;gap:0.5rem;z-index:99999;pointer-events:none';
+                c.style =
+                    'position:fixed;top:1rem;right:1rem;display:flex;flex-direction:column;gap:0.5rem;z-index:99999;pointer-events:none';
                 document.body.appendChild(c);
             }
             return c;
         }
-        window.showToast = function(message, type = 'success', duration = 3000){
+        window.showToast = function(message, type = 'success', duration = 3000) {
             const c = ensureContainer();
             const toast = document.createElement('div');
             toast.className = 'global-toast';
-            toast.style = 'pointer-events:auto;min-width:200px;max-width:360px;background:rgba(0,0,0,0.85);color:#fff;padding:12px 14px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;align-items:center;gap:10px;opacity:0;transform:translateX(12px);transition:opacity .18s ease,transform .18s ease';
+            toast.style =
+                'pointer-events:auto;min-width:200px;max-width:360px;background:rgba(0,0,0,0.85);color:#fff;padding:12px 14px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;align-items:center;gap:10px;opacity:0;transform:translateX(12px);transition:opacity .18s ease,transform .18s ease';
             const icon = document.createElement('div');
             icon.innerHTML = type === 'success' ? '✓' : (type === 'error' ? '⚠' : 'ℹ');
             icon.style = 'font-weight:700;font-size:14px';
@@ -1346,19 +1545,26 @@ Amount invested: $" .
             const close = document.createElement('button');
             close.innerHTML = '✕';
             close.style = 'background:none;border:none;color:inherit;font-size:12px;cursor:pointer';
-            close.onclick = () => { if (toast.parentNode) toast.parentNode.removeChild(toast); };
+            close.onclick = () => {
+                if (toast.parentNode) toast.parentNode.removeChild(toast);
+            };
             toast.appendChild(icon);
             toast.appendChild(msg);
             toast.appendChild(close);
             c.appendChild(toast);
-            requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateX(0)'; });
+            requestAnimationFrame(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(0)';
+            });
             let removed = false;
             const timer = setTimeout(() => {
                 if (removed) return;
                 removed = true;
                 toast.style.opacity = '0';
                 toast.style.transform = 'translateX(12px)';
-                setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 180);
+                setTimeout(() => {
+                    if (toast.parentNode) toast.parentNode.removeChild(toast);
+                }, 180);
             }, duration);
             toast.addEventListener('mouseenter', () => clearTimeout(timer));
             toast.addEventListener('mouseleave', () => setTimeout(() => {
@@ -1366,7 +1572,9 @@ Amount invested: $" .
                     removed = true;
                     toast.style.opacity = '0';
                     toast.style.transform = 'translateX(12px)';
-                    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 180);
+                    setTimeout(() => {
+                        if (toast.parentNode) toast.parentNode.removeChild(toast);
+                    }, 180);
                 }
             }, 500));
         };
@@ -1451,33 +1659,40 @@ Amount invested: $" .
     }
 
     // Generate and download helper scripts to open impersonation URL in Incognito
-    function downloadFile(filename, content){
-        const blob = new Blob([content], { type: 'text/plain' });
+    function downloadFile(filename, content) {
+        const blob = new Blob([content], {
+            type: 'text/plain'
+        });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = filename;
         document.body.appendChild(a);
         a.click();
         a.remove();
-        setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
 
-    function downloadIncognitoHelper(url, id){
-        try{
-            const timestamp = new Date().toISOString().replace(/[:.]/g,'-');
+    function downloadIncognitoHelper(url, id) {
+        try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             // macOS helper (uses open)
-            const mac = `#!/bin/bash\n# macOS: Open Google Chrome in incognito with the impersonation URL\nopen -a "Google Chrome" --args --incognito "${url}"\n`;
-            const linux = `#!/bin/bash\n# Linux: Open Google Chrome in incognito with the impersonation URL\ngoogle-chrome --incognito "${url}" || google-chrome-stable --incognito "${url}" || chromium-browser --incognito "${url}"\n`;
-            const win = `# PowerShell script to open Chrome in incognito with the impersonation URL\nStart-Process "chrome" -ArgumentList '--incognito','"${url}"'\n`;
+            const mac =
+                `#!/bin/bash\n# macOS: Open Google Chrome in incognito with the impersonation URL\nopen -a "Google Chrome" --args --incognito "${url}"\n`;
+            const linux =
+                `#!/bin/bash\n# Linux: Open Google Chrome in incognito with the impersonation URL\ngoogle-chrome --incognito "${url}" || google-chrome-stable --incognito "${url}" || chromium-browser --incognito "${url}"\n`;
+            const win =
+                `# PowerShell script to open Chrome in incognito with the impersonation URL\nStart-Process "chrome" -ArgumentList '--incognito','"${url}"'\n`;
 
             downloadFile(`impersonate-${id}-mac-${timestamp}.sh`, mac);
             downloadFile(`impersonate-${id}-linux-${timestamp}.sh`, linux);
             downloadFile(`impersonate-${id}-windows-${timestamp}.ps1`, win);
 
-            if(window.showToast) window.showToast('Incognito helper scripts downloaded', 'success'); else alert('Downloaded helper scripts');
-        }catch(e){
+            if (window.showToast) window.showToast('Incognito helper scripts downloaded', 'success');
+            else alert('Downloaded helper scripts');
+        } catch (e) {
             console.error(e);
-            if(window.showToast) window.showToast('Failed to create helper files', 'error'); else alert('Failed to create helper files');
+            if (window.showToast) window.showToast('Failed to create helper files', 'error');
+            else alert('Failed to create helper files');
         }
     }
 </script>

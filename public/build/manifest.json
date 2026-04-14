@@ -1,6 +1,10 @@
 {
+  "_apexcharts-DbRiHw6s.js": {
+    "file": "assets/apexcharts-DbRiHw6s.js",
+    "name": "apexcharts"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-BrIdOVGb.css",
+    "file": "assets/app-C1jwCR3K.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "names": [
@@ -8,9 +12,12 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-je17lW9u.js",
+    "file": "assets/app-e9opc8GP.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_apexcharts-DbRiHw6s.js"
+    ]
   }
 }

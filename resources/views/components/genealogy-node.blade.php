@@ -9,27 +9,51 @@
 
             <!-- Superior Card -->
             <div class="relative flex flex-col items-center">
-                <!-- Circle Card -->
-                <div class="cursor-not-allowed opacity-80" title="Superior node - Viewing disabled">
-                    <div
-                        class="w-20 h-20 rounded-full border-4 border-purple-500 dark:border-purple-600 overflow-hidden flex items-center justify-center bg-white dark:bg-gray-800 shadow-md">
+                @if (auth()->user()->hasRole('admin'))
+                    <a href="{{ route('genealogy.show', $superior->riscoin_id) }}"
+                        class="block transition-transform hover:scale-105 hover:shadow-lg">
+                        <!-- Circle Card -->
+                        <div class="{{ auth()->user()->hasRole('admin') ? '' : 'cursor-not-allowed opacity-80' }}"
+                            title="{{ auth()->user()->hasRole('admin') ? '' : 'Superior node - Viewing disabled' }}">
+                            <div
+                                class="w-20 h-20 rounded-full border-4 border-purple-500 dark:border-purple-600 overflow-hidden flex items-center justify-center bg-white dark:bg-gray-800 shadow-md">
+                                @if ($superior->hasMedia('avatar'))
+                                    <img src="{{ $superior->getFirstMediaUrl('avatar') }}" alt="{{ $superior->name }}"
+                                        class="w-full h-full object-cover">
+                                @else
+                                    <div
+                                        class="w-full h-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+                                        <span class="text-xl font-bold text-purple-500 dark:text-purple-400">
+                                            {{ $superior->name ? substr($superior->name, 0, 1) : '' }}
+                                        </span>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </a>
+                @else
+                    <div class="w-20 h-20 rounded-full border-4 border-purple-500 dark:border-purple-600 overflow-hidden flex items-center justify-center bg-white dark:bg-gray-800 shadow-md
+                    cursor-not-allowed opacity-80"
+                        title="Superior node - Viewing disabled">
                         @if ($superior->hasMedia('avatar'))
                             <img src="{{ $superior->getFirstMediaUrl('avatar') }}" alt="{{ $superior->name }}"
                                 class="w-full h-full object-cover">
                         @else
-                            <div class="w-full h-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+                            <div
+                                class="w-full h-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
                                 <span class="text-xl font-bold text-purple-500 dark:text-purple-400">
                                     {{ $superior->name ? substr($superior->name, 0, 1) : '' }}
                                 </span>
                             </div>
                         @endif
                     </div>
-                </div>
+                @endif
 
                 <!-- Superior Info -->
                 <div class="mt-2 text-center max-w-xs">
                     <div class="font-semibold dark:text-white text-sm">{{ $superior->name ?? 'N/A' }}</div>
-                    <div class="text-xs text-gray-600 dark:text-gray-400">ID: {{ $superior->riscoin_id ?? 'N/A' }}</div>
+                    <div class="text-xs text-gray-600 dark:text-gray-400">ID: {{ $superior->riscoin_id ?? 'N/A' }}
+                    </div>
                     <div class="text-xs text-purple-600 dark:text-purple-400 font-medium">Superior</div>
                     <div class="text-xs text-green-600 dark:text-green-400 font-medium">
                         ${{ number_format($superior->invested_amount ?? 0, 2) }}</div>

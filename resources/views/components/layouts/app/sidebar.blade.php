@@ -65,7 +65,7 @@
                         wire:navigate>{{ __('Dashboard') }}</flux:navlist.item>
                 @endcan
                 @can('genealogy.view')
-                    <flux:navlist.item icon="users" :href="route('genealogy')" :current="request()->routeIs('genealogy')"
+                    <flux:navlist.item icon="users" :href="route('genealogy')" :current="request()->routeIs('genealogy*')"
                         wire:navigate>{{ __('Genealogy') }}</flux:navlist.item>
                 @endcan
                 @can('my-team.access')
@@ -80,6 +80,11 @@
                 @can('my-withdrawals.view')
                     <flux:navlist.item icon="credit-card" :href="route('my-withdrawals')"
                         :current="request()->routeIs('my-withdrawals')" wire:navigate>{{ __('My Withdrawals') }}
+                    </flux:navlist.item>
+                @endcan
+                @can('withdrawals.view')
+                    <flux:navlist.item icon="credit-card" :href="route('withdrawals.index')"
+                        :current="request()->routeIs('withdrawals.index')" wire:navigate>{{ __('Withdrawals') }}
                     </flux:navlist.item>
                 @endcan
                 @can('appointments.book')
@@ -112,6 +117,26 @@
                         :current="request()->routeIs('guide.access')" wire:navigate>{{ __('Guide') }}
                     </flux:navlist.item>
                 @endcan
+                @can('reply-template.access')
+                    <flux:navlist.item icon="chat-bubble-left-right" :href="route('reply-template.index')"
+                        :current="request()->routeIs('reply-template.index')" wire:navigate>{{ __('Reply Templates') }}
+                    </flux:navlist.item>
+                @endcan
+                @auth
+                    <flux:navlist.item icon="heart" :href="route('donate.index')"
+                        :current="request()->routeIs('donate.index')" wire:navigate>{{ __('Donate') }}
+                    </flux:navlist.item>
+                @endauth
+                @can('donate.manage')
+                    <flux:navlist.item icon="currency-dollar" :href="route('donate.manage')"
+                        :current="request()->routeIs('donate.manage')" wire:navigate>{{ __('Donation Methods') }}
+                    </flux:navlist.item>
+                @endcan
+                @can('teams.view')
+                    <flux:navlist.item icon="user-group" :href="route('teams.index')"
+                        :current="request()->routeIs('teams.index')" wire:navigate>{{ __('Teams') }}
+                    </flux:navlist.item>
+                @endcan
                 @can('users.view')
                     <flux:navlist.item icon="user-circle" :href="route('users.index')"
                         :current="request()->routeIs('users.index')" wire:navigate>{{ __('Users') }}</flux:navlist.item>
@@ -132,6 +157,12 @@
                     </flux:navlist.item>
                 @endcan
 
+                @can('calculator.usage-logs')
+                    <flux:navlist.item icon="clock" :href="route('calculator-usage-logs')"
+                        :current="request()->routeIs('calculator-usage-logs')" wire:navigate>{{ __('Calculator Usage Logs') }}
+                    </flux:navlist.item>
+                @endcan
+
                 @can('calculator.view')
                     <flux:navlist.item icon="chart-bar" :href="route('compound-calculator')"
                         :current="request()->routeIs('compound-calculator')" wire:navigate>{{ __('Compound Calculator') }}
@@ -146,6 +177,37 @@
                 @can('opalite.manage')
                     <flux:navlist.item icon="wrench" :href="route('opalite.manage')"
                         :current="request()->routeIs('opalite.manage')" wire:navigate>{{ __('Manage Opalite Dance') }}
+                    </flux:navlist.item>
+                @endcan
+
+                @can('riscoin-links.manage')
+                    <flux:navlist.item icon="link" :href="route('riscoin-links.index')"
+                        :current="request()->routeIs('riscoin-links.index')" wire:navigate>{{ __('Riscoin Links') }}
+                    </flux:navlist.item>
+                @endcan
+
+                {{-- Support: Tickets, FAQ, Chatbot Logs --}}
+                @auth
+                    <flux:navlist.item icon="ticket" :href="route('tickets.index')"
+                        :current="request()->routeIs('tickets.*')" wire:navigate>{{ __('My Tickets') }}
+                    </flux:navlist.item>
+                    <flux:navlist.item icon="question-mark-circle" :href="route('faq.index')"
+                        :current="request()->routeIs('faq.index')" wire:navigate>{{ __('FAQ') }}
+                    </flux:navlist.item>
+                @endauth
+                @can('tickets.manage')
+                    <flux:navlist.item icon="inbox-stack" :href="route('tickets.index')"
+                        :current="false" wire:navigate>{{ __('Manage Tickets') }}
+                    </flux:navlist.item>
+                @endcan
+                @can('faq.manage')
+                    <flux:navlist.item icon="document-text" :href="route('faq.manage')"
+                        :current="request()->routeIs('faq.manage')" wire:navigate>{{ __('FAQ Management') }}
+                    </flux:navlist.item>
+                @endcan
+                @can('chatbot.manage')
+                    <flux:navlist.item icon="chat-bubble-bottom-center-text" :href="route('chatbot.logs')"
+                        :current="request()->routeIs('chatbot.logs')" wire:navigate>{{ __('Chatbot Logs') }}
                     </flux:navlist.item>
                 @endcan
             </flux:navlist.group>

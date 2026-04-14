@@ -4,10 +4,12 @@ use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 use App\Models\Manager;
+use App\Mail\ManagerCongratulations;
 
 new #[Layout('components.layouts.auth')] class extends Component {
     public string $name = '';
@@ -22,11 +24,16 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $phone_number = '';
     public string $gender = '';
     public string $occupation = '';
+    public string $support_group = '';
+    public string $bonchat_id = '';
+    public string $primary_language = 'english';
+    public ?string $secondary_language = null;
 
     public function mount(): void
     {
         if (request()->has('ref')) {
             $this->inviters_code = request()->get('ref');
+            $this->support_group = User::where('riscoin_id', strtoupper($this->inviters_code))->value('support_group') ?? '';
         }
     }
 
@@ -35,6 +42,8 @@ new #[Layout('components.layouts.auth')] class extends Component {
      */
     public function register(): void
     {
+        $this->secondary_language = $this->secondary_language ?: null;
+
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
@@ -47,13 +56,26 @@ new #[Layout('components.layouts.auth')] class extends Component {
             'phone_number' => ['nullable', 'string', 'max:20'],
             'gender' => ['required', 'string', 'max:50'],
             'occupation' => ['required', 'string', 'max:100'],
+            'support_group' => ['nullable', 'string', 'max:100'],
+            'bonchat_id' => ['required', 'string', 'max:255'],
+            'primary_language' => ['required', 'string', 'in:english,tagalog'],
+            'secondary_language' => ['nullable', 'string', 'in:english,tagalog'],
             // 'gRecaptcha-response' => ['required', 'captcha'],
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
 
-        $validated['riscoind_id'] = strtoupper($validated['riscoin_id']);
-        $validated['inviters_code'] = strtoupper($validated['inviters_code']);
+        $validated['riscoin_id'] = strtoupper(trim(str_replace(' ', '', $validated['riscoin_id'])));
+        $validated['inviters_code'] = strtoupper(trim(str_replace(' ', '', $validated['inviters_code'])));
+        $validated['team_id'] = User::where('riscoin_id', $validated['inviters_code'])->value('team_id') ?? null;
+
+        //check if riscoin_id already exists
+        $checkRiscoinId = User::where('riscoin_id', $validated['riscoin_id'])->first();
+        if ($checkRiscoinId) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'riscoin_id' => 'This Riscoin ID is already registered. Please use a different Riscoin ID.',
+            ]);
+        }
 
         //check if inviters code exists
         $checkInvitersCode = User::where('riscoin_id', $validated['inviters_code'])->first();
@@ -79,16 +101,41 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public function promoteToManager($code): void
     {
         $user = User::where('riscoin_id', strtoupper($code))->first();
-        if ($user && $user->invites()->count() >= 3) {
-            //check if already a manager
-            if (!$user->managerLevel) {
+        if (!$user) return;
 
-                // dd( 'Promoting user ID ' . $user->id . ' to manager level 1.');
-                Manager::create([
-                    'user_id' => $user->id,
-                    'level' => 1,
-                ]);
-            }
+        $directs = $user->invites()->count();
+        $totalMembers = $user->descendants->count();
+
+        // Determine the highest level the user qualifies for
+        $qualifiedLevel = 0;
+
+        if ($directs >= 20 && $totalMembers >= 500) {
+            $qualifiedLevel = 6;
+        } elseif ($directs >= 15 && $totalMembers >= 200) {
+            $qualifiedLevel = 5;
+        } elseif ($directs >= 10 && $totalMembers >= 100) {
+            $qualifiedLevel = 4;
+        } elseif ($directs >= 6 && $totalMembers >= 50) {
+            $qualifiedLevel = 3;
+        } elseif ($directs >= 5 && $totalMembers >= 15) {
+            $qualifiedLevel = 2;
+        } elseif ($directs >= 3) {
+            $qualifiedLevel = 1;
+        }
+
+        if ($qualifiedLevel === 0) return;
+
+        $managerLevel = $user->managerLevel;
+
+        if (!$managerLevel) {
+            Manager::create([
+                'user_id' => $user->id,
+                'level' => $qualifiedLevel,
+            ]);
+            Mail::to($user->email)->queue(new ManagerCongratulations($user, $qualifiedLevel, false));
+        } elseif ($qualifiedLevel > $managerLevel->level) {
+            $managerLevel->update(['level' => $qualifiedLevel]);
+            Mail::to($user->email)->queue(new ManagerCongratulations($user, $qualifiedLevel, true));
         }
     }
 }; ?>
@@ -111,9 +158,19 @@ new #[Layout('components.layouts.auth')] class extends Component {
         <!-- Riscoin ID -->
         <flux:input wire:model="riscoin_id" :label="__('Riscoin ID')" type="text" required autocomplete="riscoin_id"
             :placeholder="__('Riscoin ID')" />
+
+        <!-- Bonchat ID -->
+        <flux:input wire:model="bonchat_id" :label="__('Bonchat ID')" type="text" required
+            autocomplete="bonchat_id" :placeholder="__('Bonchat ID')" />
+
         <!-- Inviters Code -->
         <flux:input wire:model="inviters_code" :label="__('Inviters Code')" type="text" required
             autocomplete="inviters_code" :placeholder="__('Inviters Code')" />
+
+        <!-- Support Group -->
+        <flux:input wire:model="support_group" :label="__('Support Group (ask your inviter, bonchat support group)')" type="text" required
+            autocomplete="support_group" :placeholder="__('Support Group')" />
+
         <!-- Invested Amount -->
         <flux:input wire:model="invested_amount" :label="__('Invested Amount (USD)')" type="number" step="0.01"
             required autocomplete="invested_amount" :placeholder="__('Invested Amount')" prefix="$" />
@@ -135,6 +192,19 @@ new #[Layout('components.layouts.auth')] class extends Component {
         <!-- Occupation -->
         <flux:input wire:model="occupation" :label="__('Occupation')" type="text" required autocomplete="occupation"
             :placeholder="__('Occupation')" />
+
+        <!-- Primary Language -->
+        <flux:select wire:model="primary_language" :label="__('Primary Language')" required>
+            <option value="english">English</option>
+            <option value="tagalog">Tagalog</option>
+        </flux:select>
+
+        <!-- Secondary Language -->
+        <flux:select wire:model="secondary_language" :label="__('Secondary Language (optional)')">
+            <option value="">None</option>
+            <option value="english">English</option>
+            <option value="tagalog">Tagalog</option>
+        </flux:select>
 
         <!-- Password -->
         <flux:input wire:model="password" :label="__('Password')" type="password" required autocomplete="new-password"
