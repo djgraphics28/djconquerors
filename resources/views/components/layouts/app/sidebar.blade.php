@@ -185,6 +185,31 @@
                         :current="request()->routeIs('riscoin-links.index')" wire:navigate>{{ __('Riscoin Links') }}
                     </flux:navlist.item>
                 @endcan
+
+                {{-- Support: Tickets, FAQ, Chatbot Logs --}}
+                @auth
+                    <flux:navlist.item icon="ticket" :href="route('tickets.index')"
+                        :current="request()->routeIs('tickets.*')" wire:navigate>{{ __('My Tickets') }}
+                    </flux:navlist.item>
+                    <flux:navlist.item icon="question-mark-circle" :href="route('faq.index')"
+                        :current="request()->routeIs('faq.index')" wire:navigate>{{ __('FAQ') }}
+                    </flux:navlist.item>
+                @endauth
+                @can('tickets.manage')
+                    <flux:navlist.item icon="inbox-stack" :href="route('tickets.index')"
+                        :current="false" wire:navigate>{{ __('Manage Tickets') }}
+                    </flux:navlist.item>
+                @endcan
+                @can('faq.manage')
+                    <flux:navlist.item icon="document-text" :href="route('faq.manage')"
+                        :current="request()->routeIs('faq.manage')" wire:navigate>{{ __('FAQ Management') }}
+                    </flux:navlist.item>
+                @endcan
+                @can('chatbot.manage')
+                    <flux:navlist.item icon="chat-bubble-bottom-center-text" :href="route('chatbot.logs')"
+                        :current="request()->routeIs('chatbot.logs')" wire:navigate>{{ __('Chatbot Logs') }}
+                    </flux:navlist.item>
+                @endcan
             </flux:navlist.group>
         </flux:navlist>
 

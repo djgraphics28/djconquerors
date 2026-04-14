@@ -98,6 +98,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Reply Templates - Using Livewire Volt
     Volt::route('reply-template', 'reply-template.index')->name('reply-template.index')->middleware('can:reply-template.access');
 
+    // Support Tickets (all authenticated users)
+    Volt::route('tickets', 'tickets.index')->name('tickets.index');
+    Volt::route('tickets/create', 'tickets.create')->name('tickets.create');
+    Volt::route('tickets/{ticketId}', 'tickets.show')->name('tickets.show');
+
+    // FAQ (all authenticated users can browse; admin can manage)
+    Volt::route('faq', 'faq.index')->name('faq.index');
+    Volt::route('faq/manage', 'faq.manage')->name('faq.manage')->middleware('can:faq.manage');
+
+    // Chatbot logs (admin only)
+    Volt::route('chatbot/logs', 'chatbot.logs')->name('chatbot.logs')->middleware('can:chatbot.manage');
+
     // Donate
     Volt::route('donate', 'donate.index')->name('donate.index');
     Volt::route('donate/manage', 'donate.manage')->name('donate.manage')->middleware('can:donate.manage');
