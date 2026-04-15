@@ -181,7 +181,7 @@ new class extends Component {
     {
         $this->editMode = true;
         $this->userId = $user->id;
-        $this->user = $user;
+        $this->user = $user->load('media');
         $this->name = $user->name;
         $this->email = $user->email;
         $this->phone_number = $user->phone_number;
@@ -1069,9 +1069,9 @@ Amount invested: $" .
                                         <!-- Avatar Upload -->
                                         <div class="flex items-center space-x-6">
                                             <div class="flex-shrink-0">
-                                                @if ($editMode && $user && $user->getFirstMediaUrl('avatar') && !$avatarToRemove)
+                                                @if ($editMode && $this->user && $this->user->getFirstMediaUrl('avatar') && !$avatarToRemove)
                                                     <img class="h-20 w-20 rounded-full object-cover"
-                                                        src="{{ $user->getFirstMediaUrl('avatar') }}"
+                                                        src="{{ $this->user->getFirstMediaUrl('avatar') }}"
                                                         alt="Current avatar">
                                                 @elseif($avatar)
                                                     <img class="h-20 w-20 rounded-full object-cover"
@@ -1100,7 +1100,7 @@ Amount invested: $" .
                                                             </p>
                                                         @enderror
                                                     </div>
-                                                    @if ($editMode && (($user && $user->getFirstMediaUrl('avatar')) || $avatar))
+                                                    @if ($editMode && (($this->user && $this->user->getFirstMediaUrl('avatar')) || $avatar))
                                                         <flux:button type="button" wire:click="removeAvatar"
                                                             variant="ghost" size="sm" class="text-red-600">
                                                             Remove Avatar
