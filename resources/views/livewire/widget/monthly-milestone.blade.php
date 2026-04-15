@@ -4,6 +4,7 @@ use Livewire\Volt\Component;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 new class extends Component {
     public ?string $riscoinId = null;
@@ -49,6 +50,9 @@ new class extends Component {
 
         $this->membershipAnniversaries = User::whereIn('id', $teamMemberIds)
             ->whereNotNull('date_joined')
+            ->whereDay('date_joined', now()->day)
+            ->with('media')
+            ->select('id', 'name', 'date_joined', 'riscoin_id', 'invested_amount', 'is_monthly_milestone_mention')
             ->get()
             ->filter(function ($user) {
                 $joinDate = Carbon::parse($user->date_joined);
@@ -79,28 +83,31 @@ new class extends Component {
         $this->milestonesHasMore = count($this->membershipAnniversaries) > $this->milestonesPerPage;
     }
 
-    private function getAllTeamMemberIds($userId)
+    private function getAllTeamMemberIds(int $userId): array
     {
-        $memberIds = [$userId];
+        $root = DB::table('users')->where('id', $userId)->value('riscoin_id');
+        if (!$root) return [$userId];
 
-        $user = User::with('invites')->find($userId);
-        if (! $user) return $memberIds;
+        $allIds            = [$userId];
+        $currentRiscoinIds = [$root];
 
-        $currentLevel = $user->invites;
+        while (!empty($currentRiscoinIds)) {
+            $batch = DB::table('users')
+                ->whereIn('inviters_code', $currentRiscoinIds)
+                ->whereNull('deleted_at')
+                ->select('id', 'riscoin_id')
+                ->get();
 
-        while ($currentLevel->isNotEmpty()) {
-            $currentLevelIds = $currentLevel->pluck('id')->toArray();
-            $memberIds = array_merge($memberIds, $currentLevelIds);
+            if ($batch->isEmpty()) break;
 
-            $nextLevel = collect();
-            foreach ($currentLevel as $member) {
-                $member->load('invites');
-                $nextLevel = $nextLevel->merge($member->invites);
+            $currentRiscoinIds = [];
+            foreach ($batch as $row) {
+                $allIds[]            = $row->id;
+                $currentRiscoinIds[] = $row->riscoin_id;
             }
-            $currentLevel = $nextLevel;
         }
 
-        return array_unique($memberIds);
+        return array_unique($allIds);
     }
 
     public function getIndividualMessage($memberIndex)

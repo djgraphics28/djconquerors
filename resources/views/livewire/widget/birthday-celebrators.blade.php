@@ -4,6 +4,7 @@ use Livewire\Volt\Component;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 new class extends Component {
     public ?string $riscoinId = null;
@@ -39,9 +40,11 @@ new class extends Component {
 
         $this->birthdayCelebrators = User::whereIn('id', $teamMemberIds)
             ->whereNotNull('birth_date')
+            ->whereMonth('birth_date', $currentMonth)
             ->orderByRaw('DAYOFMONTH(birth_date) ASC')
+            ->with('media')
+            ->select('id', 'name', 'birth_date', 'riscoin_id', 'invested_amount', 'date_joined', 'is_birthday_mention')
             ->get()
-            ->filter(fn($u) => Carbon::parse($u->birth_date)->month == $currentMonth)
             ->map(function($u){ $d=Carbon::parse($u->birth_date); return [
                 'name'=>$u->name,
                 'birth_date'=>$d->format('M d'),
@@ -54,10 +57,31 @@ new class extends Component {
             ];})->values()->toArray();
     }
 
-    private function getAllTeamMemberIds($userId){
-        $ids = [$userId]; $user = User::with('invites')->find($userId); if(! $user) return $ids;
-        $lvl = $user->invites; while($lvl->isNotEmpty()){ $ids = array_merge($ids, $lvl->pluck('id')->toArray()); $next=collect(); foreach($lvl as $m){ $m->load('invites'); $next=$next->merge($m->invites);} $lvl=$next; }
-        return array_unique($ids);
+    private function getAllTeamMemberIds(int $userId): array
+    {
+        $root = DB::table('users')->where('id', $userId)->value('riscoin_id');
+        if (!$root) return [$userId];
+
+        $allIds            = [$userId];
+        $currentRiscoinIds = [$root];
+
+        while (!empty($currentRiscoinIds)) {
+            $batch = DB::table('users')
+                ->whereIn('inviters_code', $currentRiscoinIds)
+                ->whereNull('deleted_at')
+                ->select('id', 'riscoin_id')
+                ->get();
+
+            if ($batch->isEmpty()) break;
+
+            $currentRiscoinIds = [];
+            foreach ($batch as $row) {
+                $allIds[]            = $row->id;
+                $currentRiscoinIds[] = $row->riscoin_id;
+            }
+        }
+
+        return array_unique($allIds);
     }
 
     public function getRandomBirthdayMessage(string $name): string{

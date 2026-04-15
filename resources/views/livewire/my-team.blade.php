@@ -8,6 +8,7 @@ use Spatie\Activitylog\Models\Activity;
 use Livewire\WithPagination;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 new class extends Component {
@@ -60,6 +61,15 @@ new class extends Component {
     public array $selectedUsers = [];
     public bool $selectAll = false;
 
+    // ── Memoization (per-request, shared across computed properties) ──
+    private ?array $_teamMemberIds  = null; // [id, ...]
+    private ?array $_childrenMap    = null; // [riscoin_id => [child_riscoin_id, ...]]
+    private ?array $_idToRiscoin    = null; // [id => riscoin_id]
+    private ?array $_investedById   = null; // [id => invested_amount]
+    private ?array $_isActiveById   = null; // [id => bool]
+    private ?array $_depthById      = null; // [id => depth from auth user]
+    private ?array $_withdrawalsMap = null; // [user_id => total_paid]
+
     protected $queryString = [
         'search' => ['except' => ''],
         'dateJoined' => ['except' => ''],
@@ -79,12 +89,12 @@ new class extends Component {
 
     public function loadAssistants()
     {
-        // Load full user models excluding authenticated user and target user
         $this->assistants = User::where('is_active', true)
-            ->where('id', '!=', 1) // Exclude super admin
+            ->where('id', '!=', 1)
             ->when($this->assistantTargetUserId, function ($query) {
                 $query->where('id', '!=', $this->assistantTargetUserId);
             })
+            ->select('id', 'name', 'email', 'riscoin_id')
             ->get();
     }
 
@@ -122,53 +132,25 @@ new class extends Component {
     }
 
     // Get total withdrawals amount for a user (only paid status)
-    public function getTotalWithdrawals($userId)
+    public function getTotalWithdrawals($userId): float
     {
-        $user = User::with('withdrawals')->find($userId);
-        if (!$user || !$user->withdrawals) {
-            return 0;
-        }
-
-        return $user->withdrawals->where('status', 'paid')->sum('amount');
+        return $this->getWithdrawalsMap()[$userId] ?? 0.0;
     }
 
-    // Get capital recovery status
-    public function getCapitalRecoveryStatus($userId)
+    public function getCapitalRecoveryStatus($userId): array
     {
-        $user = User::find($userId);
-        if (!$user) {
-            return [
-                'status' => 'unknown',
-                'label' => 'Unknown',
-                'color' => 'gray',
-            ];
-        }
-
+        $this->fetchTeamData();
+        $investedAmount   = $this->_investedById[$userId] ?? 0;
         $totalWithdrawals = $this->getTotalWithdrawals($userId);
-        $investedAmount = $user->invested_amount ?? 0;
 
         if ($investedAmount == 0) {
-            return [
-                'status' => 'no_investment',
-                'label' => 'No Investment',
-                'color' => 'gray',
-            ];
+            return ['status' => 'no_investment', 'label' => 'No Investment', 'color' => 'gray'];
         }
-
         if ($totalWithdrawals < $investedAmount) {
-            $percentage = ($totalWithdrawals / $investedAmount) * 100;
-            return [
-                'status' => 'recovering',
-                'label' => 'Recovering (' . number_format($percentage, 1) . '%)',
-                'color' => 'yellow',
-            ];
-        } else {
-            return [
-                'status' => 'recovered',
-                'label' => 'Capital Recovered',
-                'color' => 'green',
-            ];
+            $pct = ($totalWithdrawals / $investedAmount) * 100;
+            return ['status' => 'recovering', 'label' => 'Recovering (' . number_format($pct, 1) . '%)', 'color' => 'yellow'];
         }
+        return ['status' => 'recovered', 'label' => 'Capital Recovered', 'color' => 'green'];
     }
 
     // Get Riscoin Link with user's riscoin_id
@@ -185,119 +167,49 @@ new class extends Component {
         return $activeLink->url . '?code=' . $riscoinId;
     }
 
-    private function getFilteredUserIdsByCapitalRecovery()
+    private function getFilteredUserIdsByCapitalRecovery(): array
     {
-        $currentUser = User::find(auth()->user()->id);
-        $userRiscoindId = $currentUser->riscoin_id;
-        $allTeamMembers = $this->getAllTeamMembers($userRiscoindId);
+        $this->fetchTeamData();
+        $withdrawalsMap  = $this->getWithdrawalsMap();
         $filteredUserIds = [];
 
-        foreach ($allTeamMembers as $user) {
-            $capitalStatus = $this->getCapitalRecoveryStatus($user->id);
+        foreach ($this->_teamMemberIds as $id) {
+            $invested  = $this->_investedById[$id] ?? 0;
+            $withdrawn = $withdrawalsMap[$id] ?? 0;
+            $status    = $invested == 0 ? 'no_investment' : ($withdrawn < $invested ? 'recovering' : 'recovered');
 
-            switch ($this->capitalRecoveryFilter) {
-                case 'recovered':
-                    if ($capitalStatus['status'] === 'recovered') {
-                        $filteredUserIds[] = $user->id;
-                    }
-                    break;
-                case 'recovering':
-                    if ($capitalStatus['status'] === 'recovering') {
-                        $filteredUserIds[] = $user->id;
-                    }
-                    break;
-                case 'no_investment':
-                    if ($capitalStatus['status'] === 'no_investment') {
-                        $filteredUserIds[] = $user->id;
-                    }
-                    break;
+            if ($status === $this->capitalRecoveryFilter) {
+                $filteredUserIds[] = $id;
             }
         }
 
         return $filteredUserIds;
     }
 
-    // Get all team members recursively (direct invites + their invites + their invites, etc.)
-    public function getAllTeamMembers($riscoinId)
+    // getAllTeamMembers replaced by fetchTeamData() BFS — see private helper methods below
+
+    public function getTeamLevel($userId, $currentUserRiscoinId): int
     {
-        $allMembers = collect();
-
-        // Get direct invites
-        $directInvites = User::with(['roles', 'inviter'])
-            ->where('inviters_code', $riscoinId)
-            ->where('inviters_code', '!=', '')
-            ->get();
-
-        foreach ($directInvites as $invite) {
-            $allMembers->push($invite);
-            // Recursively get invites of this invite
-            $nestedInvites = $this->getAllTeamMembers($invite->riscoin_id);
-            $allMembers = $allMembers->merge($nestedInvites);
-        }
-
-        return $allMembers;
+        $this->fetchTeamData();
+        return $this->_depthById[$userId] ?? 1;
     }
 
-    // Get team level for display (1 for direct, 2 for their invites, etc.)
-    public function getTeamLevel($userId, $currentUserRiscoinId)
+    public function getTeamCount($userId): int
     {
-        $level = 1;
-        $user = User::find($userId);
+        $this->fetchTeamData();
+        $riscoinId = $this->_idToRiscoin[$userId] ?? null;
+        if (!$riscoinId) return 0;
 
-        if (!$user || !$user->inviters_code) {
-            return $level;
-        }
-
-        // If user's inviter is the current user, it's level 1
-        if ($user->inviters_code === $currentUserRiscoinId) {
-            return $level;
-        }
-
-        // Otherwise, find the level by checking the hierarchy
-        $currentInviterCode = $user->inviters_code;
-        $level = 2; // Start from level 2 since we already checked level 1
-
-        while ($currentInviterCode && $currentInviterCode !== $currentUserRiscoinId) {
-            $inviter = User::where('riscoin_id', $currentInviterCode)->first();
-            if (!$inviter || !$inviter->inviters_code) {
-                break;
-            }
-
-            if ($inviter->inviters_code === $currentUserRiscoinId) {
-                return $level;
-            }
-
-            $currentInviterCode = $inviter->inviters_code;
-            $level++;
-
-            // Safety check to prevent infinite loops
-            if ($level > 10) {
-                break;
+        $count = 0;
+        $queue = [$riscoinId];
+        while (!empty($queue)) {
+            $children = $this->_childrenMap[array_shift($queue)] ?? [];
+            $count   += count($children);
+            foreach ($children as $childRiscoinId) {
+                $queue[] = $childRiscoinId;
             }
         }
-
-        return $level;
-    }
-
-    // Get total team count for a user (recursive)
-    public function getTeamCount($userId)
-    {
-        $user = User::find($userId);
-        if (!$user) {
-            return 0;
-        }
-
-        $directInvites = User::where('inviters_code', $user->riscoin_id)->count();
-        $totalCount = $directInvites;
-
-        // Get direct invites to calculate their teams recursively
-        $directUsers = User::where('inviters_code', $user->riscoin_id)->get();
-
-        foreach ($directUsers as $directUser) {
-            $totalCount += $this->getTeamCount($directUser->id);
-        }
-
-        return $totalCount;
+        return $count;
     }
 
     public function rules()
@@ -619,20 +531,13 @@ new class extends Component {
 
     public function getUsersProperty()
     {
-        $currentUser = User::find(auth()->user()->id);
-        $userRiscoindId = $currentUser->riscoin_id;
-
-        // Get all team members (direct invites + their invites recursively)
-        $allTeamMembers = $this->getAllTeamMembers($userRiscoindId);
-
-        // Convert to query for filtering and pagination
-        $userIds = $allTeamMembers->pluck('id')->toArray();
+        $userIds = $this->getTeamMemberIds();
 
         if (empty($userIds)) {
             return new \Illuminate\Pagination\LengthAwarePaginator([], 0, $this->perPage);
         }
 
-        return User::with(['roles', 'inviter', 'withdrawals', 'managerLevel'])
+        return User::with(['roles', 'inviter', 'managerLevel'])
             ->whereIn('id', $userIds)
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
@@ -652,7 +557,6 @@ new class extends Component {
                 $query->where('inviters_code', $this->inviterFilter);
             })
             ->when($this->capitalRecoveryFilter, function ($query) {
-                // NEW: Capital recovery filter
                 $query->whereIn('id', function ($subquery) {
                     $subquery->select('id')->from('users')->whereIn('id', $this->getFilteredUserIdsByCapitalRecovery());
                 });
@@ -704,30 +608,31 @@ new class extends Component {
 
     public function getTeamStatsProperty()
     {
-        $currentUser = auth()->user();
-        $allMembers = $this->getAllTeamMembers($currentUser->riscoin_id);
-        $memberIds = $allMembers->pluck('id');
+        $this->fetchTeamData();
+        $currentUser    = auth()->user();
+        $ids            = $this->_teamMemberIds;
+        $withdrawalsMap = $this->getWithdrawalsMap();
 
-        $directCount = User::where('inviters_code', $currentUser->riscoin_id)->count();
-        $activeCount = $allMembers->where('is_active', true)->count();
-        $totalInvested = $allMembers->sum('invested_amount');
+        $total         = count($ids);
+        $direct        = count($this->_childrenMap[$currentUser->riscoin_id] ?? []);
+        $active        = count(array_filter($this->_isActiveById, fn($v) => $v === true));
+        $totalInvested = array_sum($this->_investedById);
+        $totalWithdrawn = array_sum($withdrawalsMap);
 
-        $totalWithdrawn = \App\Models\Withdrawal::whereIn('user_id', $memberIds)
-            ->where('status', 'paid')
-            ->sum('amount');
+        $managersCount = \App\Models\Manager::whereIn('user_id', $ids)->count();
 
-        $managersCount = \App\Models\Manager::whereIn('user_id', $memberIds)->count();
-
-        $capitalRecovered = $allMembers->filter(function ($member) {
-            $withdrawn = $member->withdrawals ? $member->withdrawals->where('status', 'paid')->sum('amount') : 0;
-            return $member->invested_amount > 0 && $withdrawn >= $member->invested_amount;
-        })->count();
+        $capitalRecovered = 0;
+        foreach ($ids as $id) {
+            $invested = $this->_investedById[$id] ?? 0;
+            if ($invested <= 0) continue;
+            if (($withdrawalsMap[$id] ?? 0) >= $invested) $capitalRecovered++;
+        }
 
         return [
-            'total'             => $allMembers->count(),
-            'direct'            => $directCount,
-            'active'            => $activeCount,
-            'inactive'          => $allMembers->count() - $activeCount,
+            'total'             => $total,
+            'direct'            => $direct,
+            'active'            => $active,
+            'inactive'          => $total - $active,
             'total_invested'    => $totalInvested,
             'total_withdrawn'   => $totalWithdrawn,
             'managers_count'    => $managersCount,
@@ -781,9 +686,7 @@ new class extends Component {
 
     private function getAllFilteredUserIds(): array
     {
-        $currentUser = User::find(auth()->user()->id);
-        $allTeamMembers = $this->getAllTeamMembers($currentUser->riscoin_id);
-        $userIds = $allTeamMembers->pluck('id')->toArray();
+        $userIds = $this->getTeamMemberIds();
 
         if (empty($userIds)) {
             return [];
@@ -819,6 +722,85 @@ new class extends Component {
             ->pluck('id')
             ->map(fn($id) => (string) $id)
             ->toArray();
+    }
+
+    // ── Private BFS helpers ───────────────────────────────────────────────────
+
+    private function fetchTeamData(): void
+    {
+        if ($this->_teamMemberIds !== null) return;
+
+        $currentUser       = auth()->user();
+        $allIds            = [];
+        $childrenMap       = [];
+        $idToRiscoin       = [];
+        $investedById      = [];
+        $isActiveById      = [];
+        $depthById         = [];
+
+        $currentRiscoinIds = [$currentUser->riscoin_id];
+        $depth = 1;
+
+        while (!empty($currentRiscoinIds)) {
+            $batch = DB::table('users')
+                ->whereIn('inviters_code', $currentRiscoinIds)
+                ->whereNull('deleted_at')
+                ->select('id', 'riscoin_id', 'inviters_code', 'invested_amount', 'is_active')
+                ->get();
+
+            if ($batch->isEmpty()) break;
+
+            $nextRiscoinIds = [];
+            foreach ($batch as $row) {
+                $allIds[]                           = $row->id;
+                $idToRiscoin[$row->id]              = $row->riscoin_id;
+                $investedById[$row->id]             = (float) ($row->invested_amount ?? 0);
+                $isActiveById[$row->id]             = (bool) $row->is_active;
+                $depthById[$row->id]                = $depth;
+                $childrenMap[$row->inviters_code][] = $row->riscoin_id;
+                $nextRiscoinIds[]                   = $row->riscoin_id;
+            }
+
+            $currentRiscoinIds = $nextRiscoinIds;
+            $depth++;
+        }
+
+        $this->_teamMemberIds = array_unique($allIds);
+        $this->_childrenMap   = $childrenMap;
+        $this->_idToRiscoin   = $idToRiscoin;
+        $this->_investedById  = $investedById;
+        $this->_isActiveById  = $isActiveById;
+        $this->_depthById     = $depthById;
+    }
+
+    private function getTeamMemberIds(): array
+    {
+        $this->fetchTeamData();
+        return $this->_teamMemberIds;
+    }
+
+    private function getWithdrawalsMap(): array
+    {
+        if ($this->_withdrawalsMap !== null) return $this->_withdrawalsMap;
+
+        $ids = $this->getTeamMemberIds();
+
+        if (empty($ids)) {
+            $this->_withdrawalsMap = [];
+            return $this->_withdrawalsMap;
+        }
+
+        $this->_withdrawalsMap = DB::table('withdrawals')
+            ->whereIn('user_id', $ids)
+            ->where('status', 'paid')
+            ->select('user_id', DB::raw('SUM(amount) as total'))
+            ->groupBy('user_id')
+            ->get()
+            ->pluck('total', 'user_id')
+            ->map(fn($v) => (float) $v)
+            ->all();
+
+        return $this->_withdrawalsMap;
     }
 
     private function getExportData(): array

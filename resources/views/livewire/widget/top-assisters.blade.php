@@ -123,8 +123,9 @@ new class extends Component {
             ->withCount(['assistedUsers as assists_count' => function($q) use ($start, $end) {
                 $q->whereBetween('date_joined', [$start, $end]);
             }])
+            ->with('media')
             ->orderByDesc('assists_count')
-            ->get();
+            ->get(['id', 'name', 'riscoin_id']);
 
         return $top->map(function ($user) {
             return [

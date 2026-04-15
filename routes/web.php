@@ -98,6 +98,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Reply Templates - Using Livewire Volt
     Volt::route('reply-template', 'reply-template.index')->name('reply-template.index')->middleware('can:reply-template.access');
 
+    // Celebrations: Birthday Celebrants & Monthly Milestones
+    Volt::route('celebrations', 'celebrations.index')->name('celebrations.index')->middleware('can:celebrations.view');
+    Volt::route('celebrations/{riscoinId}', 'celebrations.index')->name('celebrations.show')->middleware('can:celebrations.view');
+
+    // Leaderboards: Top Inviters & Top Assisters
+    Volt::route('leaderboards', 'leaderboards.index')->name('leaderboards.index')->middleware('can:leaderboards.view');
+
     // Support Tickets (all authenticated users)
     Volt::route('tickets', 'tickets.index')->name('tickets.index');
     Volt::route('tickets/create', 'tickets.create')->name('tickets.create');

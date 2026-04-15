@@ -3,6 +3,7 @@
 use Livewire\Volt\Component;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 new class extends Component {
     public string $filter = 'today';
@@ -70,14 +71,16 @@ new class extends Component {
 
     private function calculateAnalytics(): void
     {
+        // Count badges for all periods (5 lightweight COUNT queries)
         foreach (self::PERIODS as $period) {
             $dateRange = $this->getDateRangeForPeriod($period);
-
             $this->newInvestorsCounts[$period] = $this->getNewInvestorsCount($dateRange);
-            $this->topInvitersByFilter[$period] = $this->getTopInviters($dateRange);
         }
 
-        // Reset pagination when period changes
+        // Top inviters only for the active filter
+        $dateRange = $this->getDateRangeForPeriod($this->filter);
+        $this->topInvitersByFilter[$this->filter] = $this->getTopInviters($dateRange);
+
         $this->topInvitersPage = 1;
         $all = $this->topInvitersByFilter[$this->filter] ?? [];
         $this->topInvitersHasMore = count($all) > $this->topInvitersPerPage;
@@ -130,26 +133,35 @@ new class extends Component {
 
     private function getTopInviters(array $dateRange): array
     {
-        $topInviters = User::query()
+        $rows = DB::table('users')
             ->whereNotNull('date_joined')
             ->whereBetween('date_joined', [
                 $dateRange[0]->toDateString(),
-                $dateRange[1]->toDateString()
+                $dateRange[1]->toDateString(),
             ])
             ->whereNotNull('inviters_code')
+            ->where('inviters_code', '!=', '')
             ->selectRaw('inviters_code, COUNT(*) as invites_count')
             ->groupBy('inviters_code')
             ->orderByDesc('invites_count')
-            // ->limit(5)
             ->get();
 
-        return $topInviters->map(function ($row) {
-            $inviter = User::where('riscoin_id', $row->inviters_code)->first();
+        if ($rows->isEmpty()) return [];
 
+        // Batch-load all inviters in a single query — no N+1
+        $inviterCodes = $rows->pluck('inviters_code')->all();
+        $inviters = User::whereIn('riscoin_id', $inviterCodes)
+            ->with('media')
+            ->select('id', 'name', 'riscoin_id')
+            ->get()
+            ->keyBy('riscoin_id');
+
+        return $rows->map(function ($row) use ($inviters) {
+            $inviter = $inviters[$row->inviters_code] ?? null;
             return [
-                'riscoin_id' => $row->inviters_code,
-                'name' => $inviter?->name ?? $row->inviters_code,
-                'avatar' => $inviter?->getFirstMediaUrl('avatar') ?? $this->getDefaultAvatar(),
+                'riscoin_id'    => $row->inviters_code,
+                'name'          => $inviter?->name ?? $row->inviters_code,
+                'avatar'        => $inviter?->getFirstMediaUrl('avatar') ?? $this->getDefaultAvatar(),
                 'invites_count' => (int) $row->invites_count,
             ];
         })->toArray();
@@ -164,108 +176,58 @@ new class extends Component {
         $this->chartLabels = [];
         $this->chartValues = [];
 
-        // Generate data points based on filter period
+        // Single aggregate query per view — no per-bucket queries
         if ($this->filter === 'year') {
-            // Monthly data for year view
-            $current = $startDate->copy();
+            $rows = DB::table('users')
+                ->whereNotNull('date_joined')
+                ->whereBetween('date_joined', [$startDate->toDateString(), $endDate->toDateString()])
+                ->selectRaw('YEAR(date_joined) as y, MONTH(date_joined) as m, COUNT(*) as cnt')
+                ->groupByRaw('YEAR(date_joined), MONTH(date_joined)')
+                ->get()
+                ->keyBy(fn($r) => $r->y . '-' . str_pad($r->m, 2, '0', STR_PAD_LEFT));
+
+            $current = $startDate->copy()->startOfMonth();
             while ($current <= $endDate) {
-                $monthStart = $current->copy()->startOfMonth();
-                $monthEnd = $current->copy()->endOfMonth();
-
-                $count = User::whereNotNull('date_joined')
-                    ->whereBetween('date_joined', [
-                        $monthStart->toDateString(),
-                        $monthEnd->toDateString()
-                    ])
-                    ->count();
-
-                $this->chartLabels[] = $monthStart->format('M Y');
-                $this->chartValues[] = $count;
-
+                $key = $current->format('Y-m');
+                $this->chartLabels[] = $current->format('M Y');
+                $this->chartValues[] = (int) ($rows[$key]->cnt ?? 0);
                 $current->addMonth();
             }
-        } elseif ($this->filter === 'month') {
-            // Daily data for month view
-            $current = $startDate->copy();
-            while ($current <= $endDate) {
-                $dayStart = $current->copy()->startOfDay();
-                $dayEnd = $current->copy()->endOfDay();
-
-                $count = User::whereNotNull('date_joined')
-                    ->whereBetween('date_joined', [
-                        $dayStart->toDateString(),
-                        $dayEnd->toDateString()
-                    ])
-                    ->count();
-
-                $this->chartLabels[] = $dayStart->format('d M');
-                $this->chartValues[] = $count;
-
-                $current->addDay();
-            }
-        } elseif ($this->filter === 'week') {
-            // Daily data for week view
-            $current = $startDate->copy();
-            while ($current <= $endDate) {
-                $dayStart = $current->copy()->startOfDay();
-                $dayEnd = $current->copy()->endOfDay();
-
-                $count = User::whereNotNull('date_joined')
-                    ->whereBetween('date_joined', [
-                        $dayStart->toDateString(),
-                        $dayEnd->toDateString()
-                    ])
-                    ->count();
-
-                $this->chartLabels[] = $dayStart->format('D d');
-                $this->chartValues[] = $count;
-
-                $current->addDay();
-            }
         } else {
-            // For today or custom range, show daily data
             $diffDays = $startDate->diffInDays($endDate);
 
-            if ($diffDays <= 31) {
-                // Show daily data for up to 31 days
+            // One daily-grouped query covers today / week / month / short custom
+            $dailyRows = DB::table('users')
+                ->whereNotNull('date_joined')
+                ->whereBetween('date_joined', [$startDate->toDateString(), $endDate->toDateString()])
+                ->selectRaw('DATE(date_joined) as day, COUNT(*) as cnt')
+                ->groupByRaw('DATE(date_joined)')
+                ->get()
+                ->keyBy('day');
+
+            if ($diffDays <= 31 || in_array($this->filter, ['today', 'week', 'month'])) {
+                $format  = $this->filter === 'week' ? 'D d' : 'd M';
                 $current = $startDate->copy();
                 while ($current <= $endDate) {
-                    $dayStart = $current->copy()->startOfDay();
-                    $dayEnd = $current->copy()->endOfDay();
-
-                    $count = User::whereNotNull('date_joined')
-                        ->whereBetween('date_joined', [
-                            $dayStart->toDateString(),
-                            $dayEnd->toDateString()
-                        ])
-                        ->count();
-
-                    $this->chartLabels[] = $dayStart->format('d M');
-                    $this->chartValues[] = $count;
-
+                    $key = $current->format('Y-m-d');
+                    $this->chartLabels[] = $current->format($format);
+                    $this->chartValues[] = (int) ($dailyRows[$key]->cnt ?? 0);
                     $current->addDay();
                 }
             } else {
-                // Show weekly data for longer periods
+                // Aggregate daily counts into weekly buckets in PHP
                 $current = $startDate->copy();
                 while ($current <= $endDate) {
                     $weekStart = $current->copy()->startOfWeek();
-                    $weekEnd = $current->copy()->endOfWeek();
-
-                    if ($weekEnd > $endDate) {
-                        $weekEnd = $endDate->copy();
+                    $weekEnd   = min($current->copy()->endOfWeek(), $endDate->copy());
+                    $sum = 0;
+                    $day = $weekStart->copy();
+                    while ($day <= $weekEnd) {
+                        $sum += (int) ($dailyRows[$day->format('Y-m-d')]->cnt ?? 0);
+                        $day->addDay();
                     }
-
-                    $count = User::whereNotNull('date_joined')
-                        ->whereBetween('date_joined', [
-                            $weekStart->toDateString(),
-                            $weekEnd->toDateString()
-                        ])
-                        ->count();
-
                     $this->chartLabels[] = $weekStart->format('d M');
-                    $this->chartValues[] = $count;
-
+                    $this->chartValues[] = $sum;
                     $current->addWeek();
                 }
             }

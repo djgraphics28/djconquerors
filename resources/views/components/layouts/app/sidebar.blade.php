@@ -122,6 +122,16 @@
                         :current="request()->routeIs('reply-template.index')" wire:navigate>{{ __('Reply Templates') }}
                     </flux:navlist.item>
                 @endcan
+                @can('celebrations.view')
+                    <flux:navlist.item icon="cake" :href="route('celebrations.index')"
+                        :current="request()->routeIs('celebrations.*')" wire:navigate>{{ __('Celebrations') }}
+                    </flux:navlist.item>
+                @endcan
+                @can('leaderboards.view')
+                    <flux:navlist.item icon="trophy" :href="route('leaderboards.index')"
+                        :current="request()->routeIs('leaderboards.index')" wire:navigate>{{ __('Leaderboards') }}
+                    </flux:navlist.item>
+                @endcan
                 @auth
                     <flux:navlist.item icon="heart" :href="route('donate.index')"
                         :current="request()->routeIs('donate.index')" wire:navigate>{{ __('Donate') }}

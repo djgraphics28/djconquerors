@@ -5,8 +5,8 @@ use App\Models\User;
 use App\Models\Withdrawal;
 use App\Models\Investment;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
-
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 new class extends Component {
     public $totalTeamWithdrawals = 0;
     public $totalTeamMembers = 0;
@@ -14,8 +14,6 @@ new class extends Component {
     public $totalTeamFirstInvestments = 0;
     public $currentNode;
     public $riscoinId;
-    public $birthdayCelebrators = [];
-    public $membershipAnniversaries = [];
     public $showFirstReplyToMartin = false;
     public $showLatestInvitesWidget = false;
     public $insight = [];
@@ -23,91 +21,84 @@ new class extends Component {
     public function mount($riscoinId = null)
     {
         if ($riscoinId) {
-            // Viewing a specific user's team data
             $this->currentNode = User::where('riscoin_id', $riscoinId)
-                ->with([
-                    'invites' => function ($query) {
-                        $query->withCount('invites');
-                    },
-                    'assistant',
-                    'managerLevel',
-                ])
+                ->with(['assistant', 'managerLevel'])
                 ->firstOrFail();
         } else {
-            // Viewing current user's team data
             $this->currentNode = Auth::user();
-            $this->currentNode->load([
-                'invites' => function ($query) {
-                    $query->withCount('invites');
-                },
-                'managerLevel',
-            ]);
+            $this->currentNode->load('managerLevel');
         }
 
-        //if auth user is just first week investor and has no invites, show first reply to martin
+        // Only run these checks for the user's own dashboard
         if (Auth::user()->id === $this->currentNode->id) {
-            $firstInvestor = User::where('id', Auth::user()->id)
-                ->where('date_joined', '>=', now()->subWeek())
-                ->whereDoesntHave('invites')
-                ->first();
+            $isNewInvestor = $this->currentNode->date_joined
+                && $this->currentNode->date_joined >= now()->subWeek()->toDateString();
 
-            if ($firstInvestor) {
-                $this->showFirstReplyToMartin = true;
+            if ($isNewInvestor) {
+                $hasInvites = DB::table('users')
+                    ->where('inviters_code', $this->currentNode->riscoin_id)
+                    ->whereNull('deleted_at')
+                    ->exists();
+                $this->showFirstReplyToMartin = !$hasInvites;
             }
 
-            $user = User::whereHas('invites', function ($query) {
-                $query->where('created_at', '>=', now()->subWeek());
-            })->first();
-
-
-
-            $latestInvitesCount = $this->currentNode
-                ->invites()
+            $this->showLatestInvitesWidget = DB::table('users')
+                ->where('inviters_code', $this->currentNode->riscoin_id)
                 ->where('created_at', '>=', now()->subWeek())
-                ->count();
-            if ($latestInvitesCount > 0) {
-                $this->showLatestInvitesWidget = true;
-            }
+                ->whereNull('deleted_at')
+                ->exists();
         }
-
-        $this->latestInvites = $latestInvites ?? collect();
 
         $this->riscoinId = $riscoinId;
         $this->calculateStatistics();
-        $this->calculateSpecialOccasions();
     }
 
     private function calculateStatistics()
     {
-        // Direct members count
-        $this->totalDirectMembers = $this->currentNode->invites->count();
+        $cacheKey = 'dashboard_stats_' . $this->currentNode->id;
 
-        // Calculate total team members and investments recursively
-        $this->totalTeamMembers = 1; // Start with 1 to include current node
-        $this->totalTeamFirstInvestments = $this->currentNode->invested_amount ?? 0;
+        $stats = Cache::remember($cacheKey, now()->addMinutes(5), function () {
+            // Direct count — one query, no model loading
+            $directCount = DB::table('users')
+                ->where('inviters_code', $this->currentNode->riscoin_id)
+                ->whereNull('deleted_at')
+                ->count();
 
-        $currentLevel = $this->currentNode->invites;
+            // BFS tree walk — one query per depth level instead of one per user
+            $totalMembers    = 1; // include the root node
+            $totalInvested   = (float) ($this->currentNode->invested_amount ?? 0);
+            $allMemberIds    = [$this->currentNode->id];
+            $currentRiscoinIds = [$this->currentNode->riscoin_id];
 
-        while ($currentLevel->isNotEmpty()) {
-            $this->totalTeamMembers += $currentLevel->count();
-            $this->totalTeamFirstInvestments += $currentLevel->sum('invested_amount');
+            while (!empty($currentRiscoinIds)) {
+                $batch = DB::table('users')
+                    ->whereIn('inviters_code', $currentRiscoinIds)
+                    ->whereNull('deleted_at')
+                    ->select('id', 'riscoin_id', 'invested_amount')
+                    ->get();
 
-            $nextLevel = collect();
-            foreach ($currentLevel as $user) {
-                $user->load('invites'); // Load invites for the next level
-                $nextLevel = $nextLevel->merge($user->invites);
+                if ($batch->isEmpty()) break;
+
+                $totalMembers  += $batch->count();
+                $totalInvested += (float) $batch->sum('invested_amount');
+                $allMemberIds   = array_merge($allMemberIds, $batch->pluck('id')->all());
+                $currentRiscoinIds = $batch->pluck('riscoin_id')->all();
             }
-            $currentLevel = $nextLevel;
-        }
 
-        // Get all team member IDs for withdrawal calculation
-        $teamMemberIds = $this->getAllTeamMemberIds($this->currentNode->id);
+            $totalWithdrawals = (float) DB::table('withdrawals')
+                ->whereIn('user_id', $allMemberIds)
+                ->sum('amount');
 
-        // Calculate total team withdrawals
-        $this->totalTeamWithdrawals = Withdrawal::whereIn('user_id', $teamMemberIds)->sum('amount');
+            return compact('directCount', 'totalMembers', 'totalInvested', 'totalWithdrawals');
+        });
 
-        // Build DJC Insight
-        $currentLevel = $this->currentNode->managerLevel?->level ?? 0;
+        $this->totalDirectMembers         = $stats['directCount'];
+        $this->totalTeamMembers           = $stats['totalMembers'];
+        $this->totalTeamFirstInvestments  = $stats['totalInvested'];
+        $this->totalTeamWithdrawals       = $stats['totalWithdrawals'];
+
+        // DJC Insight — no additional DB queries
+        $currentLevel  = $this->currentNode->managerLevel?->level ?? 0;
         $levels = [
             1 => ['directs' => 3,  'members' => 0,   'reward' => 15],
             2 => ['directs' => 5,  'members' => 15,  'reward' => 40],
@@ -133,148 +124,6 @@ new class extends Component {
         ];
     }
 
-    private function calculateSpecialOccasions()
-    {
-        // Get all team member IDs
-        $teamMemberIds = $this->getAllTeamMemberIds($this->currentNode->id);
-
-        // Get current month and year
-        $currentMonth = now()->month;
-        $currentYear = now()->year;
-
-        // Get birthday celebrators with their details
-        $this->birthdayCelebrators = User::whereIn('id', $teamMemberIds)
-            ->whereNotNull('birth_date')
-            ->orderByRaw('DAYOFMONTH(birth_date) ASC')
-            ->get()
-            ->filter(function ($user) use ($currentMonth) {
-                $birthday = Carbon::parse($user->birth_date);
-                return $birthday->month == $currentMonth;
-            })
-            ->map(function ($user) {
-                return [
-                    'name' => $user->name,
-                    'birth_date' => Carbon::parse($user->birth_date)->format('M d'),
-                    'avatar' => $user->getFirstMediaUrl('avatar') ?: $this->getDefaultAvatar(),
-                    'riscoin_id' => $user->riscoin_id,
-                    'invested_amount' => $user->invested_amount,
-                    'date_joined' => $user->date_joined,
-                    'is_birthday_mention' => $user->is_birthday_mention == 1 ? true : false,
-                ];
-            })
-            ->values()
-            ->toArray();
-
-        // Get membership anniversaries with their details
-        $this->membershipAnniversaries = User::whereIn('id', $teamMemberIds)
-            ->whereNotNull('date_joined')
-            ->get()
-            ->filter(function ($user) {
-                $joinDate = Carbon::parse($user->date_joined);
-                $monthsDifference = $joinDate->diffInMonths(now());
-
-                // Check if it's exactly n months since joining (same day of month)
-                return $monthsDifference > 0 && $joinDate->day == now()->day;
-            })
-            ->map(function ($user) {
-                $joinDate = Carbon::parse($user->date_joined);
-                $monthsWithTeam = number_format($joinDate->diffInMonths(now()));
-
-                return [
-                    'name' => $user->name,
-                    'join_date' => $joinDate->format('M d, Y'),
-                    'months_with_team' => $monthsWithTeam,
-                    'avatar' => $user->getFirstMediaUrl('avatar') ?: $this->getDefaultAvatar(),
-                    'riscoin_id' => $user->riscoin_id,
-                    'invested_amount' => $user->invested_amount,
-                    'date_joined' => $user->date_joined,
-                    'is_today_joined' => $joinDate->format('Y-m-d') === now()->format('Y-m-d'),
-                    'is_monthly_milestone_mention' => $user->is_monthly_milestone_mention == 1 ? true : false,
-                ];
-            })
-            ->values()
-            ->toArray();
-    }
-
-    private function getDefaultAvatar()
-    {
-        // Return a default avatar URL or SVG
-        return 'data:image/svg+xml;base64,' .
-            base64_encode('
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-        ');
-    }
-
-    private function getAllTeamMemberIds($userId)
-    {
-        $memberIds = [$userId];
-
-        // Get the user with their invites
-        $user = User::with('invites')->find($userId);
-        $currentLevel = $user->invites;
-
-        while ($currentLevel->isNotEmpty()) {
-            $currentLevelIds = $currentLevel->pluck('id')->toArray();
-            $memberIds = array_merge($memberIds, $currentLevelIds);
-
-            $nextLevel = collect();
-            foreach ($currentLevel as $member) {
-                $member->load('invites');
-                $nextLevel = $nextLevel->merge($member->invites);
-            }
-            $currentLevel = $nextLevel;
-        }
-
-        return array_unique($memberIds);
-    }
-
-    public function getRandomBirthdayMessage($name)
-    {
-        $messages = [
-            "Happy Birthday, {$name}!\n\nOn your special day, we want you to know how much you are loved and appreciated. May your heart be filled with joy, your year ahead with blessings, and your life with endless happiness.\n\nWishing you all the very best today and always.\n\nWith love,\nDJ Conquerors Family",
-            "Happy Birthday, {$name}!\n\nHope your day is as amazing as you are! Sending you lots of love and good vibes on your special day.\n\nCheers,\nDJ Conquerors Family",
-            "It's your birthday, {$name}! Time to conquer the day! 🎉\n\nGet ready for cake, good music, and great times! We hope your day is filled with fantastic moments and unforgettable memories. Let's make some noise!\n\nAll the best,\nDJ Conquerors Family",
-            "A very happy birthday to you, {$name}.\n\nOn this wonderful day, we're reminded of how grateful we are to have you in our lives/family. May you be surrounded by love, laughter, and everything that brings you happiness.\n\nWarmest wishes on your birthday.\n\nSincerely,\nDJ Conquerors Family",
-            "🎂 HAPPY BIRTHDAY, {$name}! 🎶\n\nAnother year older, wiser, and more awesome! The DJ Conquerors Family is wishing you a day full of good tunes, great company, and non-stop fun. Have a blast!\n\nMuch love,\nDJ Conquerors Family",
-            "Dear {$name},\n\nWe extend our warmest wishes to you on the occasion of your birthday. May this new year of your life bring you success, health, and profound happiness.\n\nBest regards,\nDJ Conquerors Family",
-        ];
-
-        return $messages[array_rand($messages)];
-    }
-
-    public function getMembershipAnniversaryMessage($member)
-    {
-        $name = $member['name'];
-        $joinDate = Carbon::parse($member['date_joined'])->format('M j, Y');
-        $investedAmount = $member['invested_amount'] ?? 0;
-
-        // If joined today
-        if ($member['is_today_joined']) {
-            return "Welcome to DJ Conquerors! 🍾\nLet's grow, conquer, and succeed together 💪🔥\n\n{$name}\nDate invested: {$joinDate}\nAmount invested: \${$investedAmount} USDT";
-        }
-
-        // Monthly milestone messages
-        $messages = [
-            "🎯 Monthly Milestone Unlocked!\nTeam DJ Conquerors, we've made another month of progress, passion, and perseverance. Let's celebrate the wins, learn from the challenges, and keep pushing forward together!\nLet's conquer more milestones ahead.\n— DJ Conquerors Team 💪",
-
-            "🔥 This month was an incredible one for DJ Conquerors!\nEvery challenge faced and every goal achieved shows our unstoppable spirit. Here's to more victories, stronger teamwork, and endless success in the coming months!\nProudly,\nDJ Conquerors Family",
-
-            "💥 Cheers to our Monthly Milestone!\nWe've proven once again that dedication and unity make us unstoppable. Let's keep the fire burning as we set our sights on even greater goals.\nKeep conquering,\nDJ Conquerors",
-
-            "👏 Monthly Milestone Celebration!\nEach member of DJ Conquerors played a part in this success story. Thank you for your hard work, energy, and passion. Together, we rise — higher and stronger every month.\nWith appreciation,\nDJ Conquerors Team",
-
-            "🚀 This Month Was One to Remember!\nWe hit our targets, strengthened our bond, and kept our Conqueror spirit alive. Let's take this momentum into the next chapter — the journey continues!\nMuch respect,\nDJ Conquerors Family",
-
-            "🌟 DJ Conquerors Monthly Milestone!\nAnother month of teamwork, dedication, and breakthroughs! Let's celebrate our success and prepare to conquer new horizons ahead.\nWith gratitude,\nDJ Conquerors Team",
-        ];
-
-        $selectedMessage = $messages[array_rand($messages)];
-
-        // Add member-specific information
-        return "{$selectedMessage}\n\n🎊 Celebrating {$member['months_with_team']} month" . ($member['months_with_team'] > 1 ? 's' : '') . " with {$name}!\nJoined: {$joinDate}";
-    }
 }; ?>
 <div class="space-y-5">
     <!-- User Info Modal Component -->
@@ -519,32 +368,6 @@ new class extends Component {
         </div>
     </div>
     @endif
-
-    @can('dashboard.viewNewInvestorsAnalytics')
-        <!-- New Investors Analytics Widget -->
-        <div class="mb-6">
-            <livewire:widget.new-investors-analytics :filter="'today'" />
-        </div>
-    @endcan
-
-    @can('dashboard.viewTopAssisters')
-        <!-- Top Assisters Widget -->
-        <div class="mb-6">
-            <livewire:widget.top-assisters />
-        </div>
-    @endcan
-
-    <!-- New Cards for Special Occasions -->
-    @can('dashboard.viewSpecialOccasions')
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-
-            <!-- Birthday Celebrators Card -->
-            <livewire:widget.birthday-celebrators :riscoinId="$riscoinId" />
-
-            <!-- Membership Anniversaries Card -->
-            <livewire:widget.monthly-milestone :riscoinId="$riscoinId" />
-        </div>
-    @endcan
 
     {{-- Quick Actions & Team Summary --}}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
