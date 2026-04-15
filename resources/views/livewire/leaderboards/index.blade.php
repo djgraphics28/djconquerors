@@ -15,7 +15,7 @@ new class extends Component {};
     </div>
 
     {{-- Top Inviters (New Investors Analytics) --}}
-    <livewire:widget.new-investors-analytics :filter="'month'" />
+    <livewire:widget.new-investors-analytics :filter="'today'" />
 
     {{-- Top Assisters --}}
     <livewire:widget.top-assisters />
