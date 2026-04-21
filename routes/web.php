@@ -5,6 +5,7 @@ use Laravel\Fortify\Features;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\ImpersonationController;
+use App\Http\Controllers\GenealogyPdfController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -17,6 +18,8 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('dashboard', 'dashboard')->name('dashboard');
     Volt::route('genealogy', 'genealogy.index')->name('genealogy');
+    Route::get('genealogy/pdf', [GenealogyPdfController::class, 'generate'])->name('genealogy.pdf');
+    Route::get('genealogy/{riscoinId}/pdf', [GenealogyPdfController::class, 'generate'])->name('genealogy.pdf.show');
     Volt::route('genealogy/{riscoinId}', 'genealogy.index')->name('genealogy.show');
     Volt::route('my-team','my-team')->name('my-team');
     Volt::route('my-withdrawals', 'my-withdrawals')->name('my-withdrawals');

@@ -5,1112 +5,1287 @@ use App\Models\Appointment;
 use App\Models\User;
 use App\Models\AvailabilitySlot;
 use Carbon\Carbon;
-use Livewire\WithPagination;
+use Illuminate\Support\Facades\Auth;
 
 new class extends Component {
-    use WithPagination;
 
-    // Calendar properties
-    public $currentDate;
-    public $viewMode = 'month'; // month, week, day
-    public $selectedDate = null;
-    public $selectedTime = null;
+    // ── Navigation ────────────────────────────────────────────
+    public string $activeTab = 'availability';
 
-    // Modal properties
-    public $selectedAppointment = null;
-    public $showAppointmentModal = false;
-    public $showSlotModal = false;
-    public $showBulkSlotModal = false;
-    public $showCalendarEventModal = false;
+    // ── My Availability ───────────────────────────────────────
+    public string $availDate     = '';
+    public array  $slotGrid      = [];
+    public array  $pendingSlots  = [];   // 'H:i' keys the user has toggled open
+    public array  $bookedTimes   = [];   // 'H:i' keys already booked (read-only)
+    public bool   $isDirty       = false;
 
-    // Form properties
-    public $editingSlot = null;
-    public $slotForm = [
-        'date' => '',
-        'start_time' => '',
-        'end_time' => '',
-        'is_available' => true,
-    ];
-    public $bulkSlotForm = [
-        'start_date' => '',
-        'end_date' => '',
-        'days_of_week' => [],
-        'start_time' => '',
-        'end_time' => '',
-        'is_available' => true,
-    ];
+    // ── Book Appointment ──────────────────────────────────────
+    public int    $bookStep         = 1;
+    public string $memberSearch     = '';
+    public ?int   $selectedMemberId = null;
+    public string $bookDate         = '';
+    public array  $selectedSlots    = [];   // [['id'=>int,'start'=>'H:i:s','end'=>'H:i:s'], ...]
+    public string $bookingNotes     = '';
+    public string $bookingVenue     = '';
 
-    // Filter properties
-    public $filters = [
-        'status' => '',
-        'date_from' => '',
-        'date_to' => '',
-        'type' => '',
-    ];
-    public $search = '';
+    // ── My Bookings ───────────────────────────────────────────
+    public string $bookingsSubTab = 'mine';
 
-    // Calendar navigation
-    public function mount()
+    // ── Confirm Modal ─────────────────────────────────────────
+    public bool   $showConfirmModal    = false;
+    public ?int   $confirmModalId      = null;
+    public string $confirmModalAction  = '';
+    public string $confirmModalTitle   = '';
+    public string $confirmModalMessage = '';
+
+    // ── Mount ─────────────────────────────────────────────────
+    public function mount(): void
     {
-        $this->currentDate = now()->format('Y-m-d');
-        $this->selectedDate = now()->format('Y-m-d');
-        $this->slotForm['date'] = now()->format('Y-m-d');
-        $this->slotForm['start_time'] = '09:00';
-        $this->slotForm['end_time'] = '10:00';
-
-        $this->bulkSlotForm['start_date'] = now()->format('Y-m-d');
-        $this->bulkSlotForm['end_date'] = now()->addDays(7)->format('Y-m-d');
-        $this->bulkSlotForm['start_time'] = '09:00';
-        $this->bulkSlotForm['end_time'] = '17:00';
-        $this->bulkSlotForm['days_of_week'] = [0, 1, 2, 3, 4, 5, 6]; // All days
+        $this->availDate = now()->format('Y-m-d');
+        $this->bookDate  = now()->addDay()->format('Y-m-d');
+        $this->loadSlotGrid();
     }
 
-    // Calendar navigation methods
-    public function previousPeriod()
-    {
-        $date = Carbon::parse($this->currentDate);
+    // ══════════════════════════════════════════════════════════
+    //  MY AVAILABILITY
+    // ══════════════════════════════════════════════════════════
 
-        if ($this->viewMode === 'month') {
-            $this->currentDate = $date->subMonth()->format('Y-m-d');
-        } elseif ($this->viewMode === 'week') {
-            $this->currentDate = $date->subWeek()->format('Y-m-d');
-        } else {
-            $this->currentDate = $date->subDay()->format('Y-m-d');
-        }
+    public function loadSlotGrid(): void
+    {
+        $this->pendingSlots = AvailabilitySlot::where('user_id', Auth::id())
+            ->where('date', $this->availDate)
+            ->where('is_available', true)
+            ->pluck('start_time')
+            ->map(fn($t) => substr($t, 0, 5))
+            ->filter(fn($t) => in_array((int) substr($t, 3, 2), [0, 30]))
+            ->values()
+            ->toArray();
+
+        $this->bookedTimes = Appointment::where('host_user_id', Auth::id())
+            ->whereDate('start_time', $this->availDate)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->get()
+            ->flatMap(function ($a) {
+                $times = [];
+                $cur   = Carbon::parse($a->start_time);
+                $end   = Carbon::parse($a->end_time);
+                while ($cur->lt($end)) {
+                    $times[] = $cur->format('H:i');
+                    $cur->addMinutes(30);
+                }
+                return $times;
+            })
+            ->toArray();
+
+        $this->isDirty = false;
+        $this->rebuildGrid();
     }
 
-    public function nextPeriod()
+    protected function rebuildGrid(): void
     {
-        $date = Carbon::parse($this->currentDate);
-
-        if ($this->viewMode === 'month') {
-            $this->currentDate = $date->addMonth()->format('Y-m-d');
-        } elseif ($this->viewMode === 'week') {
-            $this->currentDate = $date->addWeek()->format('Y-m-d');
-        } else {
-            $this->currentDate = $date->addDay()->format('Y-m-d');
-        }
-    }
-
-    public function goToToday()
-    {
-        $this->currentDate = now()->format('Y-m-d');
-        $this->selectedDate = now()->format('Y-m-d');
-    }
-
-    public function setViewMode($mode)
-    {
-        $this->viewMode = $mode;
-    }
-
-    public function selectDate($date)
-    {
-        $this->selectedDate = $date;
-
-        if ($this->viewMode === 'month') {
-            $this->viewMode = 'day';
-        }
-    }
-
-    // Computed properties for calendar data
-    public function calendarDays()
-    {
-        $startDate = Carbon::parse($this->currentDate);
-
-        if ($this->viewMode === 'month') {
-            // Start from Sunday of the week that contains the first day of month
-            $startDate->startOfMonth()->startOfWeek(Carbon::SUNDAY);
-            $endDate = Carbon::parse($this->currentDate)->endOfMonth()->endOfWeek(Carbon::SATURDAY);
-        } elseif ($this->viewMode === 'week') {
-            $startDate->startOfWeek(Carbon::SUNDAY);
-            $endDate = Carbon::parse($this->currentDate)->endOfWeek(Carbon::SATURDAY);
-        } else {
-            $startDate = Carbon::parse($this->selectedDate)->startOfDay();
-            $endDate = Carbon::parse($this->selectedDate)->endOfDay();
-        }
-
-        $days = [];
-        $current = $startDate->copy();
-
-        while ($current <= $endDate) {
-            $days[] = [
-                'date' => $current->format('Y-m-d'),
-                'formatted' => $current->format('j'),
-                'isToday' => $current->isToday(),
-                'isCurrentMonth' => $this->viewMode !== 'month' || $current->month == Carbon::parse($this->currentDate)->month,
-                'appointments' => $this->getAppointmentsForDate($current->format('Y-m-d')),
-                'slots' => $this->getSlotsForDate($current->format('Y-m-d')),
+        $grid = [];
+        for ($h = 7; $h < 22; $h++) {
+            $minSlots = [];
+            for ($m = 0; $m < 60; $m += 30) {
+                $timeKey  = sprintf('%02d:%02d', $h, $m);
+                $minSlots[] = [
+                    'time'      => $timeKey,
+                    'label'     => Carbon::createFromFormat('H:i', $timeKey)->format('g:i A'),
+                    'available' => in_array($timeKey, $this->pendingSlots),
+                    'booked'    => in_array($timeKey, $this->bookedTimes),
+                ];
+            }
+            $grid[] = [
+                'label' => Carbon::createFromFormat('H:i', sprintf('%02d:00', $h))->format('g A'),
+                'hour'  => $h,
+                'slots' => $minSlots,
             ];
-            $current->addDay();
         }
-
-        return $days;
+        $this->slotGrid = $grid;
     }
 
-    public function calendarHeaders()
+    public function toggleSlot(string $time): void
     {
-        $headers = [];
+        if (in_array($time, $this->bookedTimes)) return;
 
-        if ($this->viewMode === 'month' || $this->viewMode === 'week') {
-            // Start with Sunday
-            $current = Carbon::now()->startOfWeek(Carbon::SUNDAY);
+        if (in_array($time, $this->pendingSlots)) {
+            $this->pendingSlots = array_values(array_filter($this->pendingSlots, fn($t) => $t !== $time));
+        } else {
+            $this->pendingSlots[] = $time;
+        }
 
-            for ($i = 0; $i < 7; $i++) {
-                $headers[] = $current->format('D');
-                $current->addDay();
+        $this->isDirty = true;
+        $this->rebuildGrid();
+    }
+
+    public function toggleHour(int $hour): void
+    {
+        $hourTimes = [];
+        for ($m = 0; $m < 60; $m += 30) {
+            $t = sprintf('%02d:%02d', $hour, $m);
+            if (!in_array($t, $this->bookedTimes)) {
+                $hourTimes[] = $t;
             }
         }
 
-        return $headers;
-    }
+        $openInHour = array_intersect($hourTimes, $this->pendingSlots);
+        $allOpen    = count($openInHour) === count($hourTimes) && count($hourTimes) > 0;
 
-    public function getAppointmentsForDate($date)
-    {
-        return Appointment::with('user')
-            ->whereDate('start_time', $date)
-            ->orderBy('start_time')
-            ->get();
-    }
-
-    public function getSlotsForDate($date)
-    {
-        return AvailabilitySlot::where('date', $date)
-            ->orderBy('start_time')
-            ->get();
-    }
-
-    public function weekHours()
-    {
-        $hours = [];
-        for ($i = 8; $i <= 20; $i++) {
-            $hours[] = [
-                'hour' => $i,
-                'formatted' => $i <= 12 ? $i . ':00 AM' : ($i - 12) . ':00 PM'
-            ];
-        }
-        return $hours;
-    }
-
-    // Week view days starting from Sunday
-    public function weekViewDays()
-    {
-        $days = [];
-        $startDate = Carbon::parse($this->currentDate)->startOfWeek(Carbon::SUNDAY);
-
-        for ($i = 0; $i < 7; $i++) {
-            $date = $startDate->copy()->addDays($i);
-            $days[] = [
-                'date' => $date->format('Y-m-d'),
-                'day_name' => $date->format('D'),
-                'day_number' => $date->format('j'),
-                'is_today' => $date->isToday(),
-                'is_selected' => $date->format('Y-m-d') === $this->selectedDate,
-            ];
+        if ($allOpen) {
+            $this->pendingSlots = array_values(array_diff($this->pendingSlots, $hourTimes));
+        } else {
+            $this->pendingSlots = array_values(array_unique(array_merge($this->pendingSlots, $hourTimes)));
         }
 
-        return $days;
+        $this->isDirty = true;
+        $this->rebuildGrid();
     }
 
-    // Computed properties for lists
-    public function appointments()
+    public function setAllAvailable(): void
     {
-        return Appointment::with('user')
-            ->when($this->search, function ($query) {
-                $query->whereHas('user', function ($q) {
-                    $q->where('name', 'like', '%' . $this->search . '%')
-                      ->orWhere('email', 'like', '%' . $this->search . '%');
+        $all = [];
+        for ($h = 7; $h < 22; $h++) {
+            for ($m = 0; $m < 60; $m += 30) {
+                $all[] = sprintf('%02d:%02d', $h, $m);
+            }
+        }
+        $this->pendingSlots = $all;
+        $this->isDirty = true;
+        $this->rebuildGrid();
+    }
+
+    public function clearAllSlots(): void
+    {
+        // Keep booked times — can't remove a slot that has an appointment
+        $this->pendingSlots = array_values(array_intersect($this->pendingSlots, $this->bookedTimes));
+        $this->isDirty = true;
+        $this->rebuildGrid();
+    }
+
+    public function updatedAvailDate(): void
+    {
+        $this->loadSlotGrid(); // reloads from DB, resets $isDirty
+    }
+
+    public function availDateSummary(): array
+    {
+        return [
+            'available' => count($this->pendingSlots),
+            'booked'    => count($this->bookedTimes),
+        ];
+    }
+
+    public function saveAvailability(): void
+    {
+        // Delete all non-booked slots for this date, then re-create the pending set
+        $bookedFull = array_map(fn($t) => $t . ':00', $this->bookedTimes);
+
+        AvailabilitySlot::where('user_id', Auth::id())
+            ->where('date', $this->availDate)
+            ->when(!empty($bookedFull), fn($q) => $q->whereNotIn('start_time', $bookedFull))
+            ->delete();
+
+        foreach ($this->pendingSlots as $time) {
+            $endTime = Carbon::createFromFormat('H:i', $time)->addMinutes(30)->format('H:i:s');
+            AvailabilitySlot::create([
+                'user_id'      => Auth::id(),
+                'date'         => $this->availDate,
+                'start_time'   => $time . ':00',
+                'end_time'     => $endTime,
+                'is_available' => true,
+            ]);
+        }
+
+        $this->isDirty = false;
+        $this->dispatch('toast', type: 'success', message: 'Schedule saved for ' . Carbon::parse($this->availDate)->format('M j, Y') . '!');
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  BOOK APPOINTMENT
+    // ══════════════════════════════════════════════════════════
+
+    public function getMembers()
+    {
+        return User::where('id', '!=', Auth::id())
+            ->where('is_active', true)
+            ->when($this->memberSearch, function ($q) {
+                $q->where(function ($query) {
+                    $query->where('name', 'LIKE', '%' . $this->memberSearch . '%')
+                          ->orWhere('email', 'LIKE', '%' . $this->memberSearch . '%');
                 });
             })
-            ->when($this->filters['status'], function ($query, $status) {
-                $query->where('status', $status);
-            })
-            ->when($this->filters['date_from'], function ($query, $dateFrom) {
-                $query->whereDate('start_time', '>=', $dateFrom);
-            })
-            ->when($this->filters['date_to'], function ($query, $dateTo) {
-                $query->whereDate('start_time', '<=', $dateTo);
-            })
-            ->when($this->filters['type'] !== '', function ($query) {
-                $query->where('is_sure_investor', $this->filters['type']);
-            })
-            ->orderBy('start_time', 'desc')
-            ->paginate(10);
+            ->orderBy('name')
+            ->limit(20)
+            ->get();
     }
 
-    public function slots()
+    public function selectMember(int $userId): void
     {
-        return AvailabilitySlot::orderBy('date', 'desc')
+        $this->selectedMemberId = $userId;
+        $this->bookStep = 2;
+    }
+
+    public function getSelectedMember(): ?User
+    {
+        return $this->selectedMemberId ? User::find($this->selectedMemberId) : null;
+    }
+
+    public function getMemberAvailability(): array
+    {
+        if (!$this->selectedMemberId) return [];
+
+        $bookedTimes = Appointment::where('host_user_id', $this->selectedMemberId)
+            ->whereDate('start_time', $this->bookDate)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->get()
+            ->flatMap(function ($a) {
+                $times = [];
+                $cur   = Carbon::parse($a->start_time);
+                $end   = Carbon::parse($a->end_time);
+                while ($cur->lt($end)) {
+                    $times[] = $cur->format('H:i');
+                    $cur->addMinutes(30);
+                }
+                return $times;
+            })
+            ->toArray();
+
+        return AvailabilitySlot::where('user_id', $this->selectedMemberId)
+            ->where('date', $this->bookDate)
+            ->where('is_available', true)
             ->orderBy('start_time')
-            ->paginate(10, ['*'], 'slotsPage');
+            ->get()
+            ->filter(fn($slot) =>
+                !in_array(substr($slot->start_time, 0, 5), $bookedTimes) &&
+                in_array((int) substr($slot->start_time, 3, 2), [0, 30])
+            )
+            ->values()
+            ->toArray();
     }
 
-    // Appointment methods
-    public function viewAppointment($appointmentId)
+    public function toggleBookSlot(int $slotId, string $slotStart, string $slotEnd): void
     {
-        $this->selectedAppointment = Appointment::with('user')->findOrFail($appointmentId);
-        $this->showAppointmentModal = true;
-    }
+        $entry  = ['id' => $slotId, 'start' => $slotStart, 'end' => $slotEnd];
+        $slots  = $this->selectedSlots;
+        $count  = count($slots);
 
-    public function updateStatus($appointmentId, $status)
-    {
-        $appointment = Appointment::findOrFail($appointmentId);
-
-        if (in_array($status, ['pending', 'confirmed', 'cancelled', 'completed'])) {
-            $appointment->update(['status' => $status]);
-
-            session()->flash('message', "Appointment {$status} successfully!");
+        // Find if already selected
+        $idx = null;
+        foreach ($slots as $i => $s) {
+            if ($s['id'] === $slotId) { $idx = $i; break; }
         }
-    }
 
-    public function deleteAppointment($appointmentId)
-    {
-        $appointment = Appointment::findOrFail($appointmentId);
-        $appointment->delete();
-
-        session()->flash('message', 'Appointment deleted successfully!');
-        $this->showAppointmentModal = false;
-    }
-
-    // Availability Slots CRUD
-    public function createSlot()
-    {
-        $this->editingSlot = null;
-        $this->slotForm = [
-            'date' => $this->selectedDate ?? now()->format('Y-m-d'),
-            'start_time' => '09:00',
-            'end_time' => '10:00',
-            'is_available' => true,
-        ];
-        $this->showSlotModal = true;
-    }
-
-    public function editSlot($slotId)
-    {
-        $this->editingSlot = AvailabilitySlot::findOrFail($slotId);
-        $this->slotForm = [
-            'date' => $this->editingSlot->date->format('Y-m-d'),
-            'start_time' => $this->editingSlot->start_time,
-            'end_time' => $this->editingSlot->end_time,
-            'is_available' => $this->editingSlot->is_available,
-        ];
-        $this->showSlotModal = true;
-    }
-
-    public function saveSlot()
-    {
-        $this->validate([
-            'slotForm.date' => 'required|date',
-            'slotForm.start_time' => 'required|date_format:H:i',
-            'slotForm.end_time' => 'required|date_format:H:i|after:slotForm.start_time',
-            'slotForm.is_available' => 'boolean',
-        ]);
-
-        try {
-            if ($this->editingSlot) {
-                $this->editingSlot->update($this->slotForm);
-                $message = 'Slot updated successfully!';
+        if ($idx !== null) {
+            // Deselect: only trim edges to preserve contiguity
+            if ($count === 1) {
+                $this->selectedSlots = [];
+            } elseif ($idx === 0) {
+                $this->selectedSlots = array_values(array_slice($slots, 1));
+            } elseif ($idx === $count - 1) {
+                $this->selectedSlots = array_values(array_slice($slots, 0, -1));
             } else {
-                AvailabilitySlot::create($this->slotForm);
-                $message = 'Slot created successfully!';
+                // Middle slot tapped — reset to just this one
+                $this->selectedSlots = [$entry];
             }
-
-            $this->showSlotModal = false;
-            $this->reset('editingSlot', 'slotForm');
-            session()->flash('message', $message);
-        } catch (\Exception $e) {
-            session()->flash('error', 'Error saving slot: ' . $e->getMessage());
-        }
-    }
-
-    public function deleteSlot($slotId)
-    {
-        $slot = AvailabilitySlot::findOrFail($slotId);
-
-        // Check if slot has any appointments
-        $hasAppointments = Appointment::where('start_time', '>=', $slot->date . ' ' . $slot->start_time)
-            ->where('end_time', '<=', $slot->date . ' ' . $slot->end_time)
-            ->exists();
-
-        if ($hasAppointments) {
-            session()->flash('error', 'Cannot delete slot that has existing appointments!');
             return;
         }
 
-        $slot->delete();
-        session()->flash('message', 'Slot deleted successfully!');
-    }
+        // New slot: start fresh if nothing selected
+        if ($count === 0) {
+            $this->selectedSlots = [$entry];
+            return;
+        }
 
-    public function toggleSlotAvailability($slotId)
-    {
-        $slot = AvailabilitySlot::findOrFail($slotId);
-        $slot->update(['is_available' => !$slot->is_available]);
+        // Adjacency check using Carbon to avoid string-format issues
+        $newStart   = Carbon::createFromFormat('H:i:s', $slotStart);
+        $newEnd     = Carbon::createFromFormat('H:i:s', $slotEnd);
+        $firstStart = Carbon::createFromFormat('H:i:s', $slots[0]['start']);
+        $lastEnd    = Carbon::createFromFormat('H:i:s', $slots[$count - 1]['end']);
 
-        session()->flash('message', 'Slot availability updated!');
-    }
-
-    // Bulk slot creation
-    public function showBulkSlotCreation()
-    {
-        $this->showBulkSlotModal = true;
-    }
-
-    public function createBulkSlots()
-    {
-        $this->validate([
-            'bulkSlotForm.start_date' => 'required|date',
-            'bulkSlotForm.end_date' => 'required|date|after_or_equal:bulkSlotForm.start_date',
-            'bulkSlotForm.start_time' => 'required|date_format:H:i',
-            'bulkSlotForm.end_time' => 'required|date_format:H:i|after:bulkSlotForm.start_time',
-            'bulkSlotForm.days_of_week' => 'required|array|min:1',
-            'bulkSlotForm.is_available' => 'boolean',
-        ]);
-
-        try {
-            $startDate = Carbon::parse($this->bulkSlotForm['start_date']);
-            $endDate = Carbon::parse($this->bulkSlotForm['end_date']);
-            $createdCount = 0;
-
-            for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                if (in_array($date->dayOfWeek, $this->bulkSlotForm['days_of_week'])) {
-                    // Check if slot already exists
-                    $existingSlot = AvailabilitySlot::where('date', $date->format('Y-m-d'))
-                        ->where('start_time', $this->bulkSlotForm['start_time'])
-                        ->where('end_time', $this->bulkSlotForm['end_time'])
-                        ->first();
-
-                    if (!$existingSlot) {
-                        AvailabilitySlot::create([
-                            'date' => $date->format('Y-m-d'),
-                            'start_time' => $this->bulkSlotForm['start_time'],
-                            'end_time' => $this->bulkSlotForm['end_time'],
-                            'is_available' => $this->bulkSlotForm['is_available'],
-                        ]);
-                        $createdCount++;
-                    }
-                }
-            }
-
-            $this->showBulkSlotModal = false;
-            session()->flash('message', "Successfully created {$createdCount} slots!");
-        } catch (\Exception $e) {
-            session()->flash('error', 'Error creating bulk slots: ' . $e->getMessage());
+        if ($newEnd->eq($firstStart)) {
+            // Adjacent before range → prepend
+            $this->selectedSlots = array_merge([$entry], $slots);
+        } elseif ($newStart->eq($lastEnd)) {
+            // Adjacent after range → append
+            $this->selectedSlots = array_merge($slots, [$entry]);
+        } else {
+            // Not adjacent → start fresh
+            $this->selectedSlots = [$entry];
         }
     }
 
-    public function resetFilters()
+    public function proceedToConfirm(): void
     {
-        $this->reset('filters', 'search');
+        if (empty($this->selectedSlots)) return;
+        $this->bookStep = 3;
+    }
+
+    public function backToMemberList(): void
+    {
+        $this->bookStep         = 1;
+        $this->selectedMemberId = null;
+        $this->selectedSlots    = [];
+    }
+
+    public function backToSlotPick(): void
+    {
+        $this->bookStep = 2;
+    }
+
+    public function confirmBooking(): void
+    {
+        $this->validate([
+            'bookingNotes' => 'nullable|string|max:500',
+            'bookingVenue' => 'nullable|string|max:200',
+        ]);
+
+        if (empty($this->selectedSlots)) {
+            $this->dispatch('toast', type: 'error', message: 'Please select at least one time slot.');
+            $this->bookStep = 2;
+            return;
+        }
+
+        if ($this->bookDate <= now()->format('Y-m-d')) {
+            $this->dispatch('toast', type: 'error', message: 'Same-day bookings are not allowed. Please select a future date.');
+            $this->bookStep = 2;
+            return;
+        }
+
+        // Verify all slots in the range are still available
+        $unavailable = 0;
+        foreach ($this->selectedSlots as $entry) {
+            $slot = AvailabilitySlot::where('id', $entry['id'])
+                ->where('user_id', $this->selectedMemberId)
+                ->where('is_available', true)
+                ->first();
+
+            $alreadyBooked = Appointment::where('host_user_id', $this->selectedMemberId)
+                ->where('start_time', $this->bookDate . ' ' . substr($entry['start'], 0, 5))
+                ->whereIn('status', ['pending', 'confirmed'])
+                ->exists();
+
+            if (!$slot || $alreadyBooked) {
+                $unavailable++;
+            }
+        }
+
+        if ($unavailable > 0) {
+            $this->dispatch('toast', type: 'error', message: 'Some slots in your selected range are no longer available. Please choose a different time.');
+            $this->selectedSlots = [];
+            $this->bookStep = 2;
+            return;
+        }
+
+        // Create a single appointment spanning the full selected range
+        $startTime = substr($this->selectedSlots[0]['start'], 0, 5);
+        $endTime   = substr(end($this->selectedSlots)['end'], 0, 5);
+
+        Appointment::create([
+            'user_id'      => Auth::id(),
+            'host_user_id' => $this->selectedMemberId,
+            'start_time'   => $this->bookDate . ' ' . $startTime,
+            'end_time'     => $this->bookDate . ' ' . $endTime,
+            'status'       => 'pending',
+            'notes'        => $this->bookingNotes ?: null,
+            'venue'        => $this->bookingVenue ?: null,
+        ]);
+
+        $this->dispatch('toast', type: 'success', message: 'Appointment booked! Awaiting confirmation from the host.');
+        $this->activeTab      = 'bookings';
+        $this->bookingsSubTab = 'mine';
+        $this->bookStep       = 1;
+        $this->reset(['selectedMemberId', 'selectedSlots', 'bookingNotes', 'bookingVenue', 'memberSearch']);
+    }
+
+    public function updatedBookDate(): void
+    {
+        $this->selectedSlots = []; // clear selections when date changes
+    }
+    public function updatedMemberSearch(): void {}
+
+    // ══════════════════════════════════════════════════════════
+    //  MY BOOKINGS
+    // ══════════════════════════════════════════════════════════
+
+    public function getMyBookings()
+    {
+        return Appointment::with('host')
+            ->where('user_id', Auth::id())
+            ->orderBy('start_time', 'desc')
+            ->get();
+    }
+
+    public function getBookingsWithMe()
+    {
+        return Appointment::with('user')
+            ->where('host_user_id', Auth::id())
+            ->orderBy('start_time', 'desc')
+            ->get();
+    }
+
+    public function confirmAppointment(int $id): void
+    {
+        $appointment = Appointment::where('id', $id)->where('host_user_id', Auth::id())->firstOrFail();
+        $appointment->update(['status' => 'confirmed']);
+        $this->dispatch('toast', type: 'success', message: 'Appointment confirmed!');
+    }
+
+    public function cancelAppointment(int $id): void
+    {
+        $appointment = Appointment::where('id', $id)
+            ->where(fn($q) => $q->where('user_id', Auth::id())->orWhere('host_user_id', Auth::id()))
+            ->firstOrFail();
+        $appointment->update(['status' => 'cancelled']);
+        $this->dispatch('toast', type: 'success', message: 'Appointment cancelled.');
+    }
+
+    public function completeAppointment(int $id): void
+    {
+        $appointment = Appointment::where('id', $id)->where('host_user_id', Auth::id())->firstOrFail();
+        $appointment->update(['status' => 'completed']);
+        $this->dispatch('toast', type: 'success', message: 'Appointment marked as completed!');
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  CONFIRM MODAL
+    // ══════════════════════════════════════════════════════════
+
+    public function openConfirmModal(int $id, string $action, string $title, string $message): void
+    {
+        $this->confirmModalId      = $id;
+        $this->confirmModalAction  = $action;
+        $this->confirmModalTitle   = $title;
+        $this->confirmModalMessage = $message;
+        $this->showConfirmModal    = true;
+    }
+
+    public function closeConfirmModal(): void
+    {
+        $this->showConfirmModal    = false;
+        $this->confirmModalId      = null;
+        $this->confirmModalAction  = '';
+        $this->confirmModalTitle   = '';
+        $this->confirmModalMessage = '';
+    }
+
+    public function executeConfirmAction(): void
+    {
+        if (!$this->confirmModalId || !$this->confirmModalAction) {
+            $this->closeConfirmModal();
+            return;
+        }
+
+        $id     = $this->confirmModalId;
+        $action = $this->confirmModalAction;
+        $this->closeConfirmModal();
+
+        match ($action) {
+            'cancel', 'decline' => $this->cancelAppointment($id),
+            'confirm'           => $this->confirmAppointment($id),
+            'complete'          => $this->completeAppointment($id),
+            default             => null,
+        };
+    }
+
+    public function statusBadgeClass(string $status): string
+    {
+        return match ($status) {
+            'confirmed' => 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+            'pending'   => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
+            'cancelled' => 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+            'completed' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+            default     => 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+        };
     }
 }; ?>
 
-<div class="py-6">
-    <div class="max-w-12xl mx-auto sm:px-6 lg:px-8">
-        <!-- Header -->
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Appointments Calendar</h1>
-            <p class="text-gray-600 dark:text-gray-400 mt-2">Manage appointments and availability in a calendar view</p>
+<div class="min-h-screen py-4 sm:py-8">
+
+    {{-- ── Toast notifications ─────────────────────────────────── --}}
+    <div
+        x-data="{
+            toasts: [],
+            add(t) {
+                const id = Date.now() + Math.random();
+                this.toasts.push({ ...t, id, visible: false });
+                this.$nextTick(() => {
+                    const item = this.toasts.find(x => x.id === id);
+                    if (item) item.visible = true;
+                });
+                setTimeout(() => this.remove(id), 4500);
+            },
+            remove(id) {
+                const item = this.toasts.find(x => x.id === id);
+                if (item) item.visible = false;
+                setTimeout(() => this.toasts = this.toasts.filter(x => x.id !== id), 400);
+            }
+        }"
+        @toast.window="add($event.detail)"
+        class="fixed top-5 right-5 z-[9999] flex flex-col gap-3 w-80 pointer-events-none"
+    >
+        <template x-for="toast in toasts" :key="toast.id">
+            <div
+                x-show="toast.visible"
+                x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 translate-x-8"
+                x-transition:enter-end="opacity-100 translate-x-0"
+                x-transition:leave="transition ease-in duration-300"
+                x-transition:leave-start="opacity-100 translate-x-0"
+                x-transition:leave-end="opacity-0 translate-x-8"
+                :class="toast.type === 'success'
+                    ? 'border-l-4 border-green-500 bg-gray-900'
+                    : 'border-l-4 border-red-500 bg-gray-900'"
+                class="pointer-events-auto flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-2xl text-sm text-white"
+            >
+                <div
+                    x-show="toast.type === 'success'"
+                    class="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center"
+                >
+                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <div
+                    x-show="toast.type === 'error'"
+                    class="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center"
+                >
+                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                </div>
+                <span x-text="toast.message" class="flex-1 leading-snug"></span>
+                <button @click="remove(toast.id)" class="shrink-0 opacity-40 hover:opacity-100 transition-opacity ml-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </template>
+    </div>
+
+    <div class="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8">
+
+        {{-- PAGE HEADER --}}
+        <div class="mb-6">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                Appointment Scheduler
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Set your availability, book time with members, and manage your appointments.
+            </p>
         </div>
 
-        <!-- Flash Messages -->
-        @if (session()->has('message'))
-            <div class="mb-6 p-4 bg-green-100 dark:bg-green-900 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-200 rounded">
-                {{ session('message') }}
-            </div>
-        @endif
 
-        @if (session()->has('error'))
-            <div class="mb-6 p-4 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-200 rounded">
-                {{ session('error') }}
+        {{-- TAB NAV --}}
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+            <div class="flex overflow-x-auto">
+                @php
+                    $tabs = [
+                        ['id' => 'availability', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', 'label' => 'My Availability'],
+                        ['id' => 'book',         'icon' => 'M12 4v16m8-8H4', 'label' => 'Book Appointment'],
+                        ['id' => 'bookings',     'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0', 'label' => 'My Bookings'],
+                    ];
+                @endphp
+                @foreach ($tabs as $tab)
+                    <button
+                        wire:click="$set('activeTab', '{{ $tab['id'] }}')"
+                        class="flex items-center gap-2 px-4 sm:px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-colors duration-150
+                            {{ $activeTab === $tab['id']
+                                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300' }}"
+                    >
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $tab['icon'] }}"/>
+                        </svg>
+                        {{ $tab['label'] }}
+                    </button>
+                @endforeach
             </div>
-        @endif
+        </div>
 
-        <!-- Calendar View -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
-                    <!-- Calendar Navigation -->
-                    <div class="flex items-center space-x-4">
-                        <button wire:click="goToToday" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                            Today
-                        </button>
-                        <div class="flex space-x-2">
-                            <button wire:click="previousPeriod" class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                                </svg>
-                            </button>
-                            <button wire:click="nextPeriod" class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
-                        </div>
-                        <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">
-                            @if($viewMode === 'month')
-                                {{ Carbon::parse($currentDate)->format('F Y') }}
-                            @elseif($viewMode === 'week')
-                                Week of {{ Carbon::parse($currentDate)->startOfWeek(Carbon::SUNDAY)->format('M j') }} - {{ Carbon::parse($currentDate)->endOfWeek(Carbon::SATURDAY)->format('M j, Y') }}
-                            @else
-                                {{ Carbon::parse($selectedDate)->format('l, F j, Y') }}
-                            @endif
-                        </h2>
+        {{-- ══════════════════════════════════════════════════ --}}
+        {{--  TAB: MY AVAILABILITY                              --}}
+        {{-- ══════════════════════════════════════════════════ --}}
+        @if ($activeTab === 'availability')
+            <div class="mb-5 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-sm text-blue-800 dark:text-blue-200">
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 shrink-0 mt-0.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0"/>
+                    </svg>
+                    <div>
+                        <p class="font-semibold mb-1">How to set your availability:</p>
+                        <ul class="list-disc list-inside space-y-1 text-blue-700 dark:text-blue-300">
+                            <li>Choose a date, then click any time slot to <strong>toggle it open or closed</strong>. Changes are not saved yet.</li>
+                            <li>Use <em>Set All</em> to open the entire day or <em>Clear All</em> to remove all slots — then hit <strong>Save Schedule</strong>.</li>
+                            <li>
+                                <span class="inline-block w-3 h-3 bg-green-400 rounded-sm align-middle mr-1"></span>Green = open &nbsp;
+                                <span class="inline-block w-3 h-3 bg-amber-400 rounded-sm align-middle mr-1"></span>Amber = already booked &nbsp;
+                                <span class="inline-block w-3 h-3 bg-gray-300 dark:bg-gray-600 rounded-sm align-middle mr-1"></span>Gray = not set
+                            </li>
+                            <li>Click <strong>Save Schedule</strong> to apply your changes in one go.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Date picker + actions --}}
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-5">
+                <div class="flex flex-col sm:flex-row sm:items-end gap-3">
+                    <div class="flex-1">
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Select Date</label>
+                        <input
+                            type="date"
+                            wire:model.live="availDate"
+                            min="{{ now()->format('Y-m-d') }}"
+                            class="w-full sm:w-56 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
                     </div>
 
-                    <!-- View Mode Selector -->
-                    <div class="flex space-x-2">
-                        <button wire:click="setViewMode('month')" class="px-4 py-2 rounded-lg {{ $viewMode === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' }}">
-                            Month
-                        </button>
-                        <button wire:click="setViewMode('week')" class="px-4 py-2 rounded-lg {{ $viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' }}">
-                            Week
-                        </button>
-                        <button wire:click="setViewMode('day')" class="px-4 py-2 rounded-lg {{ $viewMode === 'day' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' }}">
-                            Day
-                        </button>
+                    @php $summary = $this->availDateSummary(); @endphp
+                    <div class="flex flex-wrap gap-2 pb-0.5">
+                        <span class="px-2 py-1 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 rounded-lg text-xs font-medium">
+                            {{ $summary['available'] }} open
+                        </span>
+                        <span class="px-2 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-medium">
+                            {{ $summary['booked'] }} booked
+                        </span>
                     </div>
 
-                    <!-- Action Buttons -->
-                    <div class="flex space-x-2">
-                        <button wire:click="createSlot" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                            Add Slot
-                        </button>
-                        <button wire:click="showBulkSlotCreation" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
-                            Bulk Slots
+                    <div class="flex flex-wrap gap-2 pb-0.5">
+                        <button
+                            wire:click="setAllAvailable"
+                            class="flex-1 sm:flex-none px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium transition-colors"
+                        >Set All</button>
+                        <button
+                            wire:click="clearAllSlots"
+                            class="flex-1 sm:flex-none px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-sm font-medium transition-colors"
+                        >Clear All</button>
+                        <button
+                            wire:click="saveAvailability"
+                            wire:loading.attr="disabled"
+                            wire:target="saveAvailability"
+                            @class([
+                                'flex-1 sm:flex-none px-5 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 flex items-center gap-2',
+                                'bg-blue-600 hover:bg-blue-700 text-white shadow-sm' => $isDirty,
+                                'bg-blue-100 dark:bg-blue-900/30 text-blue-400 dark:text-blue-500 cursor-default' => !$isDirty,
+                            ])
+                        >
+                            <span wire:loading.remove wire:target="saveAvailability">
+                                @if ($isDirty)
+                                    <svg class="inline w-3.5 h-3.5 mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    Save Schedule
+                                @else
+                                    Saved
+                                @endif
+                            </span>
+                            <span wire:loading wire:target="saveAvailability">Saving…</span>
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Calendar Grid -->
-            <div class="p-4">
-                @if($viewMode === 'month')
-                    <!-- Month View -->
-                    <div class="grid grid-cols-7 gap-1">
-                        <!-- Headers (Sunday first) -->
-                        @foreach($this->calendarHeaders() as $header)
-                            <div class="p-2 text-center text-sm font-medium text-gray-500 dark:text-gray-400">
-                                {{ $header }}
+            {{-- Time slot grid --}}
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div class="px-4 sm:px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        {{ Carbon::parse($availDate)->format('l, F j, Y') }} &mdash; 7:00 AM to 10:00 PM &nbsp;&bull;&nbsp; 30-min intervals
+                    </h2>
+                </div>
+
+                <div class="divide-y divide-gray-100 dark:divide-gray-700">
+                    @foreach ($slotGrid as $hourRow)
+                        @php
+                            $hourFree   = collect($hourRow['slots'])->filter(fn($s) => !$s['booked']);
+                            $hourAllOpen = $hourFree->isNotEmpty() && $hourFree->every(fn($s) => $s['available']);
+                        @endphp
+                        <div class="flex items-start px-3 sm:px-6 py-2 gap-2 sm:gap-4">
+                            <div class="w-12 sm:w-14 shrink-0 text-right pt-1">
+                                <button
+                                    wire:click="toggleHour({{ $hourRow['hour'] }})"
+                                    title="{{ $hourAllOpen ? 'Deselect all ' . $hourRow['label'] : 'Select all ' . $hourRow['label'] }}"
+                                    class="w-full text-xs font-semibold px-1 py-1 rounded-lg transition-colors
+                                        {{ $hourAllOpen
+                                            ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50'
+                                            : 'text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20' }}"
+                                >
+                                    {{ $hourRow['label'] }}
+                                    <span class="block text-[9px] leading-tight mt-0.5 opacity-70">{{ $hourAllOpen ? '✕ all' : '+ all' }}</span>
+                                </button>
                             </div>
-                        @endforeach
-
-                        <!-- Days -->
-                        @foreach($this->calendarDays() as $day)
-                            <div
-                                class="min-h-24 p-2 border border-gray-200 dark:border-gray-700 {{ !$day['isCurrentMonth'] ? 'bg-gray-50 dark:bg-gray-900' : '' }} {{ $day['isToday'] ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}"
-                                wire:click="selectDate('{{ $day['date'] }}')"
-                            >
-                                <div class="flex justify-between items-start mb-1">
-                                    <span class="text-sm font-medium {{ $day['isToday'] ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white' }}">
-                                        {{ $day['formatted'] }}
-                                    </span>
-                                    @if(!$day['isCurrentMonth'])
-                                        <span class="text-xs text-gray-400">•</span>
-                                    @endif
-                                </div>
-
-                                <!-- Appointments for this day -->
-                                <div class="space-y-1 max-h-20 overflow-y-auto">
-                                    @foreach($day['appointments'] as $appointment)
-                                        <div
-                                            class="text-xs p-1 rounded cursor-pointer
-                                                {{ $appointment->status === 'confirmed' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
-                                                   ($appointment->status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
-                                                   ($appointment->status === 'cancelled' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' :
-                                                   'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200')) }}"
-                                            wire:click="viewAppointment({{ $appointment->id }})"
-                                            wire:key="appointment-{{ $appointment->id }}"
-                                        >
-                                            <div class="font-medium truncate">
-                                                {{ $appointment->user->name }}
-                                            </div>
-                                            <div class="truncate">
-                                                {{ $appointment->start_time->format('g:i A') }}
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-
-                                <!-- Available slots indicator -->
-                                @if($day['slots']->where('is_available', true)->count() > 0)
-                                    <div class="mt-1 text-xs text-green-600 dark:text-green-400">
-                                        {{ $day['slots']->where('is_available', true)->count() }} available
-                                    </div>
-                                @endif
-                            </div>
-                        @endforeach
-                    </div>
-
-                @elseif($viewMode === 'week')
-                    <!-- Week View -->
-                    <div class="grid grid-cols-8 gap-1">
-                        <!-- Time column -->
-                        <div class="p-2"></div>
-
-                        <!-- Day headers (Sunday first) -->
-                        @foreach($this->weekViewDays() as $day)
-                            <div
-                                class="p-2 text-center border-b border-gray-200 dark:border-gray-700 cursor-pointer
-                                    {{ $day['is_today'] ? 'bg-blue-50 dark:bg-blue-900/20' : '' }}
-                                    {{ $day['is_selected'] ? 'ring-2 ring-blue-500' : '' }}"
-                                wire:click="selectDate('{{ $day['date'] }}')"
-                            >
-                                <div class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ $day['day_name'] }}</div>
-                                <div class="text-lg font-semibold {{ $day['is_today'] ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white' }}">
-                                    {{ $day['day_number'] }}
-                                </div>
-                            </div>
-                        @endforeach
-
-                        <!-- Time slots -->
-                        @foreach($this->weekHours() as $hour)
-                            <div class="grid grid-cols-8 gap-1 border-t border-gray-100 dark:border-gray-800">
-                                <!-- Time label -->
-                                <div class="p-2 text-xs text-gray-500 dark:text-gray-400 text-right pr-4 -mt-2">
-                                    {{ $hour['formatted'] }}
-                                </div>
-
-                                <!-- Day columns (Sunday first) -->
-                                @foreach($this->weekViewDays() as $day)
-                                    @php
-                                        $currentDateTime = $day['date'] . ' ' . sprintf('%02d:00:00', $hour['hour']);
-                                    @endphp
-                                    <div class="p-1 min-h-16 border-l border-gray-100 dark:border-gray-800 relative">
-                                        <!-- Appointments for this time slot -->
-                                        @foreach($this->getAppointmentsForDate($day['date']) as $appointment)
-                                            @php
-                                                $appointmentHour = $appointment->start_time->hour;
-                                                $appointmentEndHour = $appointment->end_time->hour;
-                                            @endphp
-                                            @if($appointmentHour <= $hour['hour'] && $appointmentEndHour > $hour['hour'])
-                                                <div
-                                                    class="absolute left-1 right-1 p-1 rounded text-xs cursor-pointer
-                                                        {{ $appointment->status === 'confirmed' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-700' :
-                                                           ($appointment->status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700' :
-                                                           ($appointment->status === 'cancelled' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-700' :
-                                                           'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600')) }}"
-                                                    wire:click="viewAppointment({{ $appointment->id }})"
-                                                    style="top: {{ ($appointment->start_time->minute / 60) * 64 }}px; height: {{ max(32, (($appointment->end_time->diffInMinutes($appointment->start_time)) / 60) * 64) }}px;"
-                                                >
-                                                    <div class="font-medium truncate">{{ $appointment->user->name }}</div>
-                                                    <div class="truncate">{{ $appointment->start_time->format('g:i A') }}</div>
-                                                </div>
-                                            @endif
-                                        @endforeach
-                                    </div>
+                            <div class="flex gap-1 sm:gap-2 flex-1 flex-wrap py-1">
+                                @foreach ($hourRow['slots'] as $slot)
+                                    <button
+                                        wire:click="toggleSlot('{{ $slot['time'] }}')"
+                                        @if ($slot['booked']) disabled title="Already booked" @endif
+                                        class="flex-1 min-w-[58px] sm:min-w-[72px] max-w-[100px] px-1 sm:px-2 py-1.5 rounded-lg text-xs font-medium text-center transition-all border
+                                            @if ($slot['booked'])
+                                                bg-amber-100 dark:bg-amber-900/40 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 cursor-not-allowed
+                                            @elseif ($slot['available'])
+                                                bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/60
+                                            @else
+                                                bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700
+                                            @endif"
+                                    >
+                                        {{ $slot['label'] }}
+                                        @if ($slot['booked'])
+                                            <span class="block text-[10px] leading-tight opacity-80">booked</span>
+                                        @elseif ($slot['available'])
+                                            <span class="block text-[10px] leading-tight opacity-80">✓ open</span>
+                                        @else
+                                            <span class="block text-[10px] leading-tight opacity-50">+ add</span>
+                                        @endif
+                                    </button>
                                 @endforeach
                             </div>
-                        @endforeach
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        {{-- ══════════════════════════════════════════════════ --}}
+        {{--  TAB: BOOK APPOINTMENT                             --}}
+        {{-- ══════════════════════════════════════════════════ --}}
+        @if ($activeTab === 'book')
+            <div class="mb-5 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl text-sm text-purple-800 dark:text-purple-200">
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 shrink-0 mt-0.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0"/>
+                    </svg>
+                    <div>
+                        <p class="font-semibold mb-1">How to book an appointment:</p>
+                        <ol class="list-decimal list-inside space-y-1 text-purple-700 dark:text-purple-300">
+                            <li><strong>Step 1:</strong> Search and select the member you want to meet.</li>
+                            <li><strong>Step 2:</strong> Pick a date and choose an open time slot from their schedule.</li>
+                            <li><strong>Step 3:</strong> Add optional notes or venue, then confirm your booking.</li>
+                            <li>The member will be notified and can confirm or decline.</li>
+                        </ol>
                     </div>
+                </div>
+            </div>
 
-                @else
-                    <!-- Day View -->
-                    <div class="grid grid-cols-2 gap-1">
-                        <!-- Time slots -->
-                        <div class="space-y-1">
-                            @foreach($this->weekHours() as $hour)
-                                <div class="grid grid-cols-2 gap-1 border-t border-gray-100 dark:border-gray-800 min-h-16">
-                                    <!-- Time label -->
-                                    <div class="p-2 text-sm text-gray-500 dark:text-gray-400 text-right pr-4">
-                                        {{ $hour['formatted'] }}
-                                    </div>
+            {{-- Step indicator --}}
+            <div class="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+                @foreach ([1 => 'Pick Member', 2 => 'Pick Date & Time', 3 => 'Confirm'] as $num => $label)
+                    <div class="flex items-center gap-2 shrink-0">
+                        <div class="flex items-center gap-1.5">
+                            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+                                {{ $bookStep >= $num ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400' }}">
+                                {{ $bookStep > $num ? '✓' : $num }}
+                            </div>
+                            <span class="text-xs font-medium {{ $bookStep >= $num ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500' }}">
+                                {{ $label }}
+                            </span>
+                        </div>
+                        @if ($num < 3)
+                            <div class="w-8 sm:w-16 h-0.5 {{ $bookStep > $num ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700' }}"></div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
 
-                                    <!-- Appointments for this time slot -->
-                                    <div class="p-1 relative">
-                                        @foreach($this->getAppointmentsForDate($selectedDate) as $appointment)
-                                            @php
-                                                $appointmentHour = $appointment->start_time->hour;
-                                                $appointmentEndHour = $appointment->end_time->hour;
-                                            @endphp
-                                            @if($appointmentHour <= $hour['hour'] && $appointmentEndHour > $hour['hour'])
-                                                <div
-                                                    class="absolute left-1 right-1 p-2 rounded cursor-pointer
-                                                        {{ $appointment->status === 'confirmed' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-700' :
-                                                           ($appointment->status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700' :
-                                                           ($appointment->status === 'cancelled' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-700' :
-                                                           'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600')) }}"
-                                                    wire:click="viewAppointment({{ $appointment->id }})"
-                                                    style="top: {{ ($appointment->start_time->minute / 60) * 64 }}px; height: {{ max(32, (($appointment->end_time->diffInMinutes($appointment->start_time)) / 60) * 64) }}px;"
-                                                >
-                                                    <div class="font-medium">{{ $appointment->user->name }}</div>
-                                                    <div class="text-sm">{{ $appointment->start_time->format('g:i A') }} - {{ $appointment->end_time->format('g:i A') }}</div>
-                                                    <div class="text-xs mt-1">
-                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                                                            {{ $appointment->is_sure_investor ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' }}">
-                                                            {{ $appointment->is_sure_investor ? 'Sure Investor' : 'Orientation' }}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            @endif
-                                        @endforeach
+            {{-- STEP 1: Pick Member --}}
+            @if ($bookStep === 1)
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+                    <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-4">Choose a Member</h2>
+                    <div class="relative mb-4">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                        </svg>
+                        <input
+                            type="text"
+                            wire:model.live="memberSearch"
+                            placeholder="Search by name or email…"
+                            class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                    </div>
+                    @php $members = $this->getMembers(); @endphp
+                    @if ($members->isEmpty())
+                        <p class="text-center text-gray-400 dark:text-gray-500 text-sm py-8">No members found.</p>
+                    @else
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            @foreach ($members as $member)
+                                <button
+                                    wire:click="selectMember({{ $member->id }})"
+                                    class="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-left transition-all"
+                                >
+                                    @if ($member->getFirstMediaUrl('profile'))
+                                        <img src="{{ $member->getFirstMediaUrl('profile') }}" class="w-10 h-10 rounded-full object-cover shrink-0" alt="{{ $member->name }}">
+                                    @else
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shrink-0">
+                                            <span class="text-white text-sm font-bold">{{ strtoupper(substr($member->name, 0, 1)) }}</span>
+                                        </div>
+                                    @endif
+                                    <div class="min-w-0 flex-1">
+                                        <div class="text-sm font-semibold text-gray-900 dark:text-white truncate">{{ $member->name }}</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ $member->email }}</div>
                                     </div>
-                                </div>
+                                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
                             @endforeach
                         </div>
+                    @endif
+                </div>
+            @endif
 
-                        <!-- Availability slots for the day -->
-                        <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                            <h3 class="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200">
-                                Availability for {{ Carbon::parse($selectedDate)->format('l, F j, Y') }}
-                            </h3>
-
-                            <div class="space-y-2">
-                                @foreach($this->getSlotsForDate($selectedDate) as $slot)
-                                    <div class="flex justify-between items-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                                        <div>
-                                            <div class="font-medium text-gray-900 dark:text-white">
-                                                {{ \Carbon\Carbon::parse($slot->start_time)->format('g:i A') }} -
-                                                {{ \Carbon\Carbon::parse($slot->end_time)->format('g:i A') }}
-                                            </div>
-                                            <div class="text-sm text-gray-500 dark:text-gray-400">
-                                                {{ $slot->is_available ? 'Available' : 'Unavailable' }}
-                                            </div>
-                                        </div>
-                                        <div class="flex space-x-2">
-                                            <button wire:click="editSlot({{ $slot->id }})" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
-                                                Edit
-                                            </button>
-                                            <button wire:click="toggleSlotAvailability({{ $slot->id }})" class="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300">
-                                                {{ $slot->is_available ? 'Disable' : 'Enable' }}
-                                            </button>
-                                            <button wire:click="deleteSlot({{ $slot->id }})" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                @endforeach
-
-                                @if($this->getSlotsForDate($selectedDate)->count() === 0)
-                                    <div class="text-center py-8 text-gray-500 dark:text-gray-400">
-                                        No availability slots for this day
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                @endif
-            </div>
-        </div>
-
-        <!-- The rest of your code remains the same for lists and modals -->
-        <!-- Lists Section (Collapsible) -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- Appointments Section -->
-            <div class="lg:col-span-2">
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-                    <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Appointments List</h2>
-                            <div class="flex space-x-2">
-                                <!-- Search -->
-                                <div class="relative">
-                                    <input type="text" wire:model.live="search"
-                                        class="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                                        placeholder="Search users...">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center">
-                                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                        </svg>
-                                    </div>
+            {{-- STEP 2: Pick Date & Time (multi-select) --}}
+            @if ($bookStep === 2)
+                @php
+                    $selectedMember     = $this->getSelectedMember();
+                    $selectedSlotIds    = collect($selectedSlots)->pluck('id')->toArray();
+                    $selectedSlotCount  = count($selectedSlots);
+                @endphp
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+                    <div class="flex items-center gap-3 mb-5">
+                        <button wire:click="backToMemberList" class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                            </svg>
+                        </button>
+                        @if ($selectedMember)
+                            @if ($selectedMember->getFirstMediaUrl('profile'))
+                                <img src="{{ $selectedMember->getFirstMediaUrl('profile') }}" class="w-9 h-9 rounded-full object-cover shrink-0" alt="{{ $selectedMember->name }}">
+                            @else
+                                <div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shrink-0">
+                                    <span class="text-white text-sm font-bold">{{ strtoupper(substr($selectedMember->name, 0, 1)) }}</span>
                                 </div>
-                            </div>
-                        </div>
-
-                        <!-- Filters -->
-                        <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <select wire:model.live="filters.status"
-                                class="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white">
-                                <option value="">All Status</option>
-                                <option value="pending">Pending</option>
-                                <option value="confirmed">Confirmed</option>
-                                <option value="cancelled">Cancelled</option>
-                                <option value="completed">Completed</option>
-                            </select>
-
-                            <select wire:model.live="filters.type"
-                                class="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white">
-                                <option value="">All Types</option>
-                                <option value="1">Sure Investor</option>
-                                <option value="0">Orientation</option>
-                            </select>
-
-                            <input type="date" wire:model.live="filters.date_from"
-                                class="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white"
-                                placeholder="From Date">
-
-                            <input type="date" wire:model.live="filters.date_to"
-                                class="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white"
-                                placeholder="To Date">
-                        </div>
-
-                        @if ($this->filters['status'] || $this->filters['date_from'] || $this->filters['date_to'] || $this->filters['type'] !== '' || $this->search)
-                            <div class="mt-2">
-                                <button wire:click="resetFilters"
-                                    class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
-                                    Clear Filters
-                                </button>
+                            @endif
+                            <div>
+                                <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ $selectedMember->name }}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Pick a date, then select one or more time slots</div>
                             </div>
                         @endif
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">User</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date & Time</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                @forelse ($this->appointments() as $appointment)
-                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $appointment->user->name }}</div>
-                                            <div class="text-sm text-gray-500 dark:text-gray-400">{{ $appointment->user->email }}</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm text-gray-900 dark:text-white">{{ $appointment->start_time->format('M j, Y') }}</div>
-                                            <div class="text-sm text-gray-500 dark:text-gray-400">{{ $appointment->start_time->format('g:i A') }} - {{ $appointment->end_time->format('g:i A') }}</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $appointment->is_sure_investor ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' }}">
-                                                {{ $appointment->is_sure_investor ? 'Sure Investor' : 'Orientation' }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                                {{ $appointment->status === 'confirmed' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
-                                                   ($appointment->status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
-                                                   ($appointment->status === 'cancelled' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' :
-                                                   'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200')) }}">
-                                                {{ ucfirst($appointment->status) }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <button wire:click="viewAppointment({{ $appointment->id }})" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-3">
-                                                View
-                                            </button>
-                                            <div class="inline-block relative group">
-                                                <button class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300">
-                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                                                    </svg>
-                                                </button>
-                                                <div class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-10 hidden group-hover:block">
-                                                    <button wire:click="updateStatus({{ $appointment->id }}, 'confirmed')" class="block w-full text-left px-4 py-2 text-sm text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900">
-                                                        Confirm
-                                                    </button>
-                                                    <button wire:click="updateStatus({{ $appointment->id }}, 'cancelled')" class="block w-full text-left px-4 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900">
-                                                        Cancel
-                                                    </button>
-                                                    <button wire:click="updateStatus({{ $appointment->id }}, 'completed')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                                        Complete
-                                                    </button>
-                                                    <button wire:click="deleteAppointment({{ $appointment->id }})" onclick="return confirm('Are you sure you want to delete this appointment?')" class="block w-full text-left px-4 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900">
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="5" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-                                            No appointments found.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                    <div class="mb-5">
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Select Date</label>
+                        <input
+                            type="date"
+                            wire:model.live="bookDate"
+                            min="{{ now()->addDay()->format('Y-m-d') }}"
+                            class="w-full sm:w-56 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
                     </div>
 
-                    <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-                        {{ $this->appointments()->links() }}
+                    @php $memberSlots = $this->getMemberAvailability(); @endphp
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                            Available slots on {{ Carbon::parse($bookDate)->format('l, M j, Y') }}
+                        </h3>
+                        @if ($selectedSlotCount > 0)
+                            <span class="px-2.5 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full text-xs font-semibold">
+                                {{ $selectedSlotCount }} selected
+                            </span>
+                        @endif
+                    </div>
+
+                    @if (empty($memberSlots))
+                        <div class="text-center py-10 text-gray-400 dark:text-gray-500">
+                            <svg class="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            <p class="text-sm font-medium">No available slots for this date.</p>
+                            <p class="text-xs mt-1">Try a different date, or ask the member to open their schedule.</p>
+                        </div>
+                    @else
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-5">
+                            @foreach ($memberSlots as $slot)
+                                @php
+                                    $isSelected = in_array($slot['id'], $selectedSlotIds);
+                                    $startLabel = Carbon::createFromFormat('H:i:s', $slot['start_time'])->format('g:i A');
+                                    $endLabel   = Carbon::createFromFormat('H:i:s', $slot['end_time'])->format('g:i A');
+                                @endphp
+                                <button
+                                    wire:key="slot-{{ $slot['id'] }}"
+                                    wire:click="toggleBookSlot({{ $slot['id'] }}, '{{ $slot['start_time'] }}', '{{ $slot['end_time'] }}')"
+                                    class="relative px-3 py-2.5 rounded-xl border text-sm font-medium text-center transition-all
+                                        {{ $isSelected
+                                            ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
+                                            : 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-300' }}"
+                                >
+                                    @if ($isSelected)
+                                        <span class="absolute top-1 right-1 w-3.5 h-3.5 bg-white rounded-full flex items-center justify-center">
+                                            <svg class="w-2.5 h-2.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                        </span>
+                                    @endif
+                                    {{ $startLabel }}
+                                    <span class="block text-xs opacity-75 mt-0.5">{{ $endLabel }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+
+                        {{-- Continue bar --}}
+                        <div class="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                @if ($selectedSlotCount === 0)
+                                    Tap slots to build a schedule
+                                @else
+                                    @php
+                                        $rangeStart = Carbon::createFromFormat('H:i:s', $selectedSlots[0]['start'])->format('g:i A');
+                                        $rangeEnd   = Carbon::createFromFormat('H:i:s', end($selectedSlots)['end'])->format('g:i A');
+                                    @endphp
+                                    <span class="font-medium text-blue-600 dark:text-blue-400">{{ $rangeStart }} – {{ $rangeEnd }}</span>
+                                @endif
+                            </p>
+                            <button
+                                wire:click="proceedToConfirm"
+                                @if($selectedSlotCount === 0) disabled @endif
+                                class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors
+                                    {{ $selectedSlotCount > 0
+                                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' }}"
+                            >
+                                Continue
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </button>
+                        </div>
+                    @endif
+                </div>
+            @endif
+
+            {{-- STEP 3: Confirm Booking --}}
+            @if ($bookStep === 3)
+                @php $selectedMember = $this->getSelectedMember(); @endphp
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <button wire:click="backToSlotPick" class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                            </svg>
+                        </button>
+                        <h2 class="text-base font-semibold text-gray-900 dark:text-white">Confirm Your Appointment</h2>
+                    </div>
+
+                    {{-- Summary card --}}
+                    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-5 space-y-3 text-sm">
+                        <div class="flex items-center gap-2 text-gray-700 dark:text-gray-200">
+                            <svg class="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                            <span class="font-medium">With:</span>
+                            <span>{{ $selectedMember?->name ?? '—' }}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-gray-700 dark:text-gray-200">
+                            <svg class="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            <span class="font-medium">Date:</span>
+                            <span>{{ Carbon::parse($bookDate)->format('l, F j, Y') }}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-gray-700 dark:text-gray-200">
+                            <svg class="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0"/>
+                            </svg>
+                            <span class="font-medium">Time Sched:</span>
+                            @if (!empty($selectedSlots))
+                                <span class="px-2.5 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-lg text-sm font-semibold">
+                                    {{ Carbon::createFromFormat('H:i:s', $selectedSlots[0]['start'])->format('g:i A') }}
+                                    &ndash;
+                                    {{ Carbon::createFromFormat('H:i:s', end($selectedSlots)['end'])->format('g:i A') }}
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Notes <span class="text-gray-400 font-normal">(optional)</span>
+                            </label>
+                            <textarea
+                                wire:model="bookingNotes"
+                                rows="3"
+                                placeholder="What is this appointment about? Any special requests?"
+                                class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"
+                            ></textarea>
+                            @error('bookingNotes') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Venue / Meeting Link <span class="text-gray-400 font-normal">(optional)</span>
+                            </label>
+                            <input
+                                type="text"
+                                wire:model="bookingVenue"
+                                placeholder="e.g. Zoom link, office address, phone call…"
+                                class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            />
+                            @error('bookingVenue') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <button
+                        wire:click="confirmBooking"
+                        wire:loading.attr="disabled"
+                        class="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        <span wire:loading.remove wire:target="confirmBooking">Confirm Booking</span>
+                        <span wire:loading wire:target="confirmBooking">Booking…</span>
+                    </button>
+                </div>
+            @endif
+        @endif
+
+        {{-- ══════════════════════════════════════════════════ --}}
+        {{--  TAB: MY BOOKINGS                                  --}}
+        {{-- ══════════════════════════════════════════════════ --}}
+        @if ($activeTab === 'bookings')
+            <div class="mb-5 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl text-sm text-green-800 dark:text-green-200">
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 shrink-0 mt-0.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0"/>
+                    </svg>
+                    <div>
+                        <p class="font-semibold mb-1">Managing your appointments:</p>
+                        <ul class="list-disc list-inside space-y-1 text-green-700 dark:text-green-300">
+                            <li><strong>Booked by Me</strong> — appointments you've scheduled with others. Cancel pending ones if needed.</li>
+                            <li><strong>Booked with Me</strong> — when others book your open slots. You can confirm, complete, or decline.</li>
+                        </ul>
                     </div>
                 </div>
             </div>
 
-            <!-- Availability Slots Section -->
-            <div class="lg:col-span-1">
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-                    <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Availability Slots</h2>
-                            <button wire:click="createSlot" class="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600">
-                                Add Slot
-                            </button>
-                        </div>
-                    </div>
+            {{-- Sub-tab --}}
+            <div class="flex gap-1 mb-5 bg-gray-100 dark:bg-gray-900 rounded-xl p-1 w-full sm:w-auto sm:inline-flex">
+                <button
+                    wire:click="$set('bookingsSubTab', 'mine')"
+                    class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                        {{ $bookingsSubTab === 'mine' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200' }}"
+                >
+                    Booked by Me
+                    @php $mineCount = $this->getMyBookings()->count(); @endphp
+                    @if ($mineCount > 0)
+                        <span class="ml-1.5 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full text-xs">{{ $mineCount }}</span>
+                    @endif
+                </button>
+                <button
+                    wire:click="$set('bookingsSubTab', 'with_me')"
+                    class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                        {{ $bookingsSubTab === 'with_me' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200' }}"
+                >
+                    Booked with Me
+                    @php $withMeCount = $this->getBookingsWithMe()->count(); @endphp
+                    @if ($withMeCount > 0)
+                        <span class="ml-1.5 px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-full text-xs">{{ $withMeCount }}</span>
+                    @endif
+                </button>
+            </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Time</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                @forelse ($this->slots() as $slot)
-                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                            {{ $slot->date->format('M j, Y') }}
-                                        </td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                            {{ \Carbon\Carbon::parse($slot->start_time)->format('g:i A') }} - {{ \Carbon\Carbon::parse($slot->end_time)->format('g:i A') }}
-                                        </td>
-                                        <td class="px-4 py-3 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $slot->is_available ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' }}">
-                                                {{ $slot->is_available ? 'Available' : 'Unavailable' }}
-                                            </span>
-                                        </td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                                            <button wire:click="editSlot({{ $slot->id }})" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-3">
-                                                Edit
-                                            </button>
-                                            <button wire:click="toggleSlotAvailability({{ $slot->id }})" class="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 mr-3">
-                                                {{ $slot->is_available ? 'Disable' : 'Enable' }}
-                                            </button>
-                                            <button wire:click="deleteSlot({{ $slot->id }})" onclick="return confirm('Are you sure you want to delete this slot?')" class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300">
-                                                Delete
-                                            </button>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="4" class="px-4 py-4 text-center text-gray-500 dark:text-gray-400">
-                                            No availability slots found.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
+            @php
+                $appointmentCardClasses = 'bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5';
+            @endphp
 
-                    <div class="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
-                        {{ $this->slots()->links() }}
+            {{-- Booked by Me --}}
+            @if ($bookingsSubTab === 'mine')
+                @php $myBookings = $this->getMyBookings(); @endphp
+                @if ($myBookings->isEmpty())
+                    <div class="{{ $appointmentCardClasses }} p-10 text-center text-gray-400 dark:text-gray-500">
+                        <svg class="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <p class="font-medium">No appointments yet.</p>
+                        <p class="text-sm mt-1">Go to <em>Book Appointment</em> to schedule one.</p>
                     </div>
+                @else
+                    <div class="space-y-3">
+                        @foreach ($myBookings as $appt)
+                            <div class="{{ $appointmentCardClasses }}">
+                                <div class="flex flex-col sm:flex-row sm:items-start gap-3">
+                                    <div class="shrink-0">
+                                        @if ($appt->host && $appt->host->getFirstMediaUrl('profile'))
+                                            <img src="{{ $appt->host->getFirstMediaUrl('profile') }}" class="w-10 h-10 rounded-full object-cover" alt="">
+                                        @else
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
+                                                <span class="text-white text-sm font-bold">{{ strtoupper(substr($appt->host?->name ?? '?', 0, 1)) }}</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                                            <span class="font-semibold text-gray-900 dark:text-white text-sm">{{ $appt->host?->name ?? 'Unknown' }}</span>
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-medium {{ $this->statusBadgeClass($appt->status) }}">{{ ucfirst($appt->status) }}</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+                                            <div>📅 {{ $appt->start_time->format('l, F j, Y') }}</div>
+                                            <div>🕐 {{ $appt->start_time->format('g:i A') }} – {{ $appt->end_time->format('g:i A') }}</div>
+                                            @if ($appt->venue) <div>📍 {{ $appt->venue }}</div> @endif
+                                            @if ($appt->notes) <div class="mt-1 text-gray-600 dark:text-gray-400">💬 {{ $appt->notes }}</div> @endif
+                                        </div>
+                                    </div>
+                                    @if ($appt->status === 'pending')
+                                        <div class="shrink-0">
+                                            <button
+                                                wire:click="openConfirmModal({{ $appt->id }}, 'cancel', 'Cancel Appointment', 'Are you sure you want to cancel this appointment? This cannot be undone.')"
+                                                class="px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium hover:bg-red-100 transition-colors border border-red-200 dark:border-red-800"
+                                            >Cancel</button>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            @endif
+
+            {{-- Booked with Me --}}
+            @if ($bookingsSubTab === 'with_me')
+                @php $bookingsWithMe = $this->getBookingsWithMe(); @endphp
+                @if ($bookingsWithMe->isEmpty())
+                    <div class="{{ $appointmentCardClasses }} p-10 text-center text-gray-400 dark:text-gray-500">
+                        <svg class="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                        <p class="font-medium">No one has booked with you yet.</p>
+                        <p class="text-sm mt-1">Make sure your availability is set so others can find open slots.</p>
+                    </div>
+                @else
+                    <div class="space-y-3">
+                        @foreach ($bookingsWithMe as $appt)
+                            <div class="{{ $appointmentCardClasses }}">
+                                <div class="flex flex-col sm:flex-row sm:items-start gap-3">
+                                    <div class="shrink-0">
+                                        @if ($appt->user && $appt->user->getFirstMediaUrl('profile'))
+                                            <img src="{{ $appt->user->getFirstMediaUrl('profile') }}" class="w-10 h-10 rounded-full object-cover" alt="">
+                                        @else
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-teal-500 flex items-center justify-center">
+                                                <span class="text-white text-sm font-bold">{{ strtoupper(substr($appt->user?->name ?? '?', 0, 1)) }}</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                                            <span class="font-semibold text-gray-900 dark:text-white text-sm">{{ $appt->user?->name ?? 'Unknown' }}</span>
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-medium {{ $this->statusBadgeClass($appt->status) }}">{{ ucfirst($appt->status) }}</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+                                            <div>📅 {{ $appt->start_time->format('l, F j, Y') }}</div>
+                                            <div>🕐 {{ $appt->start_time->format('g:i A') }} – {{ $appt->end_time->format('g:i A') }}</div>
+                                            @if ($appt->venue) <div>📍 {{ $appt->venue }}</div> @endif
+                                            @if ($appt->notes) <div class="mt-1 text-gray-600 dark:text-gray-400">💬 {{ $appt->notes }}</div> @endif
+                                        </div>
+                                    </div>
+                                    <div class="shrink-0 flex flex-wrap gap-2">
+                                        @if ($appt->status === 'pending')
+                                            <button wire:click="openConfirmModal({{ $appt->id }}, 'confirm', 'Confirm Appointment', 'Confirm this booking? The member will be notified.')"
+                                                class="px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs font-medium hover:bg-green-100 transition-colors border border-green-200 dark:border-green-800">
+                                                Confirm
+                                            </button>
+                                            <button wire:click="openConfirmModal({{ $appt->id }}, 'decline', 'Decline Booking', 'Decline this booking request? The member will be notified.')"
+                                                class="px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium hover:bg-red-100 transition-colors border border-red-200 dark:border-red-800">
+                                                Decline
+                                            </button>
+                                        @elseif ($appt->status === 'confirmed')
+                                            <button wire:click="openConfirmModal({{ $appt->id }}, 'complete', 'Mark as Completed', 'Mark this appointment as completed?')"
+                                                class="px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-medium hover:bg-blue-100 transition-colors border border-blue-200 dark:border-blue-800">
+                                                Mark Complete
+                                            </button>
+                                            <button wire:click="openConfirmModal({{ $appt->id }}, 'cancel', 'Cancel Appointment', 'Cancel this confirmed appointment? This cannot be undone.')"
+                                                class="px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium hover:bg-red-100 transition-colors border border-red-200 dark:border-red-800">
+                                                Cancel
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            @endif
+        @endif
+
+    </div>
+
+    {{-- ── Confirm Modal ─────────────────────────────────── --}}
+    @if ($showConfirmModal)
+        <div
+            x-data="{ show: false }"
+            x-init="$nextTick(() => show = true)"
+            x-show="show"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            class="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+        >
+            {{-- Backdrop --}}
+            <div
+                class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                wire:click="closeConfirmModal"
+            ></div>
+
+            {{-- Modal card --}}
+            <div
+                x-show="show"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                class="relative w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6"
+            >
+                {{-- Icon --}}
+                @php
+                    $iconBg = match($confirmModalAction) {
+                        'cancel', 'decline' => 'bg-red-100 dark:bg-red-900/50 text-red-500',
+                        'confirm'           => 'bg-green-100 dark:bg-green-900/50 text-green-500',
+                        'complete'          => 'bg-blue-100 dark:bg-blue-900/50 text-blue-500',
+                        default             => 'bg-gray-100 dark:bg-gray-700 text-gray-500',
+                    };
+                    $iconPath = match($confirmModalAction) {
+                        'cancel', 'decline' => 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
+                        'confirm'           => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0',
+                        'complete'          => 'M9 12l2 2 4-4M7 21l-4-4 4-4m6 4H3',
+                        default             => 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0',
+                    };
+                    $confirmBtnClass = match($confirmModalAction) {
+                        'cancel', 'decline' => 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+                        'confirm'           => 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
+                        'complete'          => 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
+                        default             => 'bg-gray-600 hover:bg-gray-700 focus:ring-gray-500',
+                    };
+                    $confirmBtnLabel = match($confirmModalAction) {
+                        'cancel'   => 'Yes, cancel it',
+                        'decline'  => 'Yes, decline',
+                        'confirm'  => 'Yes, confirm',
+                        'complete' => 'Mark complete',
+                        default    => 'Confirm',
+                    };
+                @endphp
+
+                <div class="flex justify-center mb-5">
+                    <div class="w-16 h-16 rounded-2xl {{ $iconBg }} flex items-center justify-center">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="{{ $iconPath }}"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <h3 class="text-center text-lg font-bold text-gray-900 dark:text-white mb-2">
+                    {{ $confirmModalTitle }}
+                </h3>
+                <p class="text-center text-sm text-gray-500 dark:text-gray-400 mb-7 leading-relaxed">
+                    {{ $confirmModalMessage }}
+                </p>
+
+                <div class="flex gap-3">
+                    <button
+                        wire:click="closeConfirmModal"
+                        class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        No, go back
+                    </button>
+                    <button
+                        wire:click="executeConfirmAction"
+                        class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 {{ $confirmBtnClass }}"
+                    >
+                        {{ $confirmBtnLabel }}
+                    </button>
                 </div>
             </div>
         </div>
+    @endif
 
-        <!-- Modals -->
-        <!-- Appointment Detail Modal -->
-        @if ($showAppointmentModal && $selectedAppointment)
-            <div class="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center p-4 z-50">
-                <div class="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                    <div class="p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Appointment Details</h3>
-                            <button wire:click="$set('showAppointmentModal', false)" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <div class="space-y-4">
-                            <div>
-                                <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">User Information</h4>
-                                <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ $selectedAppointment->user->name }}</p>
-                                <p class="text-sm text-gray-600 dark:text-gray-400">{{ $selectedAppointment->user->email }}</p>
-                            </div>
-
-                            <div>
-                                <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Appointment Time</h4>
-                                <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ $selectedAppointment->start_time->format('l, F j, Y') }}</p>
-                                <p class="text-sm text-gray-600 dark:text-gray-400">{{ $selectedAppointment->start_time->format('g:i A') }} - {{ $selectedAppointment->end_time->format('g:i A') }}</p>
-                            </div>
-
-                            <div>
-                                <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Appointment Type</h4>
-                                <span class="mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $selectedAppointment->is_sure_investor ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' }}">
-                                    {{ $selectedAppointment->is_sure_investor ? 'Sure Investor' : 'Orientation' }}
-                                </span>
-                            </div>
-
-                            <div>
-                                <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</h4>
-                                <span class="mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                    {{ $selectedAppointment->status === 'confirmed' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
-                                       ($selectedAppointment->status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
-                                       ($selectedAppointment->status === 'cancelled' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' :
-                                       'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200')) }}">
-                                    {{ ucfirst($selectedAppointment->status) }}
-                                </span>
-                            </div>
-
-                            @if ($selectedAppointment->notes)
-                                <div>
-                                    <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Notes</h4>
-                                    <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ $selectedAppointment->notes }}</p>
-                                </div>
-                            @endif
-
-                            <div class="flex space-x-3 pt-4">
-                                <button wire:click="updateStatus({{ $selectedAppointment->id }}, 'confirmed')" class="flex-1 bg-green-600 dark:bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-700 dark:hover:bg-green-600">
-                                    Confirm
-                                </button>
-                                <button wire:click="updateStatus({{ $selectedAppointment->id }}, 'cancelled')" class="flex-1 bg-red-600 dark:bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-700 dark:hover:bg-red-600">
-                                    Cancel
-                                </button>
-                                <button wire:click="updateStatus({{ $selectedAppointment->id }}, 'completed')" class="flex-1 bg-gray-600 dark:bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600">
-                                    Complete
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        @endif
-
-        <!-- Slot Modal -->
-        @if ($showSlotModal)
-            <div class="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center p-4 z-50">
-                <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full">
-                    <div class="p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ $editingSlot ? 'Edit Slot' : 'Create New Slot' }}</h3>
-                            <button wire:click="$set('showSlotModal', false)" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <form wire:submit.prevent="saveSlot">
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
-                                    <input type="date" wire:model="slotForm.date" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white" required>
-                                    @error('slotForm.date') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Time</label>
-                                        <input type="time" wire:model="slotForm.start_time" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white" required>
-                                        @error('slotForm.start_time') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Time</label>
-                                        <input type="time" wire:model="slotForm.end_time" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white" required>
-                                        @error('slotForm.end_time') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" wire:model="slotForm.is_available" class="rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-700">
-                                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Available for booking</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="flex space-x-3 mt-6">
-                                <button type="button" wire:click="$set('showSlotModal', false)" class="flex-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500">
-                                    Cancel
-                                </button>
-                                <button type="submit" class="flex-1 bg-blue-600 dark:bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600">
-                                    {{ $editingSlot ? 'Update' : 'Create' }} Slot
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        @endif
-
-        <!-- Bulk Slot Modal -->
-        @if ($showBulkSlotModal)
-            <div class="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center p-4 z-50">
-                <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full">
-                    <div class="p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Create Bulk Slots</h3>
-                            <button wire:click="$set('showBulkSlotModal', false)" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <form wire:submit.prevent="createBulkSlots">
-                            <div class="space-y-4">
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
-                                        <input type="date" wire:model="bulkSlotForm.start_date" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white" required>
-                                        @error('bulkSlotForm.start_date') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
-                                        <input type="date" wire:model="bulkSlotForm.end_date" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white" required>
-                                        @error('bulkSlotForm.end_date') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Time</label>
-                                        <input type="time" wire:model="bulkSlotForm.start_time" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white" required>
-                                        @error('bulkSlotForm.start_time') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Time</label>
-                                        <input type="time" wire:model="bulkSlotForm.end_time" class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white" required>
-                                        @error('bulkSlotForm.end_time') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Days of Week</label>
-                                    <div class="grid grid-cols-4 gap-2">
-                                        @foreach([
-                                            ['value' => 0, 'label' => 'Sun'],
-                                            ['value' => 1, 'label' => 'Mon'],
-                                            ['value' => 2, 'label' => 'Tue'],
-                                            ['value' => 3, 'label' => 'Wed'],
-                                            ['value' => 4, 'label' => 'Thu'],
-                                            ['value' => 5, 'label' => 'Fri'],
-                                            ['value' => 6, 'label' => 'Sat']
-                                        ] as $day)
-                                            <label class="flex items-center">
-                                                <input type="checkbox" wire:model="bulkSlotForm.days_of_week" value="{{ $day['value'] }}" class="rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-700">
-                                                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ $day['label'] }}</span>
-                                            </label>
-                                        @endforeach
-                                    </div>
-                                    @error('bulkSlotForm.days_of_week') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                                </div>
-
-                                <div>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" wire:model="bulkSlotForm.is_available" class="rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-700">
-                                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Available for booking</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="flex space-x-3 mt-6">
-                                <button type="button" wire:click="$set('showBulkSlotModal', false)" class="flex-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500">
-                                    Cancel
-                                </button>
-                                <button type="submit" class="flex-1 bg-purple-600 dark:bg-purple-500 text-white py-2 px-4 rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600">
-                                    Create Slots
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        @endif
-    </div>
 </div>

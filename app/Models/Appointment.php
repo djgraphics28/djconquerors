@@ -11,6 +11,7 @@ class Appointment extends Model
 
     protected $fillable = [
         'user_id',
+        'host_user_id',
         'start_time',
         'end_time',
         'status',
@@ -30,6 +31,11 @@ class Appointment extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function host()
+    {
+        return $this->belongsTo(User::class, 'host_user_id');
     }
 
     /**

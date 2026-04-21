@@ -78,6 +78,7 @@ new class extends Component {
             $currentLevel = $nextLevel;
         }
     }
+
 }; ?>
 
 <div class="min-h-screen space-y-5">
