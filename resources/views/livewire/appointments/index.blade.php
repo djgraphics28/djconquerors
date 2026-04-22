@@ -1,6 +1,7 @@
 <?php
 
 use Livewire\Volt\Component;
+use Livewire\WithFileUploads;
 use App\Models\Appointment;
 use App\Models\User;
 use App\Models\AvailabilitySlot;
@@ -8,6 +9,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 new class extends Component {
+
+    use WithFileUploads;
 
     // ── Navigation ────────────────────────────────────────────
     public string $activeTab = 'availability';
@@ -30,6 +33,18 @@ new class extends Component {
 
     // ── My Bookings ───────────────────────────────────────────
     public string $bookingsSubTab = 'mine';
+
+    // ── Complete with Evidence Modal ──────────────────────────
+    public bool   $showCompleteModal       = false;
+    public ?int   $completeAppointmentId   = null;
+    public array  $evidencePhotos          = [];
+
+    // ── Evidence View / Edit Modal ───────────────────────────
+    public bool   $showEvidenceModal       = false;
+    public ?int   $evidenceModalApptId     = null;
+    public bool   $evidenceEditMode        = false;
+    public array  $pendingDeleteMediaIds   = [];  // saved media IDs queued for removal
+    public array  $newEvidencePhotos       = [];  // new uploads in edit mode
 
     // ── Confirm Modal ─────────────────────────────────────────
     public bool   $showConfirmModal    = false;
@@ -446,6 +461,133 @@ new class extends Component {
         $this->dispatch('toast', type: 'success', message: 'Appointment marked as completed!');
     }
 
+    public function openCompleteModal(int $id): void
+    {
+        $this->completeAppointmentId = $id;
+        $this->evidencePhotos        = [];
+        $this->showCompleteModal     = true;
+    }
+
+    public function openEvidenceModal(int $appointmentId, bool $editMode = false): void
+    {
+        $this->evidenceModalApptId   = $appointmentId;
+        $this->evidenceEditMode      = $editMode;
+        $this->pendingDeleteMediaIds = [];
+        $this->newEvidencePhotos     = [];
+        $this->showEvidenceModal     = true;
+    }
+
+    public function closeEvidenceModal(): void
+    {
+        $this->showEvidenceModal     = false;
+        $this->evidenceModalApptId   = null;
+        $this->evidenceEditMode      = false;
+        $this->pendingDeleteMediaIds = [];
+        $this->newEvidencePhotos     = [];
+    }
+
+    public function toggleDeleteEvidence(int $mediaId): void
+    {
+        if (in_array($mediaId, $this->pendingDeleteMediaIds)) {
+            $this->pendingDeleteMediaIds = array_values(array_filter($this->pendingDeleteMediaIds, fn($id) => $id !== $mediaId));
+        } else {
+            $this->pendingDeleteMediaIds[] = $mediaId;
+        }
+    }
+
+    public function removeNewEvidencePhoto(int $index): void
+    {
+        $photos = $this->newEvidencePhotos;
+        array_splice($photos, $index, 1);
+        $this->newEvidencePhotos = array_values($photos);
+    }
+
+    public function updatedNewEvidencePhotos(): void
+    {
+        $appt            = Appointment::find($this->evidenceModalApptId);
+        $existingCount   = $appt ? $appt->getMedia('evidence')->count() - count($this->pendingDeleteMediaIds) : 0;
+        $totalAllowed    = 3 - $existingCount;
+        if (count($this->newEvidencePhotos) > $totalAllowed) {
+            $this->newEvidencePhotos = array_slice($this->newEvidencePhotos, 0, max(0, $totalAllowed));
+            $this->dispatch('toast', type: 'error', message: 'Maximum 3 evidence photos total.');
+        }
+        $this->validate(['newEvidencePhotos.*' => 'image|max:5120']);
+    }
+
+    public function saveEvidenceEdit(): void
+    {
+        $this->validate(['newEvidencePhotos.*' => 'image|max:5120']);
+
+        $appointment = Appointment::where('id', $this->evidenceModalApptId)
+            ->where('host_user_id', Auth::id())
+            ->firstOrFail();
+
+        // Delete queued media
+        foreach ($this->pendingDeleteMediaIds as $mediaId) {
+            $media = $appointment->getMedia('evidence')->firstWhere('id', $mediaId);
+            if ($media) $media->delete();
+        }
+
+        // Add new uploads
+        foreach ($this->newEvidencePhotos as $photo) {
+            $appointment
+                ->addMedia($photo->getRealPath())
+                ->usingFileName($photo->getClientOriginalName())
+                ->toMediaCollection('evidence');
+        }
+
+        $this->closeEvidenceModal();
+        $this->dispatch('toast', type: 'success', message: 'Evidence photos updated!');
+    }
+
+    public function closeCompleteModal(): void
+    {
+        $this->showCompleteModal     = false;
+        $this->completeAppointmentId = null;
+        $this->evidencePhotos        = [];
+    }
+
+    public function removeEvidencePhoto(int $index): void
+    {
+        $photos = $this->evidencePhotos;
+        array_splice($photos, $index, 1);
+        $this->evidencePhotos = array_values($photos);
+    }
+
+    public function updatedEvidencePhotos(): void
+    {
+        if (count($this->evidencePhotos) > 3) {
+            $this->evidencePhotos = array_slice($this->evidencePhotos, 0, 3);
+            $this->dispatch('toast', type: 'error', message: 'Maximum 3 images allowed.');
+        }
+        $this->validate([
+            'evidencePhotos.*' => 'image|max:5120',
+        ]);
+    }
+
+    public function submitCompleteAppointment(): void
+    {
+        $this->validate([
+            'evidencePhotos'   => 'required|array|min:1|max:3',
+            'evidencePhotos.*' => 'image|max:5120',
+        ]);
+
+        $appointment = Appointment::where('id', $this->completeAppointmentId)
+            ->where('host_user_id', Auth::id())
+            ->firstOrFail();
+
+        foreach ($this->evidencePhotos as $photo) {
+            $appointment
+                ->addMedia($photo->getRealPath())
+                ->usingFileName($photo->getClientOriginalName())
+                ->toMediaCollection('evidence');
+        }
+
+        $appointment->update(['status' => 'completed']);
+        $this->closeCompleteModal();
+        $this->dispatch('toast', type: 'success', message: 'Appointment marked as completed with evidence!');
+    }
+
     // ══════════════════════════════════════════════════════════
     //  CONFIRM MODAL
     // ══════════════════════════════════════════════════════════
@@ -482,7 +624,6 @@ new class extends Component {
         match ($action) {
             'cancel', 'decline' => $this->cancelAppointment($id),
             'confirm'           => $this->confirmAppointment($id),
-            'complete'          => $this->completeAppointment($id),
             default             => null,
         };
     }
@@ -1117,15 +1258,32 @@ new class extends Component {
                                             @if ($appt->venue) <div>📍 {{ $appt->venue }}</div> @endif
                                             @if ($appt->notes) <div class="mt-1 text-gray-600 dark:text-gray-400">💬 {{ $appt->notes }}</div> @endif
                                         </div>
+                                        {{-- Evidence thumbnails --}}
+                                        @if ($appt->status === 'completed')
+                                            @php $evidenceMedia = $appt->getMedia('evidence'); @endphp
+                                            @if ($evidenceMedia->isNotEmpty())
+                                                <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+                                                    @foreach ($evidenceMedia->take(3) as $media)
+                                                        <img src="{{ $media->getUrl() }}" class="w-10 h-10 rounded-lg object-cover border border-gray-200 dark:border-gray-600" alt="Evidence">
+                                                    @endforeach
+                                                    <span class="text-[11px] text-gray-400 ml-1">{{ $evidenceMedia->count() }} photo{{ $evidenceMedia->count() !== 1 ? 's' : '' }}</span>
+                                                </div>
+                                            @endif
+                                        @endif
                                     </div>
-                                    @if ($appt->status === 'pending')
-                                        <div class="shrink-0">
+                                    <div class="shrink-0 flex flex-wrap gap-2">
+                                        @if ($appt->status === 'completed')
+                                            <button wire:click="openEvidenceModal({{ $appt->id }}, false)"
+                                                class="px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-medium hover:bg-gray-100 transition-colors border border-gray-200 dark:border-gray-600">
+                                                📷 View Evidence
+                                            </button>
+                                        @elseif ($appt->status === 'pending')
                                             <button
                                                 wire:click="openConfirmModal({{ $appt->id }}, 'cancel', 'Cancel Appointment', 'Are you sure you want to cancel this appointment? This cannot be undone.')"
                                                 class="px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium hover:bg-red-100 transition-colors border border-red-200 dark:border-red-800"
                                             >Cancel</button>
-                                        </div>
-                                    @endif
+                                        @endif
+                                    </div>
                                 </div>
                             </div>
                         @endforeach
@@ -1169,6 +1327,18 @@ new class extends Component {
                                             @if ($appt->venue) <div>📍 {{ $appt->venue }}</div> @endif
                                             @if ($appt->notes) <div class="mt-1 text-gray-600 dark:text-gray-400">💬 {{ $appt->notes }}</div> @endif
                                         </div>
+                                        {{-- Evidence thumbnails --}}
+                                        @if ($appt->status === 'completed')
+                                            @php $evidenceMedia = $appt->getMedia('evidence'); @endphp
+                                            @if ($evidenceMedia->isNotEmpty())
+                                                <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+                                                    @foreach ($evidenceMedia->take(3) as $media)
+                                                        <img src="{{ $media->getUrl() }}" class="w-10 h-10 rounded-lg object-cover border border-gray-200 dark:border-gray-600" alt="Evidence">
+                                                    @endforeach
+                                                    <span class="text-[11px] text-gray-400 ml-1">{{ $evidenceMedia->count() }} photo{{ $evidenceMedia->count() !== 1 ? 's' : '' }}</span>
+                                                </div>
+                                            @endif
+                                        @endif
                                     </div>
                                     <div class="shrink-0 flex flex-wrap gap-2">
                                         @if ($appt->status === 'pending')
@@ -1181,13 +1351,22 @@ new class extends Component {
                                                 Decline
                                             </button>
                                         @elseif ($appt->status === 'confirmed')
-                                            <button wire:click="openConfirmModal({{ $appt->id }}, 'complete', 'Mark as Completed', 'Mark this appointment as completed?')"
+                                            <button wire:click="openCompleteModal({{ $appt->id }})"
                                                 class="px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-medium hover:bg-blue-100 transition-colors border border-blue-200 dark:border-blue-800">
                                                 Mark Complete
                                             </button>
                                             <button wire:click="openConfirmModal({{ $appt->id }}, 'cancel', 'Cancel Appointment', 'Cancel this confirmed appointment? This cannot be undone.')"
                                                 class="px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-medium hover:bg-red-100 transition-colors border border-red-200 dark:border-red-800">
                                                 Cancel
+                                            </button>
+                                        @elseif ($appt->status === 'completed')
+                                            <button wire:click="openEvidenceModal({{ $appt->id }}, false)"
+                                                class="px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-medium hover:bg-gray-100 transition-colors border border-gray-200 dark:border-gray-600">
+                                                📷 View Evidence
+                                            </button>
+                                            <button wire:click="openEvidenceModal({{ $appt->id }}, true)"
+                                                class="px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-xs font-medium hover:bg-amber-100 transition-colors border border-amber-200 dark:border-amber-800">
+                                                ✏️ Edit Evidence
                                             </button>
                                         @endif
                                     </div>
@@ -1200,6 +1379,400 @@ new class extends Component {
         @endif
 
     </div>
+
+    {{-- ── Evidence View / Edit Modal ──────────────────────── --}}
+    @if ($showEvidenceModal)
+        @php
+            $evidenceAppt   = $evidenceModalApptId ? Appointment::find($evidenceModalApptId) : null;
+            $savedMedia     = $evidenceAppt ? $evidenceAppt->getMedia('evidence') : collect();
+            $savedCount     = $savedMedia->count();
+            $canAddMore     = ($savedCount - count($pendingDeleteMediaIds) + count($newEvidencePhotos)) < 3;
+        @endphp
+        <div
+            x-data="{ show: false, lightbox: null, lightboxIndex: 0, images: @js($savedMedia->map(fn($m) => $m->getUrl())->values()->toArray()) }"
+            x-init="$nextTick(() => show = true)"
+            x-show="show"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            class="fixed inset-0 z-[9997] flex items-center justify-center p-4"
+        >
+            {{-- Backdrop --}}
+            <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" wire:click="closeEvidenceModal"></div>
+
+            {{-- Modal card --}}
+            <div
+                x-show="show"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                class="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6"
+                @click.stop
+            >
+                {{-- Header --}}
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-10 h-10 rounded-xl {{ $evidenceEditMode ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-500' : 'bg-blue-100 dark:bg-blue-900/50 text-blue-500' }} flex items-center justify-center shrink-0">
+                        @if ($evidenceEditMode)
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 15H9v-3z"/>
+                            </svg>
+                        @else
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        @endif
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-base font-bold text-gray-900 dark:text-white">
+                            {{ $evidenceEditMode ? 'Edit Evidence Photos' : 'Evidence Photos' }}
+                        </h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {{ $evidenceEditMode ? 'Remove or add photos. Max 3 total.' : 'Click any photo to browse.' }}
+                        </p>
+                    </div>
+                    @if (!$evidenceEditMode)
+                        <button wire:click="openEvidenceModal({{ $evidenceModalApptId }}, true)" class="shrink-0 px-2.5 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-xs font-medium hover:bg-amber-100 transition-colors border border-amber-200 dark:border-amber-800">
+                            ✏️ Edit
+                        </button>
+                    @endif
+                    <button wire:click="closeEvidenceModal" class="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Saved media --}}
+                @if ($savedMedia->isEmpty() && empty($newEvidencePhotos))
+                    <div class="py-10 text-center text-gray-400 dark:text-gray-500">
+                        <svg class="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <p class="text-sm font-medium">No evidence photos uploaded yet.</p>
+                    </div>
+                @else
+                    <div class="grid grid-cols-3 gap-2 mb-4">
+                        {{-- Existing saved media --}}
+                        @foreach ($savedMedia as $media)
+                            @php $markedDelete = in_array($media->id, $pendingDeleteMediaIds); @endphp
+                            <div class="relative group rounded-xl overflow-hidden aspect-square bg-gray-100 dark:bg-gray-700
+                                {{ $markedDelete ? 'opacity-40 ring-2 ring-red-400' : '' }}">
+                                <img
+                                    src="{{ $media->getUrl() }}"
+                                    class="w-full h-full object-cover {{ $evidenceEditMode ? '' : 'cursor-pointer' }}"
+                                    alt="Evidence"
+                                    @if (!$evidenceEditMode) @click="lightboxIndex = {{ $loop->index }}; lightbox = images[{{ $loop->index }}]" @endif
+                                />
+                                @if (!$evidenceEditMode)
+                                    <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center pointer-events-none">
+                                        <svg class="w-7 h-7 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                        </svg>
+                                    </div>
+                                @endif
+                                @if ($evidenceEditMode)
+                                    <button
+                                        wire:click="toggleDeleteEvidence({{ $media->id }})"
+                                        type="button"
+                                        class="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-colors
+                                            {{ $markedDelete ? 'bg-amber-500 text-white' : 'bg-red-600 text-white opacity-0 group-hover:opacity-100' }}"
+                                        title="{{ $markedDelete ? 'Undo remove' : 'Remove' }}"
+                                    >
+                                        @if ($markedDelete)
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                            </svg>
+                                        @else
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/>
+                                            </svg>
+                                        @endif
+                                    </button>
+                                    @if ($markedDelete)
+                                        <div class="absolute bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-semibold rounded-md whitespace-nowrap">
+                                            Will remove
+                                        </div>
+                                    @endif
+                                @endif
+                            </div>
+                        @endforeach
+
+                        {{-- New uploads preview (edit mode) --}}
+                        @if ($evidenceEditMode)
+                            @foreach ($newEvidencePhotos as $i => $photo)
+                                <div class="relative group rounded-xl overflow-hidden aspect-square bg-gray-100 dark:bg-gray-700 ring-2 ring-blue-400">
+                                    <img src="{{ $photo->temporaryUrl() }}" class="w-full h-full object-cover" alt="New evidence {{ $i + 1 }}">
+                                    <button
+                                        wire:click="removeNewEvidencePhoto({{ $i }})"
+                                        type="button"
+                                        class="absolute top-1 right-1 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                                        title="Remove"
+                                    >
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                    </button>
+                                    <div class="absolute bottom-1 left-1 px-1.5 py-0.5 bg-blue-600 text-white text-[9px] font-semibold rounded-md">New</div>
+                                </div>
+                            @endforeach
+                        @endif
+                    </div>
+                @endif
+
+                {{-- Add more photos (edit mode) --}}
+                @if ($evidenceEditMode && $canAddMore)
+                    <div class="mb-4">
+                        <label
+                            for="evidence-edit-upload"
+                            class="flex items-center justify-center gap-2 w-full h-14 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/40 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors text-sm text-gray-500 dark:text-gray-400"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Add photos
+                        </label>
+                        <input type="file" id="evidence-edit-upload" wire:model="newEvidencePhotos" accept="image/*" multiple class="hidden" />
+                        @error('newEvidencePhotos.*') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div wire:loading wire:target="newEvidencePhotos" class="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 mb-3">
+                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        Uploading…
+                    </div>
+                @endif
+
+                {{-- Actions --}}
+                <div class="flex gap-3 pt-2">
+                    <button
+                        wire:click="closeEvidenceModal"
+                        class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        {{ $evidenceEditMode ? 'Cancel' : 'Close' }}
+                    </button>
+                    @if ($evidenceEditMode)
+                        <button
+                            wire:click="saveEvidenceEdit"
+                            wire:loading.attr="disabled"
+                            wire:target="saveEvidenceEdit"
+                            @disabled(empty($pendingDeleteMediaIds) && empty($newEvidencePhotos))
+                            class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600"
+                        >
+                            <span wire:loading.remove wire:target="saveEvidenceEdit">Save Changes</span>
+                            <span wire:loading wire:target="saveEvidenceEdit">Saving…</span>
+                        </button>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Lightbox gallery — placed AFTER modal card so it renders on top --}}
+            <div
+                x-show="lightbox !== null"
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                class="absolute inset-0 z-20 flex items-center justify-center bg-black/95"
+                @click.self="lightbox = null"
+                @keydown.escape.window="lightbox = null"
+                @keydown.arrow-left.window="if (lightbox !== null) { lightboxIndex = (lightboxIndex - 1 + images.length) % images.length; lightbox = images[lightboxIndex]; }"
+                @keydown.arrow-right.window="if (lightbox !== null) { lightboxIndex = (lightboxIndex + 1) % images.length; lightbox = images[lightboxIndex]; }"
+            >
+                {{-- Close --}}
+                <button @click="lightbox = null" class="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors z-10">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+
+                {{-- Counter --}}
+                <div class="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-white/10 text-white text-xs font-medium z-10" x-text="(lightboxIndex + 1) + ' / ' + images.length"></div>
+
+                {{-- Prev --}}
+                <button
+                    x-show="images.length > 1"
+                    @click.stop="lightboxIndex = (lightboxIndex - 1 + images.length) % images.length; lightbox = images[lightboxIndex]"
+                    class="absolute left-3 p-2.5 rounded-full bg-white/10 hover:bg-white/25 text-white transition-colors z-10"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </button>
+
+                {{-- Image --}}
+                <img :src="images[lightboxIndex]" class="max-h-[85vh] max-w-[80vw] rounded-xl object-contain shadow-2xl" alt="Evidence full view">
+
+                {{-- Next --}}
+                <button
+                    x-show="images.length > 1"
+                    @click.stop="lightboxIndex = (lightboxIndex + 1) % images.length; lightbox = images[lightboxIndex]"
+                    class="absolute right-3 p-2.5 rounded-full bg-white/10 hover:bg-white/25 text-white transition-colors z-10"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+
+                {{-- Dot indicators --}}
+                <div class="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2 z-10" x-show="images.length > 1">
+                    <template x-for="(img, i) in images" :key="i">
+                        <button
+                            @click.stop="lightboxIndex = i; lightbox = images[i]"
+                            :class="i === lightboxIndex ? 'bg-white w-5' : 'bg-white/40 w-2'"
+                            class="h-2 rounded-full transition-all duration-200"
+                        ></button>
+                    </template>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- ── Evidence Upload Modal (Complete Appointment) ──── --}}
+    @if ($showCompleteModal)
+        <div
+            x-data="{ show: false }"
+            x-init="$nextTick(() => show = true)"
+            x-show="show"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            class="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+        >
+            {{-- Backdrop --}}
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" wire:click="closeCompleteModal"></div>
+
+            {{-- Modal card --}}
+            <div
+                x-show="show"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                class="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6"
+                @click.stop
+            >
+                {{-- Header --}}
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/50 text-blue-500 flex items-center justify-center shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12l2 2 4-4M7 21l-4-4 4-4m6 4H3"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-gray-900 dark:text-white">Mark Appointment as Completed</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Upload 1–3 photos as proof the meeting took place.</p>
+                    </div>
+                    <button wire:click="closeCompleteModal" class="ml-auto p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Info banner --}}
+                <div class="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2">
+                    <svg class="w-4 h-4 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0"/>
+                    </svg>
+                    <span>Evidence photos are required before completing. Accepted formats: JPG, PNG, GIF, WebP. Max 5 MB each.</span>
+                </div>
+
+                {{-- Upload area --}}
+                <div class="mb-4">
+                    <label
+                        for="evidence-upload"
+                        class="flex flex-col items-center justify-center w-full h-28 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/40 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
+                        @class(['opacity-50 cursor-not-allowed pointer-events-none' => count($evidencePhotos) >= 3])
+                    >
+                        <svg class="w-8 h-8 text-gray-400 dark:text-gray-500 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                            @if (count($evidencePhotos) >= 3)
+                                Maximum 3 photos reached
+                            @else
+                                Click to upload photos
+                                <span class="font-normal text-xs ml-1">({{ 3 - count($evidencePhotos) }} remaining)</span>
+                            @endif
+                        </span>
+                    </label>
+                    <input
+                        type="file"
+                        id="evidence-upload"
+                        wire:model="evidencePhotos"
+                        accept="image/*"
+                        multiple
+                        class="hidden"
+                    />
+                    @error('evidencePhotos') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
+                    @error('evidencePhotos.*') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                {{-- Uploading indicator --}}
+                <div wire:loading wire:target="evidencePhotos" class="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 mb-3">
+                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    Uploading…
+                </div>
+
+                {{-- Image previews --}}
+                @if (!empty($evidencePhotos))
+                    <div class="grid grid-cols-3 gap-2 mb-5">
+                        @foreach ($evidencePhotos as $i => $photo)
+                            <div class="relative group rounded-xl overflow-hidden aspect-square bg-gray-100 dark:bg-gray-700">
+                                <img
+                                    src="{{ $photo->temporaryUrl() }}"
+                                    class="w-full h-full object-cover"
+                                    alt="Evidence {{ $i + 1 }}"
+                                />
+                                <button
+                                    wire:click="removeEvidencePhoto({{ $i }})"
+                                    type="button"
+                                    class="absolute top-1 right-1 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                                    title="Remove"
+                                >
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                                <div class="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/50 text-white text-[10px] rounded-md">
+                                    {{ $i + 1 }}/3
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                {{-- Actions --}}
+                <div class="flex gap-3 pt-1">
+                    <button
+                        wire:click="closeCompleteModal"
+                        class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        wire:click="submitCompleteAppointment"
+                        wire:loading.attr="disabled"
+                        wire:target="submitCompleteAppointment"
+                        @if (empty($evidencePhotos)) disabled @endif
+                        class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2
+                            {{ !empty($evidencePhotos) ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-300 dark:bg-blue-800 cursor-not-allowed' }}"
+                    >
+                        <span wire:loading.remove wire:target="submitCompleteAppointment">
+                            <svg class="inline w-4 h-4 mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Complete ({{ count($evidencePhotos) }}/3 photos)
+                        </span>
+                        <span wire:loading wire:target="submitCompleteAppointment">Saving…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- ── Confirm Modal ─────────────────────────────────── --}}
     @if ($showConfirmModal)
