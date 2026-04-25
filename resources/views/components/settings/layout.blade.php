@@ -8,6 +8,10 @@
             @endif
             <flux:navlist.item :href="route('appearance.edit')" wire:navigate>{{ __('Appearance') }}</flux:navlist.item>
             <flux:navlist.item :href="route('share-link')" wire:navigate>{{ __('Share Link') }}</flux:navlist.item>
+            @if (auth()->user()->managerLevel && auth()->user()->managerLevel->level >= 2)
+                <flux:navlist.item :href="route('support-group.edit')" wire:navigate>{{ __('Support Group') }}</flux:navlist.item>
+                <flux:navlist.item :href="route('bonchat-server.edit')" wire:navigate>{{ __('Bonchat Server') }}</flux:navlist.item>
+            @endif
             <flux:navlist.item :href="route('reply-to-sir-martin')" wire:navigate>{{ __('Reply to Sir Martin') }}</flux:navlist.item>
         </flux:navlist>
     </div>

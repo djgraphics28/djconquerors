@@ -57,6 +57,7 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
         'support_team',
         'assistant_id',
         'support_group',
+        'bonchat_server',
         'team_id',
         'primary_language',
         'secondary_language',

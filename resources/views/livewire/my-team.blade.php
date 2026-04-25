@@ -61,6 +61,16 @@ new class extends Component {
     public array $selectedUsers = [];
     public bool $selectAll = false;
 
+    // Support Group modal
+    public bool $showSupportGroupModal = false;
+    public ?int $supportGroupUserId = null;
+    public string $supportGroup = '';
+
+    // Bonchat Server modal
+    public bool $showBonchatServerModal = false;
+    public ?int $bonchatServerUserId = null;
+    public string $bonchatServer = '';
+
     // ── Memoization (per-request, shared across computed properties) ──
     private ?array $_teamMemberIds  = null; // [id, ...]
     private ?array $_childrenMap    = null; // [riscoin_id => [child_riscoin_id, ...]]
@@ -502,6 +512,120 @@ new class extends Component {
         $now = now()->toIsoString();
 
         return "Hi Sir Martin\nHere is my application reward request from my investor, {$this->assistantTargetUser?->name}\n\nInviter's Riscoin Account : {$inviterId}\n\nDepositor's Riscoin Account : {$depositorId}\n\nAssister's Riscoin Account: {$assistantId}\n\n";
+    }
+
+    public function openSupportGroupModal(int $userId): void
+    {
+        $this->supportGroupUserId = $userId;
+        $user = User::find($userId);
+        $this->supportGroup = $user?->support_group ?? '';
+        $this->showSupportGroupModal = true;
+    }
+
+    public function closeSupportGroupModal(): void
+    {
+        $this->showSupportGroupModal = false;
+        $this->supportGroupUserId = null;
+        $this->supportGroup = '';
+    }
+
+    public function updateSupportGroup(): void
+    {
+        $this->validate([
+            'supportGroup' => 'nullable|string|max:255',
+        ]);
+
+        $user = User::with('managerLevel')->find($this->supportGroupUserId);
+
+        if (!$user) {
+            session()->flash('error', 'User not found.');
+            $this->closeSupportGroupModal();
+            return;
+        }
+
+        $user->update(['support_group' => $this->supportGroup ?: null]);
+
+        // If manager level >= 2, cascade to direct-line members only.
+        // Stop traversal when a child is also a level 2+ manager (they own their own group).
+        if ($user->managerLevel && $user->managerLevel->level >= 2) {
+            $idsToUpdate = [];
+            $queue = User::where('inviters_code', $user->riscoin_id)
+                ->with('managerLevel')
+                ->whereNull('deleted_at')
+                ->get()
+                ->all();
+
+            while (!empty($queue)) {
+                $next = [];
+                foreach ($queue as $member) {
+                    $idsToUpdate[] = $member->id;
+                    // Don't cascade into a sub-manager's territory
+                    if (!($member->managerLevel && $member->managerLevel->level >= 2)) {
+                        $children = User::where('inviters_code', $member->riscoin_id)
+                            ->with('managerLevel')
+                            ->whereNull('deleted_at')
+                            ->get()
+                            ->all();
+                        $next = array_merge($next, $children);
+                    }
+                }
+                $queue = $next;
+            }
+
+            if (!empty($idsToUpdate)) {
+                User::whereIn('id', $idsToUpdate)->update(['support_group' => $this->supportGroup ?: null]);
+            }
+        }
+
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($user)
+            ->withProperties(['support_group' => $this->supportGroup ?: null])
+            ->log('updated support group');
+
+        $this->closeSupportGroupModal();
+        session()->flash('message', 'Support group updated successfully.');
+    }
+
+    public function openBonchatServerModal(int $userId): void
+    {
+        $this->bonchatServerUserId = $userId;
+        $user = User::find($userId);
+        $this->bonchatServer = $user?->bonchat_server ?? '';
+        $this->showBonchatServerModal = true;
+    }
+
+    public function closeBonchatServerModal(): void
+    {
+        $this->showBonchatServerModal = false;
+        $this->bonchatServerUserId = null;
+        $this->bonchatServer = '';
+    }
+
+    public function updateBonchatServer(): void
+    {
+        $this->validate([
+            'bonchatServer' => 'nullable|string|max:255',
+        ]);
+
+        $user = User::find($this->bonchatServerUserId);
+
+        if (!$user) {
+            session()->flash('error', 'User not found.');
+            $this->closeBonchatServerModal();
+            return;
+        }
+
+        $user->update(['bonchat_server' => $this->bonchatServer ?: null]);
+
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($user)
+            ->withProperties(['bonchat_server' => $this->bonchatServer ?: null])
+            ->log('updated bonchat server');
+
+        $this->closeBonchatServerModal();
+        session()->flash('message', 'Bonchat server updated successfully.');
     }
 
     // Reset filters
@@ -1276,6 +1400,8 @@ new class extends Component {
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Financials</th>
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Status</th>
                             <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Joined</th>
+                            <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">SG</th>
+                            <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Bonchat Server</th>
                             <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap sticky right-0 bg-gray-50 dark:bg-gray-700/60 w-10"></th>
                         </tr>
                     </thead>
@@ -1427,6 +1553,32 @@ new class extends Component {
                                     <div class="text-xs text-gray-400 dark:text-gray-500">{{ $user->age }}</div>
                                 </td>
 
+                                {{-- Support Group --}}
+                                <td class="px-3 py-3 whitespace-nowrap">
+                                    @if ($user->support_group)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                            {{ $user->support_group }}
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                                            Not yet entered
+                                        </span>
+                                    @endif
+                                </td>
+
+                                {{-- Bonchat Server --}}
+                                <td class="px-3 py-3 whitespace-nowrap">
+                                    @if ($user->bonchat_server)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                                            {{ $user->bonchat_server }}
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                                            Not yet entered
+                                        </span>
+                                    @endif
+                                </td>
+
                                 {{-- Actions dropdown --}}
                                 <td class="px-2 py-3 whitespace-nowrap sticky right-0 bg-white dark:bg-gray-800 border-l border-gray-100 dark:border-gray-700/50 w-10">
                                     <div class="relative flex items-center justify-center opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity"
@@ -1460,6 +1612,22 @@ new class extends Component {
                                                     Add Assistant
                                                 </button>
                                             @endif
+
+                                            @can('users.update-support-group')
+                                                <button wire:click="openSupportGroupModal({{ $user->id }})" @click="open = false"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-700 dark:hover:text-teal-300 transition-colors">
+                                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-5-3.87M9 20H4v-2a4 4 0 015-3.87m6-4a4 4 0 11-8 0 4 4 0 018 0zm6-4a3 3 0 11-6 0 3 3 0 016 0zM3 8a3 3 0 116 0 3 3 0 01-6 0z"/></svg>
+                                                    Update Support Group
+                                                </button>
+                                            @endcan
+
+                                            @can('users.update-bonchat-server')
+                                                <button wire:click="openBonchatServerModal({{ $user->id }})" @click="open = false"
+                                                        class="w-full flex items-center gap-2.5 px-3 py-2 text-left text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">
+                                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>
+                                                    Update Bonchat Server
+                                                </button>
+                                            @endcan
 
                                             @can('my-team.view')
                                                 <button wire:click="viewUser({{ $user->id }})" @click="open = false"
@@ -1881,6 +2049,142 @@ new class extends Component {
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Support Group Modal -->
+    <div x-data="{ open: @entangle('showSupportGroupModal') }" x-show="open" x-on:keydown.escape.window="open = false"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <!-- Overlay -->
+        <div x-show="open" x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+            x-on:click="open = false">
+        </div>
+
+        <!-- Modal Box -->
+        <div x-show="open" x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-150"
+            x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+            class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md mx-auto border border-gray-200 dark:border-gray-700">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-5-3.87M9 20H4v-2a4 4 0 015-3.87m6-4a4 4 0 11-8 0 4 4 0 018 0zm6-4a3 3 0 11-6 0 3 3 0 016 0zM3 8a3 3 0 116 0 3 3 0 01-6 0z"/>
+                    </svg>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Update Support Group</h2>
+                </div>
+                <button wire:click="closeSupportGroupModal"
+                    class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="px-6 py-5 space-y-4">
+                <div>
+                    <flux:input wire:model="supportGroup"
+                        label="Support Group"
+                        type="text"
+                        placeholder="Enter support group name..."
+                        autofocus />
+                    @error('supportGroup')
+                        <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                @if ($supportGroupUserId)
+                    @php $sgUser = \App\Models\User::with('managerLevel')->find($supportGroupUserId); @endphp
+                    @if ($sgUser && $sgUser->managerLevel && $sgUser->managerLevel->level >= 2)
+                        <div class="flex items-start gap-2 p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800">
+                            <svg class="w-4 h-4 text-teal-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <p class="text-xs text-teal-700 dark:text-teal-300">
+                                This user is a <strong>Level {{ $sgUser->managerLevel->level }} Manager</strong>. The support group will also be applied to all of their downline members.
+                            </p>
+                        </div>
+                    @endif
+                @endif
+            </div>
+
+            <!-- Footer -->
+            <div class="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                <button type="button" wire:click="closeSupportGroupModal"
+                    class="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    Cancel
+                </button>
+                <button type="button" wire:click="updateSupportGroup"
+                    class="px-4 py-2 text-sm font-medium rounded-lg bg-teal-600 hover:bg-teal-700 text-white transition-colors">
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Bonchat Server Modal -->
+    <div x-data="{ open: @entangle('showBonchatServerModal') }" x-show="open" x-on:keydown.escape.window="open = false"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <!-- Overlay -->
+        <div x-show="open" x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+            x-on:click="open = false">
+        </div>
+
+        <!-- Modal Box -->
+        <div x-show="open" x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100" x-transition:leave="ease-in duration-150"
+            x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+            class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md mx-auto border border-gray-200 dark:border-gray-700">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                    </svg>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Update Bonchat Server</h2>
+                </div>
+                <button wire:click="closeBonchatServerModal"
+                    class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="px-6 py-5 space-y-4">
+                <div>
+                    <flux:input wire:model="bonchatServer"
+                        label="Bonchat Server"
+                        type="text"
+                        placeholder="e.g. Server 1"
+                        autofocus />
+                    @error('bonchatServer')
+                        <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                <button type="button" wire:click="closeBonchatServerModal"
+                    class="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    Cancel
+                </button>
+                <button type="button" wire:click="updateBonchatServer"
+                    class="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+                    Save
+                </button>
             </div>
         </div>
     </div>

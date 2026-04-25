@@ -59,6 +59,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('settings/password', 'settings.password')->name('password.edit');
     Volt::route('settings/appearance', 'settings.appearance')->name('appearance.edit');
     Volt::route('settings/share-link', 'settings.share-link')->name('share-link');
+    Volt::route('settings/support-group', 'settings.support-group')->name('support-group.edit');
+    Volt::route('settings/bonchat-server', 'settings.bonchat-server')->name('bonchat-server.edit');
     Volt::route('settings/reply-to-sir-martin', 'settings.reply-to-sir-martin')->name('reply-to-sir-martin');
 
     Volt::route('managers', 'managers.index')->name('managers.index');

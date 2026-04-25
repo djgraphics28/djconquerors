@@ -35,6 +35,8 @@ class RolesPermissionSeeder extends Seeder
             'users.verify-email',
             'users.promote',
             'users.impersonate',
+            'users.update-support-group',
+            'users.update-bonchat-server',
 
             //Roles
             'roles.view',
