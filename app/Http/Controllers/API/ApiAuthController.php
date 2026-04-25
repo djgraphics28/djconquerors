@@ -3,14 +3,17 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\API\UserResource;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Validator;
 use App\Models\User;
 
 class ApiAuthController extends Controller
 {
-    public function register(Request $request)
+    public function register(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
@@ -47,14 +50,15 @@ class ApiAuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'status' => true,
-            'message' => 'User registered successfully',
-            'data' => $user,
+            'status'       => true,
+            'message'      => 'User registered successfully',
+            'data'         => new UserResource($user),
             'access_token' => $token,
-            'token_type' => 'Bearer'
+            'token_type'   => 'Bearer',
         ], 201);
     }
-    public function login(Request $request)
+
+    public function login(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
@@ -77,33 +81,63 @@ class ApiAuthController extends Controller
         }
 
         $user = User::where('email', $request->email)->firstOrFail();
+
+        // Track last login
+        $user->update([
+            'last_login_at' => now(),
+            'last_login_ip' => $request->ip(),
+        ]);
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'status' => true,
-            'message' => 'Login successful',
-            'data' => $user,
+            'status'       => true,
+            'message'      => 'Login successful',
+            'data'         => new UserResource($user->load(['team', 'managerLevel'])),
             'access_token' => $token,
-            'token_type' => 'Bearer'
+            'token_type'   => 'Bearer',
         ], 200);
     }
 
-    public function logout()
+    public function logout(Request $request): JsonResponse
     {
-        auth()->user()->tokens()->delete();
+        $request->user()->tokens()->delete();
 
         return response()->json([
-            'status' => true,
-            'message' => 'Successfully logged out'
+            'status'  => true,
+            'message' => 'Successfully logged out',
         ], 200);
     }
 
-    public function profile()
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Validation Error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        Password::sendResetLink(['email' => $request->email]);
+
+        // Always return success to prevent email enumeration
+        return response()->json([
+            'status'  => true,
+            'message' => 'If that email exists, a reset link has been sent.',
+        ]);
+    }
+
+    public function profile(Request $request): JsonResponse
     {
         return response()->json([
-            'status' => true,
+            'status'  => true,
             'message' => 'Profile data',
-            'data' => auth()->user()
+            'data'    => new UserResource($request->user()->load(['team', 'managerLevel'])),
         ], 200);
     }
 }

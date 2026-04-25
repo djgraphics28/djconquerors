@@ -356,4 +356,14 @@ class User extends Authenticatable implements MustVerifyEmail , HasMedia {
     {
         return $this->hasMany(CalculatorUsageLog::class);
     }
+
+    /**
+     * Get all support tickets submitted by the user
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class, 'user_id', 'id');
+    }
 }
