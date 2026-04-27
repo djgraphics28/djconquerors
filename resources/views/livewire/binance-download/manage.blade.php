@@ -13,8 +13,10 @@ new class extends Component {
     public $download_url = '';
     public $version = '';
     public $is_active = true;
-    public $logo = null;           // new upload
-    public $currentLogoUrl = null; // existing logo preview
+    public $logo = null;               // new logo upload
+    public $currentLogoUrl = null;     // existing logo preview
+    public $apkFile = null;            // new APK file upload
+    public $currentApkFileName = null; // existing APK filename
     public $editMode = false;
     public $showModal = false;
     public $showDeleteModal = false;
@@ -25,10 +27,11 @@ new class extends Component {
         return [
             'title'        => 'required|string|max:255',
             'description'  => 'nullable|string|max:2000',
-            'download_url' => 'required|url|max:500',
+            'download_url' => 'nullable|url|max:500',
             'version'      => 'nullable|string|max:50',
             'is_active'    => 'boolean',
             'logo'         => 'nullable|image|max:2048',
+            'apkFile'      => 'nullable|file|max:512000',
         ];
     }
 
@@ -53,20 +56,30 @@ new class extends Component {
         $this->download_url   = $apk->download_url;
         $this->version        = $apk->version;
         $this->is_active      = $apk->is_active;
-        $this->currentLogoUrl = $apk->getFirstMediaUrl('logo');
-        $this->logo           = null;
-        $this->editMode       = true;
-        $this->showModal      = true;
+        $this->currentLogoUrl      = $apk->getFirstMediaUrl('logo');
+        $this->logo                = null;
+        $this->currentApkFileName  = $apk->getFirstMedia('apk')?->file_name;
+        $this->apkFile             = null;
+        $this->editMode            = true;
+        $this->showModal           = true;
     }
 
     public function save(): void
     {
         $this->validate();
 
+        // At least one download source is required
+        $hasExistingApk = $this->editMode
+            && BinanceApkDownload::find($this->apkId)?->getFirstMedia('apk');
+        if (!$this->apkFile && !$hasExistingApk && !$this->download_url) {
+            $this->addError('download_url', 'Please provide a Google Drive link or upload an APK file.');
+            return;
+        }
+
         $data = [
             'title'        => $this->title,
             'description'  => $this->description,
-            'download_url' => $this->download_url,
+            'download_url' => $this->download_url ?: null,
             'version'      => $this->version,
             'is_active'    => $this->is_active,
         ];
@@ -80,6 +93,12 @@ new class extends Component {
                     ->usingFileName($this->logo->getClientOriginalName())
                     ->toMediaCollection('logo');
             }
+            if ($this->apkFile) {
+                $apk->clearMediaCollection('apk');
+                $apk->addMedia($this->apkFile->getRealPath())
+                    ->usingFileName($this->apkFile->getClientOriginalName())
+                    ->toMediaCollection('apk');
+            }
             session()->flash('message', 'Download link updated successfully.');
         } else {
             $apk = BinanceApkDownload::create($data);
@@ -87,6 +106,11 @@ new class extends Component {
                 $apk->addMedia($this->logo->getRealPath())
                     ->usingFileName($this->logo->getClientOriginalName())
                     ->toMediaCollection('logo');
+            }
+            if ($this->apkFile) {
+                $apk->addMedia($this->apkFile->getRealPath())
+                    ->usingFileName($this->apkFile->getClientOriginalName())
+                    ->toMediaCollection('apk');
             }
             session()->flash('message', 'Download link created successfully.');
         }
@@ -105,6 +129,7 @@ new class extends Component {
     {
         $apk = BinanceApkDownload::findOrFail($this->apkToDelete);
         $apk->clearMediaCollection('logo');
+        $apk->clearMediaCollection('apk');
         $apk->delete();
         $this->showDeleteModal = false;
         $this->apkToDelete     = null;
@@ -126,8 +151,10 @@ new class extends Component {
         $this->download_url   = '';
         $this->version        = '';
         $this->is_active      = true;
-        $this->logo           = null;
-        $this->currentLogoUrl = null;
+        $this->logo               = null;
+        $this->currentLogoUrl     = null;
+        $this->apkFile            = null;
+        $this->currentApkFileName = null;
         $this->resetErrorBag();
     }
 }; ?>
@@ -172,7 +199,7 @@ new class extends Component {
                     <tr>
                         <th class="px-6 py-3 text-left">Logo</th>
                         <th class="px-6 py-3 text-left">Title / Version</th>
-                        <th class="px-6 py-3 text-left">Download URL</th>
+                        <th class="px-6 py-3 text-left">Download Source</th>
                         <th class="px-6 py-3 text-center">Status</th>
                         <th class="px-6 py-3 text-center">Actions</th>
                     </tr>
@@ -196,10 +223,22 @@ new class extends Component {
                                 @endif
                             </td>
                             <td class="px-6 py-4">
-                                <a href="{{ $apk->download_url }}" target="_blank" rel="noopener noreferrer"
-                                    class="text-blue-500 hover:underline truncate max-w-xs block text-xs">
-                                    {{ $apk->download_url }}
-                                </a>
+                                @if ($apk->getFirstMediaUrl('apk'))
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                        APK Uploaded
+                                    </span>
+                                    @if ($apk->download_url)
+                                        <a href="{{ $apk->download_url }}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline block text-xs mt-1 truncate max-w-xs">Drive link (fallback)</a>
+                                    @endif
+                                @elseif ($apk->download_url)
+                                    <a href="{{ $apk->download_url }}" target="_blank" rel="noopener noreferrer"
+                                        class="text-blue-500 hover:underline truncate max-w-xs block text-xs">
+                                        {{ $apk->download_url }}
+                                    </a>
+                                @else
+                                    <span class="text-xs text-gray-400 dark:text-gray-500 italic">No source set</span>
+                                @endif
                             </td>
                             <td class="px-6 py-4 text-center">
                                 <button wire:click="toggleActive({{ $apk->id }})"
@@ -254,10 +293,61 @@ new class extends Component {
                         <input wire:model="title" type="text" class="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Binance for Android" />
                         @error('title') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Google Drive Download URL</label>
-                        <input wire:model="download_url" type="url" class="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="https://drive.google.com/..." />
-                        @error('download_url') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
+                    <!-- Download Source -->
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Download Source <span class="font-normal text-red-400">*</span></label>
+                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Upload an APK file directly, or provide a Google Drive link. If both are set, the uploaded file takes priority.</p>
+                        </div>
+
+                        <!-- Option 1: Upload APK -->
+                        <div class="border border-gray-200 dark:border-gray-600 rounded-xl p-4 space-y-2">
+                            <p class="text-xs font-semibold text-gray-600 dark:text-gray-400">Option 1 — Upload APK File</p>
+
+                            @if ($editMode && $currentApkFileName && !$apkFile)
+                                <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-3 py-2">
+                                    <svg class="w-4 h-4 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span>Current: <span class="font-medium text-gray-700 dark:text-gray-200">{{ $currentApkFileName }}</span></span>
+                                </div>
+                            @endif
+
+                            @if ($apkFile)
+                                <div class="flex items-center gap-2 text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg px-3 py-2">
+                                    <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <span>Selected: <span class="font-medium">{{ $apkFile->getClientOriginalName() }}</span></span>
+                                </div>
+                            @endif
+
+                            <label class="flex items-center gap-2 cursor-pointer w-fit">
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                                    </svg>
+                                    {{ $apkFile ? 'Change APK file' : 'Choose APK file' }}
+                                </span>
+                                <input type="file" wire:model="apkFile" accept=".apk,application/vnd.android.package-archive" class="hidden">
+                            </label>
+                            @error('apkFile') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1 h-px bg-gray-200 dark:bg-gray-600"></div>
+                            <span class="text-xs text-gray-400 dark:text-gray-500 font-medium">OR</span>
+                            <div class="flex-1 h-px bg-gray-200 dark:bg-gray-600"></div>
+                        </div>
+
+                        <!-- Option 2: Google Drive link -->
+                        <div class="border border-gray-200 dark:border-gray-600 rounded-xl p-4 space-y-2">
+                            <p class="text-xs font-semibold text-gray-600 dark:text-gray-400">Option 2 — Google Drive Link</p>
+                            <input wire:model="download_url" type="url" class="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="https://drive.google.com/file/d/..." />
+                            <p class="text-xs text-gray-400 dark:text-gray-500">Share link must be set to &quot;Anyone with the link&quot;.</p>
+                            @error('download_url') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Version <span class="font-normal text-gray-400">(optional)</span></label>

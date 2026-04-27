@@ -29,6 +29,9 @@ class BinanceApkDownload extends Model implements HasMedia
     {
         $this->addMediaCollection('logo')
             ->singleFile();
+
+        $this->addMediaCollection('apk')
+            ->singleFile();
     }
 
     public function scopeActive($query)

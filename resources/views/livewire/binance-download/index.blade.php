@@ -12,13 +12,22 @@ new class extends Component {
     }
 
     /**
-     * Convert a Google Drive share URL to a direct-download URL.
-     * Supports /file/d/{id}/ and ?id={id} formats.
-     * Falls back to the original URL if it's not a Drive link.
+     * Resolve the best download URL.
+     * Priority: 1) Uploaded APK via Spatie Media Library, 2) Google Drive link (converted to direct download).
      */
     public function directDownloadUrl(): string
     {
+        // Prefer directly uploaded APK file
+        $apkUrl = $this->apk?->getFirstMediaUrl('apk');
+        if ($apkUrl) {
+            return $apkUrl;
+        }
+
         $url = $this->apk?->download_url ?? '';
+
+        if (!$url) {
+            return '#';
+        }
 
         if (preg_match('/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/', $url, $m)) {
             return 'https://drive.google.com/uc?export=download&id=' . $m[1];
