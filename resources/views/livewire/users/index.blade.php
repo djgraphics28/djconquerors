@@ -492,7 +492,7 @@ new class extends Component {
 
     public function getUsersProperty()
     {
-        return User::with(['roles', 'inviter', 'team', 'managerLevel'])
+        return User::with(['roles', 'inviter', 'team', 'managerLevel', 'assistant'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('name', 'like', '%' . $this->search . '%')->orWhere('email', 'like', '%' . $this->search . '%');
@@ -942,6 +942,7 @@ Amount invested: $" .
                                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Avatar</th>
                                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Name</th>
                                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Inviter</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Assister</th>
                                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Email</th>
                                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Age</th>
                                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Riscoin ID</th>
@@ -951,7 +952,7 @@ Amount invested: $" .
                                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Roles</th>
                                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Status</th>
                                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Verified</th>
-                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">SG</th>
+                                <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Support Group</th>
                                 <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">Bonchat Server</th>
                                 <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap sticky right-0 bg-gray-50 dark:bg-gray-700/60 w-10"></th>
                             </tr>
@@ -1004,6 +1005,14 @@ Amount invested: $" .
                                     <td class="px-3 py-3 whitespace-nowrap">
                                         <div class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ $user->inviter->name ?? '—' }}</div>
                                         <button onclick="copyToClipboard('{{ $user->inviter->riscoin_id ?? '' }}')" class="text-xs text-blue-500 dark:text-blue-400 hover:underline font-mono">{{ $user->inviter->riscoin_id ?? '—' }}</button>
+                                    </td>
+                                    <td class="px-3 py-3 whitespace-nowrap">
+                                        @if ($user->assistant)
+                                            <div class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ $user->assistant->name }}</div>
+                                            <button onclick="copyToClipboard('{{ $user->assistant->riscoin_id ?? '' }}')" class="text-xs text-blue-500 dark:text-blue-400 hover:underline font-mono">{{ $user->assistant->riscoin_id ?? '—' }}</button>
+                                        @else
+                                            <span class="text-xs text-gray-400 dark:text-gray-500">—</span>
+                                        @endif
                                     </td>
                                     <td class="px-3 py-3 whitespace-nowrap">
                                         <button onclick="copyToClipboard('{{ $user->email }}')" class="text-xs text-gray-700 dark:text-gray-300 hover:underline">{{ $user->email }}</button>

@@ -13,6 +13,7 @@
                 <flux:navlist.item :href="route('bonchat-server.edit')" wire:navigate>{{ __('Bonchat Server') }}</flux:navlist.item>
             @endif
             <flux:navlist.item :href="route('reply-to-sir-martin')" wire:navigate>{{ __('Reply to Sir Martin') }}</flux:navlist.item>
+            <flux:navlist.item :href="route('adjustment-request.index')" wire:navigate>{{ __('Adjustment Request') }}</flux:navlist.item>
         </flux:navlist>
     </div>
 

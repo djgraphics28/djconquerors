@@ -119,6 +119,11 @@ class RolesPermissionSeeder extends Seeder
             'teams.create',
             'teams.edit',
             'teams.delete',
+
+            // Adjustment Requests
+            'adjustment-requests.view',
+            'adjustment-requests.manage',
+            'adjustment-request.submit',
         ];
 
         foreach ($adminPermissions as $permission) {
@@ -146,6 +151,9 @@ class RolesPermissionSeeder extends Seeder
             // Compound Interest Calculator
             'calculator.view',
             'calculator.access',
+
+            // Adjustment Requests
+            'adjustment-request.submit',
 
         ]);
 

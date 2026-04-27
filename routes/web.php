@@ -62,6 +62,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Volt::route('settings/support-group', 'settings.support-group')->name('support-group.edit');
     Volt::route('settings/bonchat-server', 'settings.bonchat-server')->name('bonchat-server.edit');
     Volt::route('settings/reply-to-sir-martin', 'settings.reply-to-sir-martin')->name('reply-to-sir-martin');
+    Volt::route('settings/adjustment-request', 'settings.adjustment-request')->name('adjustment-request.index');
+
+    Volt::route('adjustment-requests', 'adjustment-requests')->name('adjustment-requests.index');
 
     Volt::route('managers', 'managers.index')->name('managers.index');
 
