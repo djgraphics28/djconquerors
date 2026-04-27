@@ -275,9 +275,9 @@ new class extends Component {
 
     <!-- Create / Edit Modal -->
     @if ($showModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg">
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg my-auto flex flex-col max-h-[90vh]">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
                     <h2 class="text-base font-bold text-gray-900 dark:text-white">
                         {{ $editMode ? 'Edit Download Link' : 'Add Download Link' }}
                     </h2>
@@ -287,7 +287,7 @@ new class extends Component {
                         </svg>
                     </button>
                 </div>
-                <form wire:submit.prevent="save" class="px-6 py-5 space-y-4">
+                <form wire:submit.prevent="save" class="px-6 py-5 space-y-4 overflow-y-auto flex-1">
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Title</label>
                         <input wire:model="title" type="text" class="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Binance for Android" />
