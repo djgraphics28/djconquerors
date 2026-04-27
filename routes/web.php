@@ -132,6 +132,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Riscoin Links Management (Admin Only)
     Volt::route('riscoin-links', 'riscoin-links.index')->name('riscoin-links.index')->middleware('can:riscoin-links.manage');
 
+    // Binance APK Download (all authenticated users)
+    Volt::route('binance-download', 'binance-download.index')->name('binance-download.index');
+    // Binance APK Download Management (Admin only)
+    Volt::route('binance-download/manage', 'binance-download.manage')->name('binance-download.manage')->middleware('can:binance-download.manage');
+
     Volt::route('settings/two-factor', 'settings.two-factor')
         ->middleware(
             when(
