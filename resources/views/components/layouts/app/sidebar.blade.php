@@ -198,12 +198,12 @@
 
                 @auth
                     <flux:navlist.item icon="arrow-down-tray" :href="route('binance-download.index')"
-                        :current="request()->routeIs('binance-download.index')" wire:navigate>{{ __('Download Binance') }}
+                        :current="request()->routeIs('binance-download.index')" wire:navigate>{{ __('Download APKs') }}
                     </flux:navlist.item>
                 @endauth
                 @can('binance-download.manage')
                     <flux:navlist.item icon="device-phone-mobile" :href="route('binance-download.manage')"
-                        :current="request()->routeIs('binance-download.manage')" wire:navigate>{{ __('Manage Binance APK') }}
+                        :current="request()->routeIs('binance-download.manage')" wire:navigate>{{ __('Manage APK') }}
                     </flux:navlist.item>
                 @endcan
 

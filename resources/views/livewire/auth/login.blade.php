@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Models\BinanceApkDownload;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -21,6 +22,42 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $password = '';
 
     public bool $remember = false;
+
+    public function getApksProperty()
+    {
+        return BinanceApkDownload::active()
+            ->orderByRaw("FIELD(app_type, 'binance', 'okx', 'bitget', 'other')")
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    public function directDownloadUrl(?BinanceApkDownload $apk): string
+    {
+        if (!$apk) {
+            return '#';
+        }
+
+        $apkUrl = $apk->getFirstMediaUrl('apk');
+        if ($apkUrl) {
+            return $apkUrl;
+        }
+
+        $url = $apk->download_url ?? '';
+
+        if (!$url) {
+            return '#';
+        }
+
+        if (preg_match('/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/', $url, $m)) {
+            return 'https://drive.google.com/uc?export=download&id=' . $m[1];
+        }
+
+        if (preg_match('/[?&]id=([a-zA-Z0-9_-]+)/', $url, $m)) {
+            return 'https://drive.google.com/uc?export=download&id=' . $m[1];
+        }
+
+        return $url;
+    }
 
     /**
      * Handle an incoming authentication request.
@@ -145,6 +182,44 @@ new #[Layout('components.layouts.auth')] class extends Component {
         <div class="space-x-1 text-sm text-center rtl:space-x-reverse text-zinc-600 dark:text-zinc-400">
             <span>{{ __('Don\'t have an account?') }}</span>
             <flux:link :href="route('register')" wire:navigate>{{ __('Sign up') }}</flux:link>
+        </div>
+    @endif
+
+    @if ($this->apks->isNotEmpty())
+        <!-- APK Downloads for New Users -->
+        <div class="mt-2 pt-5 border-t border-zinc-200 dark:border-zinc-700">
+            <p class="text-xs font-semibold text-center text-zinc-500 dark:text-zinc-400 mb-3 flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                </svg>
+                Download Trading Apps (Android)
+            </p>
+            <div class="flex flex-col gap-2">
+                @foreach ($this->apks as $apk)
+                    @php
+                        $btnStyle = match($apk->app_type) {
+                            'binance' => 'bg-yellow-400 hover:bg-yellow-500 text-black',
+                            'okx'     => 'bg-gray-800 hover:bg-gray-900 text-white dark:bg-gray-700 dark:hover:bg-gray-600',
+                            'bitget'  => 'bg-teal-500 hover:bg-teal-600 text-white',
+                            default   => 'bg-purple-500 hover:bg-purple-600 text-white',
+                        };
+                        $downloadUrl = $this->directDownloadUrl($apk);
+                    @endphp
+                    @if ($downloadUrl !== '#')
+                        <a href="{{ $downloadUrl }}"
+                            class="inline-flex items-center justify-center gap-2 {{ $btnStyle }} font-semibold px-4 py-2 rounded-xl transition-colors duration-150 text-xs w-full">
+                            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                            {{ $apk->title }}
+                            @if ($apk->version)
+                                <span class="opacity-70">v{{ $apk->version }}</span>
+                            @endif
+                        </a>
+                    @endif
+                @endforeach
+            </div>
+            <p class="text-[10px] text-center text-zinc-400 dark:text-zinc-500 mt-2">Android only &bull; Free download</p>
         </div>
     @endif
 </div>

@@ -14,12 +14,25 @@ class BinanceApkDownload extends Model implements HasMedia
     use HasFactory, LogsActivity, InteractsWithMedia;
 
     protected $fillable = [
+        'app_type',
         'title',
         'description',
         'download_url',
         'version',
         'is_active',
     ];
+
+    public static array $appTypes = [
+        'binance' => 'Binance',
+        'okx'     => 'OKX',
+        'bitget'  => 'Bitget',
+        'other'   => 'Other',
+    ];
+
+    public function getAppLabelAttribute(): string
+    {
+        return self::$appTypes[$this->app_type] ?? ucfirst($this->app_type);
+    }
 
     protected $casts = [
         'is_active' => 'boolean',
@@ -42,7 +55,7 @@ class BinanceApkDownload extends Model implements HasMedia
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['title', 'description', 'download_url', 'version', 'is_active'])
+            ->logOnly(['app_type', 'title', 'description', 'download_url', 'version', 'is_active'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }

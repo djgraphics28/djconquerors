@@ -8,6 +8,7 @@ new class extends Component {
     use WithFileUploads;
 
     public $apkId;
+    public $app_type = 'binance';
     public $title = '';
     public $description = '';
     public $download_url = '';
@@ -25,6 +26,7 @@ new class extends Component {
     public function rules(): array
     {
         return [
+            'app_type'     => 'required|in:binance,okx,bitget,other',
             'title'        => 'required|string|max:255',
             'description'  => 'nullable|string|max:2000',
             'download_url' => 'nullable|url|max:500',
@@ -51,6 +53,7 @@ new class extends Component {
     {
         $apk = BinanceApkDownload::findOrFail($id);
         $this->apkId          = $id;
+        $this->app_type       = $apk->app_type ?? 'binance';
         $this->title          = $apk->title;
         $this->description    = $apk->description;
         $this->download_url   = $apk->download_url;
@@ -77,6 +80,7 @@ new class extends Component {
         }
 
         $data = [
+            'app_type'     => $this->app_type,
             'title'        => $this->title,
             'description'  => $this->description,
             'download_url' => $this->download_url ?: null,
@@ -146,7 +150,8 @@ new class extends Component {
     private function resetForm(): void
     {
         $this->apkId          = null;
-        $this->title          = 'Binance for Android';
+        $this->app_type       = 'binance';
+        $this->title          = '';
         $this->description    = '';
         $this->download_url   = '';
         $this->version        = '';
@@ -163,8 +168,8 @@ new class extends Component {
     <!-- Page Header -->
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-xl font-bold text-gray-900 dark:text-white">Binance APK Downloads</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage the Binance Android APK download links shown to members.</p>
+            <h1 class="text-xl font-bold text-gray-900 dark:text-white">Manage APK Downloads</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage Android APK download links for Binance, OKX, Bitget, and other apps.</p>
         </div>
         <button wire:click="openCreate"
             class="inline-flex items-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold px-4 py-2 rounded-xl transition-colors duration-150 text-sm">
@@ -198,6 +203,7 @@ new class extends Component {
                 <thead class="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase text-gray-500 dark:text-gray-400">
                     <tr>
                         <th class="px-6 py-3 text-left">Logo</th>
+                        <th class="px-6 py-3 text-left">App</th>
                         <th class="px-6 py-3 text-left">Title / Version</th>
                         <th class="px-6 py-3 text-left">Download Source</th>
                         <th class="px-6 py-3 text-center">Status</th>
@@ -215,6 +221,17 @@ new class extends Component {
                                         <svg class="w-5 h-5 text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                     </div>
                                 @endif
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                    {{ match($apk->app_type) {
+                                        'binance' => 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
+                                        'okx'     => 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
+                                        'bitget'  => 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300',
+                                        default   => 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
+                                    } }}">
+                                    {{ $apk->app_label }}
+                                </span>
                             </td>
                             <td class="px-6 py-4">
                                 <p class="font-medium text-gray-900 dark:text-white">{{ $apk->title }}</p>
@@ -288,6 +305,16 @@ new class extends Component {
                     </button>
                 </div>
                 <form wire:submit.prevent="save" class="px-6 py-5 space-y-4 overflow-y-auto flex-1">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">App Type</label>
+                        <select wire:model="app_type" class="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                            <option value="binance">Binance</option>
+                            <option value="okx">OKX</option>
+                            <option value="bitget">Bitget</option>
+                            <option value="other">Other</option>
+                        </select>
+                        @error('app_type') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
+                    </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Title</label>
                         <input wire:model="title" type="text" class="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Binance for Android" />
