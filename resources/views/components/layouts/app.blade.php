@@ -8,6 +8,6 @@
     <!-- New Investor Reminder -->
     @auth
         <livewire:widget.reminder-for-new-investors />
-        <livewire:widget.chatbot />
+        {{-- <livewire:widget.chatbot /> --}}
     @endauth
 </x-layouts.app.sidebar>
